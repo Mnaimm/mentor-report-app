@@ -1,18 +1,16 @@
 // pages/api/get-mentee-mapping.js
 import { google } from 'googleapis';
-
- 
-
-
 export default async function handler(req, res) {
-   console.log("✅ Loaded API using PRIVATE_KEY_BASE64"); // ✅ Debug line
   try {
-    const spreadsheetId = process.env.GOOGLE_SHEETS_MAPPING_ID;
-    const sheetName = process.env.MAPPING_SHEET_NAME || 'mapping';
+    // Decode the full credentials from a single Base64 string
+    const credentialsJson = Buffer.from(process.env.GOOGLE_CREDENTIALS_BASE64, 'base64').toString('ascii');
+    const credentials = JSON.parse(credentialsJson);
 
-    if (!process.env.GOOGLE_SHEETS_CLIENT_EMAIL || !process.env.GOOGLE_SHEETS_PRIVATE_KEY_BASE64 || !spreadsheetId) {
-        return res.status(500).json({ error: 'Server configuration error: Missing environment variables.' });
-    }
+    const auth = new google.auth.GoogleAuth({
+      credentials, // Use the entire credentials object
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    });
+
 
     const auth = new google.auth.GoogleAuth({
       credentials: {
