@@ -1,12 +1,14 @@
 import { google } from 'googleapis';
 
 export default async function handler(req, res) {
-  console.log("✅ Loaded API using PRIVATE_KEY_BASE64"); // ✅ Debug line
   try {
+    // Decode the private key from Base64
+    const privateKey = Buffer.from(process.env.GOOGLE_SHEETS_PRIVATE_KEY_BASE64, 'base64').toString('ascii');
+
     const auth = new google.auth.GoogleAuth({
       credentials: {
         client_email: process.env.GOOGLE_SHEETS_CLIENT_EMAIL,
-        private_key: Buffer.from(process.env.GOOGLE_SHEETS_PRIVATE_KEY_BASE64, 'base64').toString('utf-8'),
+        private_key: privateKey,
       },
       scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     });
@@ -14,7 +16,7 @@ export default async function handler(req, res) {
     const sheets = google.sheets({ version: 'v4', auth });
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.GOOGLE_SHEETS_BANK_ID,
-      range: 'Bank!A:E',
+      range: 'Bank!A:E', 
     });
 
     const rows = response.data.values;
@@ -32,6 +34,6 @@ export default async function handler(req, res) {
     res.status(200).json(data);
   } catch (error) {
     console.error("❌ Error in /api/framework:", error);
-    res.status(500).json({ error: 'Failed to fetch framework data', details: error.message });
+    res.status(500).json({ error: 'Failed to fetch framework data' });
   }
 }
