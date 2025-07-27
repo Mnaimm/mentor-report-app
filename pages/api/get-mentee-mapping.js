@@ -6,7 +6,7 @@ export default async function handler(req, res) {
     // 1. Decode the full credentials from a single Base64 string (Correct Method)
     const credentialsJson = Buffer.from(process.env.GOOGLE_CREDENTIALS_BASE64, 'base64').toString('ascii');
     const credentials = JSON.parse(credentialsJson);
-
+credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
     // 2. Authenticate using the full credentials object
     const auth = new google.auth.GoogleAuth({
       credentials,
