@@ -122,26 +122,38 @@ export default function UpwardMobilityPage() {
   const [submitMessage, setSubmitMessage] = useState('');
 
   // --- Data Fetching ---
-  useEffect(() => {
-    setIsLoading(true);
-    fetch('/api/mapping')
-      .then(res => res.json())
-      .then(data => {
-        if (data && Array.isArray(data)) {
-            setMappingData(data);
-            const uniqueBatches = [...new Set(data.map(item => item.batch))];
-            setBatches(uniqueBatches);
-        } else {
-            setSubmitMessage("Error: Mapping data is not in expected format.");
-        }
-        setIsLoading(false);
-      })
-      .catch(error => {
-        console.error("Failed to fetch mapping data", error);
-        setSubmitMessage("Failed to load critical mapping data. Please refresh.");
-        setIsLoading(false);
-      });
-  }, []);
+useEffect(() => {
+  setIsLoading(true);
+  fetch('/api/mapping')
+    .then(res => res.json())
+    .then(data => {
+      if (data && Array.isArray(data)) {
+        // Normalize key names to lowercase camelCase
+        const normalized = data.map(item => ({
+          batch: item.Batch,
+          zon: item.Zon,
+          mentor: item.Mentor,
+          mentee: item.Usahawan,
+          namaSyarikat: item.Nama_Syarikat,
+          alamat: item.Alamat,
+          noTelefon: item.No_Tel,
+        }));
+        setMappingData(normalized);
+
+        const uniqueBatches = [...new Set(normalized.map(item => item.batch))];
+        setBatches(uniqueBatches);
+      } else {
+        setSubmitMessage("Error: Mapping data is not in expected format.");
+      }
+      setIsLoading(false);
+    })
+    .catch(error => {
+      console.error("Failed to fetch mapping data", error);
+      setSubmitMessage("Failed to load critical mapping data. Please refresh.");
+      setIsLoading(false);
+    });
+}, []);
+
 
   // --- Cascading Dropdown Logic ---
   const handleBatchChange = (e) => {
