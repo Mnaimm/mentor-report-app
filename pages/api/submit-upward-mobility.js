@@ -9,13 +9,15 @@ export default async function handler(req, res) {
   try {
     const formData = req.body;
 
-    const auth = new google.auth.GoogleAuth({
-      credentials: {
-        client_email: process.env.GOOGLE_SHEETS_CLIENT_EMAIL,
-        private_key: process.env.GOOGLE_SHEETS_PRIVATE_KEY.replace(/\\n/g, '\n'),
-      },
-      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-    });
+const credentialsJson = Buffer.from(process.env.GOOGLE_CREDENTIALS_BASE64, 'base64').toString('ascii');
+const credentials = JSON.parse(credentialsJson);
+credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+
+const auth = new google.auth.GoogleAuth({
+  credentials,
+  scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+});
+
 
     const sheets = google.sheets({ version: 'v4', auth });
 
