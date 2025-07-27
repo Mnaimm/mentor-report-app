@@ -234,9 +234,7 @@ export default function MentorReportPage() {
             <p className="text-gray-500 mt-1">Versi 10 - Laporan Berterusan</p>
             <div className="flex justify-center items-center space-x-6 mt-6 border-t pt-6">
                 <img src="/logo1.png" alt="Sadaqa" className="h-10 sm:h-12" onError={(e) => { e.target.style.display = 'none'; }}/>
-                <img src="/logo2.png" alt="Bank Islam" className="h-10 sm:h-12" onError={(e) => { e.target.style.display = 'none'; }}/>
-                <img src="/logo3.png" alt="iTekad" className="h-10 sm:h-12" onError={(e) => { e.target.style.display = 'none'; }}/>
-                <img src="/logo4.png" alt="StartLah" className="h-10 sm:h-12" onError={(e) => { e.target.style.display = 'none'; }}/>
+              
             </div>
         </header>
 
