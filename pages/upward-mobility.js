@@ -124,7 +124,7 @@ export default function UpwardMobilityPage() {
   // --- Data Fetching ---
   useEffect(() => {
     setIsLoading(true);
-    fetch('/api/get-mentee-mapping')
+    fetch('/api/mapping')
       .then(res => res.json())
       .then(data => {
         if (data && Array.isArray(data)) {
