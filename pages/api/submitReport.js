@@ -6,14 +6,12 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Decode the private key from Base64
-    const privateKey = Buffer.from(process.env.GOOGLE_SHEETS_PRIVATE_KEY_BASE64, 'base64').toString('ascii');
+    // Decode the full credentials from a single Base64 string
+    const credentialsJson = Buffer.from(process.env.GOOGLE_CREDENTIALS_BASE64, 'base64').toString('ascii');
+    const credentials = JSON.parse(credentialsJson);
 
     const auth = new google.auth.GoogleAuth({
-      credentials: {
-        client_email: process.env.GOOGLE_SHEETS_CLIENT_EMAIL,
-        private_key: privateKey,
-      },
+      credentials, // Use the entire credentials object
       scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     });
 
