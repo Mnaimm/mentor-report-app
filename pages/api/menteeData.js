@@ -2,57 +2,38 @@ import { google } from 'googleapis';
 
 export default async function handler(req, res) {
   try {
-    const { name } = req.query;
-    if (!name) {
-      return res.status(400).json({ error: 'Mentee name is required' });
-    }
+    // Decode the private key from Base64
+    const privateKey = Buffer.from(process.env.GOOGLE_SHEETS_PRIVATE_KEY_BASE64, 'base64').toString('ascii');
 
     const auth = new google.auth.GoogleAuth({
       credentials: {
         client_email: process.env.GOOGLE_SHEETS_CLIENT_EMAIL,
-        private_key: Buffer.from(process.env.GOOGLE_SHEETS_PRIVATE_KEY_BASE64, 'base64').toString('utf-8'),
+        private_key: privateKey,
       },
       scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     });
 
     const sheets = google.sheets({ version: 'v4', auth });
     const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: process.env.GOOGLE_SHEETS_REPORT_ID,
-      range: 'V8!A:AK', 
+      spreadsheetId: process.env.GOOGLE_SHEETS_BANK_ID,
+      range: 'Bank!A:E', 
     });
 
     const rows = response.data.values;
-    if (!rows || rows.length < 2) {
-      return res.status(200).json(null);
+    if (!rows || rows.length === 0) {
+      return res.status(200).json([]);
     }
 
-    // **CHANGE**: Nama Usahawan is now in Column G (index 6)
-    const menteeRows = rows.slice(1).filter(row => row[6] === name);
-    if (menteeRows.length === 0) {
-      return res.status(200).json(null);
-    }
-
-    const latestRow = menteeRows[menteeRows.length - 1];
-    
-    const previousDecisions = [];
-    // **CHANGE**: Updated indices for previous decisions based on the new structure
-    for (let i = 0; i < 4; i++) {
-        const keputusan = latestRow[13 + (i * 3)]; // Starts at N
-        const tindakan = latestRow[14 + (i * 3)]; // Starts at O
-        if (keputusan && tindakan) {
-            previousDecisions.push({ keputusan, tindakan });
-        }
-    }
-
-    const data = {
-      // **CHANGE**: Sesi Laporan is now in Column C (index 2)
-      Sesi_Laporan: latestRow[2], 
-      previousDecisions: previousDecisions,
-    };
+    const data = rows.slice(1).map(row => ({
+      Focus_Area: row[0],
+      Keputusan: row[1],
+      Tindakan_1: row[2],
+      Tindakan_2: row[3] || '',
+    }));
 
     res.status(200).json(data);
   } catch (error) {
-    console.error("Error in /api/menteeData:", error);
-    res.status(500).json({ error: 'Failed to fetch mentee data' });
+    console.error("❌ Error in /api/framework:", error);
+    res.status(500).json({ error: 'Failed to fetch framework data' });
   }
 }
