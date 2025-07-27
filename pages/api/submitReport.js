@@ -6,10 +6,13 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Decode the private key from Base64
+    const privateKey = Buffer.from(process.env.GOOGLE_SHEETS_PRIVATE_KEY_BASE64, 'base64').toString('ascii');
+
     const auth = new google.auth.GoogleAuth({
       credentials: {
         client_email: process.env.GOOGLE_SHEETS_CLIENT_EMAIL,
-        private_key: Buffer.from(process.env.GOOGLE_SHEETS_PRIVATE_KEY_BASE64, 'base64').toString('utf-8'),
+        private_key: privateKey,
       },
       scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     });
@@ -23,7 +26,6 @@ export default async function handler(req, res) {
 
     await sheets.spreadsheets.values.append({
       spreadsheetId: process.env.GOOGLE_SHEETS_REPORT_ID,
-      // Menggunakan nama helaian yang betul untuk menambah data
       range: 'V8!A1', 
       valueInputOption: 'RAW',
       resource: {
@@ -33,7 +35,7 @@ export default async function handler(req, res) {
 
     res.status(200).json({ success: true });
   } catch (error) {
-    console.error("Error submitting to Google Sheets:", error.response ? error.response.data : error.message);
+    console.error("❌ Error in /api/submitReport:", error);
     res.status(500).json({ error: 'Failed to submit report' });
   }
 }
