@@ -1,5 +1,20 @@
 import { google } from 'googleapis';
 
+
+export default async function handler(req, res) {
+  console.log("✅ Loaded API using PRIVATE_KEY_BASE64"); // ✅ Debug line
+
+  try {
+    const auth = new google.auth.GoogleAuth({
+      credentials: {
+        client_email: process.env.GOOGLE_SHEETS_CLIENT_EMAIL,
+        private_key: Buffer.from(process.env.GOOGLE_SHEETS_PRIVATE_KEY_BASE64, 'base64').toString('utf-8'),
+      },
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    });
+
+    // ... rest of your code ...
+
 export default async function handler(req, res) {
   try {
     const auth = new google.auth.GoogleAuth({
