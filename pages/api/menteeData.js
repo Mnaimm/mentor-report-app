@@ -7,6 +7,12 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Mentee name is required' });
     }
 
+    // **FIX**: Add a check to ensure the environment variable is loaded.
+    if (!process.env.GOOGLE_CREDENTIALS_BASE64) {
+      console.error("❌ FATAL ERROR: GOOGLE_CREDENTIALS_BASE64 environment variable not found on the server.");
+      return res.status(500).json({ error: 'Server configuration error. Secret key is missing.' });
+    }
+
     // Decode the full credentials from a single Base64 string
     const credentialsJson = Buffer.from(process.env.GOOGLE_CREDENTIALS_BASE64, 'base64').toString('ascii');
     const credentials = JSON.parse(credentialsJson);
@@ -50,7 +56,7 @@ export default async function handler(req, res) {
       previousDecisions: previousDecisions,
     };
 
-    // **FIX**: Add cache-control headers to prevent Vercel from caching the result
+    // Add cache-control headers to prevent Vercel from caching the result
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
@@ -58,6 +64,6 @@ export default async function handler(req, res) {
     res.status(200).json(data);
   } catch (error) {
     console.error("❌ Error in /api/menteeData:", error);
-    res.status(500).json({ error: 'Failed to fetch mentee data' });
+    res.status(500).json({ error: 'Failed to fetch mentee data', details: error.message });
   }
 }
