@@ -33,8 +33,8 @@ export default async function handler(req, res) {
       return res.status(200).json(null);
     }
 
-    // Nama Usahawan is in Column G (index 6)
-    const menteeRows = rows.slice(1).filter(row => row[6] === name);
+    // **FINAL FIX**: Add a check to ensure the row exists before filtering. This prevents crashes from empty rows.
+    const menteeRows = rows.slice(1).filter(row => row && row[6] === name);
     if (menteeRows.length === 0) {
       return res.status(200).json(null);
     }
