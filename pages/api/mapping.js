@@ -12,10 +12,9 @@ export default async function handler(req, res) {
 
     const sheets = google.sheets({ version: 'v4', auth });
     
-    // Fetch the mentor-mentee mapping data
     const mappingResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.GOOGLE_SHEETS_MAPPING_ID,
-      range: 'mapping!A:K', // Read all relevant columns
+      range: 'mapping!A:K',
     });
     const mappingRows = mappingResponse.data.values;
 
@@ -23,40 +22,39 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'No data found in mapping sheet.' });
     }
 
-    // Fetch the report data to check for MIA status
     const reportResponse = await sheets.spreadsheets.values.get({
         spreadsheetId: process.env.GOOGLE_SHEETS_REPORT_ID,
-        range: 'V8!C:H', // Column C for Status, Column H for Mentee Name
+        range: 'V8!C:H',
     });
     const reportRows = reportResponse.data.values || [];
 
-    // Create a lookup map of mentees who are marked as MIA
     const menteeStatus = {};
     if (reportRows.length > 1) {
         reportRows.slice(1).forEach(row => {
             const status = row[0];
             const menteeName = row[5];
             if (menteeName) {
-                // Only store the latest status
                 menteeStatus[menteeName] = status;
             }
         });
     }
 
-    // Filter out mentees who have a status of 'MIA'
     const activeMenteesData = mappingRows.slice(1).filter(row => {
-        const menteeName = row[4]; // Mentee name is in Column E
+        // Use the personal name from Column E for the MIA check
+        const menteeName = row[4]; 
         return menteeStatus[menteeName] !== 'MIA';
     });
 
-    // Map the rows to a clean JSON object
+    // --- THIS IS THE CORRECTED MAPPING ---
     const data = activeMenteesData.map(row => ({
       Batch: row[0] || '',
       Zon: row[1] || '',
       Mentor: row[2] || '',
       Mentor_Email: row[3] || '',
-      Usahawan: row[4] || '',
-      Nama_Syarikat: row[5] || '',
+      // Correctly assign the personal name from Column E to 'Usahawan'
+      Usahawan: row[4] || '', 
+      // Correctly assign the company name from Column F to 'Nama_Syarikat'
+      Nama_Syarikat: row[5] || '', 
       Alamat: row[6] || '',
       No_Tel: row[7] || 'N/A',
       Folder_ID: row[8] || '',
