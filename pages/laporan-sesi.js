@@ -9,7 +9,7 @@ const SelectField = ({ label, value, onChange, children, required = true, disabl
 const TextArea = ({ label, value, onChange, placeholder, rows = 4, required = true }) => ( <div><label className="block text-sm font-medium text-gray-700 mb-1">{label}{required && <span className="text-red-500">*</span>}</label><textarea value={value} onChange={onChange} placeholder={placeholder} rows={rows} required={required} className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"/></div> );
 const FileInput = ({ label, multiple = false, onChange, required = false }) => ( <div><label className="block text-sm font-medium text-gray-700 mb-1">{label}{required && <span className="text-red-500">*</span>}</label><input type="file" multiple={multiple} onChange={onChange} required={required} className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" /></div> );
 const InfoCard = ({ companyName, address, phone }) => ( <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg text-sm"><h3 className="text-base font-bold text-gray-800 mb-2">Maklumat Usahawan</h3><p><strong>Syarikat:</strong> {companyName || 'N/A'}</p><p><strong>Alamat:</strong> {address || 'N/A'}</p><p><strong>No. Tel:</strong> {phone || 'N/A'}</p></div> );
-
+//new update 
 // --- Main Page Component ---
 export default function LaporanSesiPage() {
   const { data: session, status } = useSession();
