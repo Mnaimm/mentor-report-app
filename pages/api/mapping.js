@@ -47,6 +47,7 @@ export default async function handler(req, res) {
 
     // --- THIS IS THE CORRECTED MAPPING ---
     const data = activeMenteesData.map(row => ({
+      console.log('ROW DEBUG:', row);
       Batch: row[0] || '',
       Zon: row[1] || '',
       Mentor: row[2] || '',
