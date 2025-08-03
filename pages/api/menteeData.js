@@ -7,61 +7,73 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Mentee name is required' });
     }
 
-    // **FIX**: Add a check to ensure the environment variable is loaded.
-    if (!process.env.GOOGLE_CREDENTIALS_BASE64) {
-      console.error("❌ FATAL ERROR: GOOGLE_CREDENTIALS_BASE64 environment variable not found on the server.");
-      return res.status(500).json({ error: 'Server configuration error. Secret key is missing.' });
-    }
-
-    // Decode the full credentials from a single Base64 string
     const credentialsJson = Buffer.from(process.env.GOOGLE_CREDENTIALS_BASE64, 'base64').toString('ascii');
     const credentials = JSON.parse(credentialsJson);
 
     const auth = new google.auth.GoogleAuth({
-      credentials, // Use the entire credentials object
+      credentials,
       scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
     });
 
     const sheets = google.sheets({ version: 'v4', auth });
+    
+    // Widen the range to fetch all necessary columns for history
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.GOOGLE_SHEETS_REPORT_ID,
-      range: 'V8!A:AK', 
+      range: 'V8!C:AM', 
     });
+
+    res.setHeader('Cache-Control', 'no-store');
 
     const rows = response.data.values;
     if (!rows || rows.length < 2) {
-      return res.status(200).json(null);
+      return res.status(200).json({ lastSession: 0, status: '', previousSales: [], previousInisiatif: [] });
     }
 
-    // **FINAL FIX**: Add a check to ensure the row exists before filtering. This prevents crashes from empty rows.
-    const menteeRows = rows.slice(1).filter(row => row && row[6] === name);
-    if (menteeRows.length === 0) {
-      return res.status(200).json(null);
-    }
-
-    const latestRow = menteeRows[menteeRows.length - 1];
+    const menteeRows = rows.slice(1).filter(row => row && row[5] === name); // Column H is index 5 in this range
     
-    const previousDecisions = [];
-    // Keputusan starts at Column N (index 13), Cadangan at O (index 14)
+    if (menteeRows.length === 0) {
+        return res.status(200).json({ lastSession: 0, status: '', previousSales: [], previousInisiatif: [] });
+    }
+
+    // Find the row with the highest session number
+    let latestRow = null;
+    let lastSession = 0;
+    menteeRows.forEach(row => {
+        const sessionMatch = row[1].match(/#(\d+)/); // Column D is index 1
+        if (sessionMatch) {
+            const sessionNum = parseInt(sessionMatch[1], 10);
+            if (sessionNum >= lastSession) {
+                lastSession = sessionNum;
+                latestRow = row;
+            }
+        }
+    });
+
+    if (!latestRow) {
+        return res.status(200).json({ lastSession: 0, status: '', previousSales: [], previousInisiatif: [] });
+    }
+
+    // Extract previous sales data (Columns AB to AM)
+    const previousSales = latestRow.slice(25, 37) || Array(12).fill('');
+
+    // Extract previous initiatives (Columns P to AA)
+    const previousInisiatif = [];
     for (let i = 0; i < 4; i++) {
-        const keputusan = latestRow[13 + (i * 3)];
-        const tindakan = latestRow[14 + (i * 3)];
-        if (keputusan && tindakan) {
-            previousDecisions.push({ keputusan, tindakan });
+        const offset = 13 + (i * 3); // Starts at Column P (index 13)
+        if (latestRow[offset] && latestRow[offset+1]) {
+            previousInisiatif.push({
+                focusArea: latestRow[offset],
+                keputusan: latestRow[offset + 1],
+                pelanTindakan: latestRow[offset + 2] || '',
+            });
         }
     }
+    
+    const status = latestRow[0]; // Column C is index 0
 
-    const data = {
-      Sesi_Laporan: latestRow[2], // Sesi Laporan is in Column C (index 2)
-      previousDecisions: previousDecisions,
-    };
+    res.status(200).json({ lastSession, status, previousSales, previousInisiatif });
 
-    // Add cache-control headers to prevent Vercel from caching the result
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-
-    res.status(200).json(data);
   } catch (error) {
     console.error("❌ Error in /api/menteeData:", error);
     res.status(500).json({ error: 'Failed to fetch mentee data', details: error.message });
