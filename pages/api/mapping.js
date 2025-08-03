@@ -46,21 +46,23 @@ export default async function handler(req, res) {
     });
 
     // --- THIS IS THE CORRECTED MAPPING ---
-    const data = activeMenteesData.map(row => ({
-      Batch: row[0] || '',
-      Zon: row[1] || '',
-      Mentor: row[2] || '',
-      Mentor_Email: row[3] || '',
-      // THIS LINE IS THE FIX: It ensures the dropdown shows the mentee's personal name from Column E.
-      Usahawan: row[4] || '', 
-      // This line correctly gets the company name from Column F.
-      Nama_Syarikat: row[5] || '', 
-      Alamat: row[6] || '',
-      No_Tel: row[7] || 'N/A',
-      Folder_ID: row[8] || '',
-      Emel: row[9] || '',
-      Jenis_Bisnes: row[10] || '',
-    }));
+const data = activeMenteesData.map(row => {
+
+
+  return {
+    Batch: row[0] || '',
+    Zon: row[1] || '',
+    Mentor: row[2] || '',
+    Mentor_Email: row[3] || '',
+    Usahawan: row[4] || '',
+    Nama_Syarikat: row[5] || '',
+    Alamat: row[6] || '',
+    No_Tel: row[7] || 'N/A',
+    Folder_ID: row[8] || '',
+    Emel: row[9] || '',
+    Jenis_Bisnes: row[10] || '',
+  };
+});
 
     res.status(200).json(data);
 
