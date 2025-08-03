@@ -51,9 +51,9 @@ export default async function handler(req, res) {
       Zon: row[1] || '',
       Mentor: row[2] || '',
       Mentor_Email: row[3] || '',
-      // Correctly assign the personal name from Column E to 'Usahawan'
+      // THIS LINE IS THE FIX: It ensures the dropdown shows the mentee's personal name from Column E.
       Usahawan: row[4] || '', 
-      // Correctly assign the company name from Column F to 'Nama_Syarikat'
+      // This line correctly gets the company name from Column F.
       Nama_Syarikat: row[5] || '', 
       Alamat: row[6] || '',
       No_Tel: row[7] || 'N/A',
