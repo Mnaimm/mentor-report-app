@@ -37,6 +37,7 @@ const mapDataToSheetRow = (data) => {
     if (data.status === 'MIA') {
         row[14] = data.mia.alasan; // Penerangan MIA in Ulasan Mentor column (Column O)
         row[63] = data.imageUrls.mia; // Link_Bukti_MIA (Column BL)
+        row[74] = !!data.premisDilawatChecked;    // Column BW (checkbox)
     } 
     // --- Handle Sesi 1 vs Sesi 2+ for Regular Reports ---
     else if (data.sesiLaporan === 1) {
@@ -58,6 +59,7 @@ const mapDataToSheetRow = (data) => {
         row[71] = data.refleksi.create;
 
         row[72] = data.imageUrls.profil; // Link Gambar Profil (Column BU)
+        row[74] = !!data.premisDilawatChecked;    // Column BW (checkbox)
     } 
     else { // This handles Sesi 2, 3, 4, etc.
         // Combine initiative updates and summary into the main summary column
@@ -67,6 +69,8 @@ const mapDataToSheetRow = (data) => {
         
         row[14] = `KEMASKINI SESI LEPAS:\n${kemaskiniText}\n\nRUMUSAN SESI INI:\n${data.rumusan || ''}`; // Ulasan/Rumusan (Column O)
         row[39] = data.imageUrls.sesi.join(', '); // Link Gambar Sesi (Column AN)
+        row[63] = (data.imageUrls?.premis || []).join(', '); // Column BL (premis uploaded in Sesi 2+)
+        row[74] = !!data.premisDilawatChecked;    // Column BW (checkbox)
     }
 
     return row;

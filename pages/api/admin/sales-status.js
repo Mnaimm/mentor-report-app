@@ -1,11 +1,34 @@
 import { getSheetsClient } from '../../../lib/sheets';
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "../auth/[...nextauth]";
+import { isAdmin } from '../../../lib/auth';
 
 export default async function handler(req, res) {
   try {
+    // 1. Check admin authentication
+    const session = await getServerSession(req, res, authOptions);
+    if (!session?.user?.email || !isAdmin(session.user.email)) {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+
     const client = await getSheetsClient();
     const mappingSheet = await client.getRows('mapping');
     const sessionSheet = await client.getRows('V8'); 
-    const batchSheet = await client.getRows('batch');
+    
+    // Try to get batch sheet, if it doesn't exist, extract batches from mapping
+    let batchSheet;
+    try {
+      batchSheet = await client.getRows('batch');
+    } catch (error) {
+      console.log('Batch sheet not found, extracting batches from mapping sheet');
+      // Extract unique batches from mapping sheet
+      const uniqueBatches = [...new Set(mappingSheet.map(row => row.Batch).filter(Boolean))];
+      batchSheet = uniqueBatches.map(batch => ({
+        'Batch': batch,
+        'Mentoring Round': 'Round 1', // Default value
+        'Period': '2024' // Default value
+      }));
+    }
 
     const sessionsByMentee = new Map();
     for (const session of sessionSheet) {
@@ -32,9 +55,14 @@ export default async function handler(req, res) {
 
     for (const batch of batchSheet) {
       const { 'Batch': batchName, 'Mentoring Round': roundLabel, 'Period': period } = batch;
-      if (!batchName || !roundLabel) continue;
+      if (!batchName) continue;
       
       const filteredMap = mappingSheet.filter(row => row.Batch === batchName);
+
+      if (filteredMap.length === 0) {
+        console.log(`No mapping data found for batch: ${batchName}`);
+        continue;
+      }
 
       const mentorMap = {};
       for (const row of filteredMap) {
@@ -53,14 +81,14 @@ export default async function handler(req, res) {
         const expectedSessions = data.mentees.length;
         
         // Use a regular expression to reliably get the number
-        const roundMatch = roundLabel.match(/\d+$/);
-        const roundNumber = roundMatch ? roundMatch[0] : null;
+        const roundMatch = (roundLabel || 'Round 1').match(/\d+$/);
+        const roundNumber = roundMatch ? roundMatch[0] : '1';
 
         data.mentees.forEach(name => {
           const menteeSessions = sessionsByMentee.get(name) || [];
           
           const reportsForThisRound = menteeSessions.filter(session => {
-            if (!session.reportLabel || !roundNumber) return false;
+            if (!session.reportLabel) return false;
             
             // Use a regular expression to reliably get the number
             const reportMatch = session.reportLabel.match(/\d+$/);
@@ -106,9 +134,15 @@ export default async function handler(req, res) {
       const zones = Object.entries(zonesMap).map(([zoneName, mentorList]) => ({ zoneName, mentors: mentorList }));
 
       if (mentors.length > 0) {
-        batches.push({ batchName: `${batchName} - ${period}`, roundLabel, zones });
+        batches.push({ 
+          batchName: period ? `${batchName} - ${period}` : batchName, 
+          roundLabel: roundLabel || 'Round 1', 
+          zones 
+        });
       }
     }
+
+    console.log(`Found ${batches.length} batches with data`);
     res.status(200).json(batches);
   } catch (err) {
     console.error('❌ ERROR IN /api/admin/sales-status:', err);
