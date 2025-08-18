@@ -373,10 +373,21 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
         const reader = new FileReader();
         reader.readAsDataURL(file);
         reader.onloadend = () => {
-          fetch(process.env.NEXT_PUBLIC_APPS_SCRIPT_URL, {
-            method: 'POST',
-            body: JSON.stringify({ fileData: reader.result.split(',')[1], fileName: file.name, fileType: file.type, folderId: fId, menteeName, sessionNumber }),
-          })
+     // Call our proxy API instead of Apps Script directly
+    fetch('/api/upload-proxy', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        fileData: reader.result.split(',')[1],
+        fileName: file.name,
+        fileType: file.type,
+        folderId: fId,
+        menteeName,
+        sessionNumber
+      })
+    })
             .then((res) => res.json())
             .then((result) => {
               if (result.error) reject(new Error(result.error));
