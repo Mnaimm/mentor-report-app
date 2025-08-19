@@ -47,7 +47,7 @@ const mapDataToSheetRow = (data) => {
   // --- MIA vs Regular ---
   if (data.status === 'MIA') {
     row[14] = data.mia?.alasan || '';                   // Ringkasan Sesi (O)
-    row[63] = data.imageUrls?.mia || '';                // Link_Bukti_MIA (BL)
+    row[73] = data.imageUrls?.mia || '';                // Link_Bukti_MIA (BL)
     row[74] = !!data.premisDilawatChecked;              // Premis_Dilawat_Checked (BW)
   } else if (data.sesiLaporan === 1) {
     // Sesi 1
