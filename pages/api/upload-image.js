@@ -1,7 +1,7 @@
 // pages/api/upload-image.js
 import { google } from 'googleapis';
 import { IncomingForm } from 'formidable';
-import fs from 'fs'; // Node.js file system module
+import fs from 'fs';
 
 // Disable bodyParser to handle file uploads
 export const config = {
@@ -11,82 +11,133 @@ export const config = {
 };
 
 export default async function handler(req, res) {
+  console.log('🔍 Upload-image API called with method:', req.method);
+  
   if (req.method !== 'POST') {
+    console.log('❌ Wrong method:', req.method);
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
   const form = new IncomingForm();
 
   try {
+    console.log('📝 Parsing form data...');
     const [fields, files] = await form.parse(req);
-    const uploadedFile = files.file?.[0]; // Access the file array, then the first item
+    
+    console.log('📋 Fields received:', Object.keys(fields));
+    console.log('📁 Files received:', Object.keys(files));
+    console.log('🆔 Folder ID from fields:', fields.folderId);
+    
+    const uploadedFile = files.file?.[0];
     
     if (!uploadedFile) {
+      console.log('❌ No file uploaded');
       return res.status(400).json({ error: 'No file uploaded.' });
     }
 
-    // Extract folder ID from NEXT_PUBLIC_GOOGLE_DRIVE_FOLDER_URL
-    const driveFolderUrl = process.env.NEXT_PUBLIC_GOOGLE_DRIVE_FOLDER_URL;
-    if (!driveFolderUrl) {
-      return res.status(500).json({ error: 'GOOGLE_DRIVE_UPLOAD_FOLDER_ID is not set in environment variables.' });
-    }
-    const folderIdMatch = driveFolderUrl.match(/\/folders\/([a-zA-Z0-9_-]+)/);
-    const folderId = folderIdMatch ? folderIdMatch[1] : null;
+    console.log('📄 File details:', {
+      name: uploadedFile.originalFilename,
+      size: uploadedFile.size,
+      type: uploadedFile.mimetype,
+      path: uploadedFile.filepath
+    });
 
+    // Get folder ID from the form data
+    const folderId = fields.folderId?.[0];
+    
     if (!folderId) {
-      return res.status(500).json({ error: 'Could not extract Google Drive Folder ID from URL.' });
+      console.log('❌ No folder ID provided');
+      return res.status(400).json({ error: 'No folder ID provided. Please select a mentee first.' });
     }
 
-    // --- Authentication for Google Drive ---
+    console.log('🗂️ Using folder ID:', folderId);
+
+    // Check if credentials are available
+    if (!process.env.GOOGLE_CREDENTIALS_BASE64) {
+      console.log('❌ GOOGLE_CREDENTIALS_BASE64 not found in environment');
+      return res.status(500).json({ error: 'Google credentials not configured' });
+    }
+
+    console.log('🔐 Initializing Google Drive authentication...');
+    
+    // Authentication for Google Drive
     const credentialsJson = Buffer.from(process.env.GOOGLE_CREDENTIALS_BASE64, 'base64').toString('ascii');
     const credentials = JSON.parse(credentialsJson);
 
     const auth = new google.auth.GoogleAuth({
       credentials,
-      scopes: ['https://www.googleapis.com/auth/drive.file'], // Scope for file management
+      scopes: ['https://www.googleapis.com/auth/drive.file'],
     });
 
     const authClient = await auth.getClient();
     const drive = google.drive({ version: 'v3', auth: authClient });
 
-    // --- Upload file to Google Drive ---
+    console.log('☁️ Uploading file to Google Drive...');
+
+    // Upload file to Google Drive
     const fileMetadata = {
       name: uploadedFile.originalFilename,
       parents: [folderId],
-      mimeType: uploadedFile.mimetype,
     };
 
     const media = {
       mimeType: uploadedFile.mimetype,
-      body: fs.createReadStream(uploadedFile.filepath), // Read the uploaded file from its temp path
+      body: fs.createReadStream(uploadedFile.filepath),
     };
 
     const response = await drive.files.create({
       requestBody: fileMetadata,
       media: media,
-      fields: 'id, webViewLink, webContentLink, parents', // Request relevant fields including parents
+      fields: 'id, webViewLink, webContentLink',
+    });
+
+    console.log('✅ File uploaded successfully:', {
+      fileId: response.data.id,
+      webViewLink: response.data.webViewLink,
+      webContentLink: response.data.webContentLink
     });
 
     // Make the file publicly accessible
+    console.log('🌐 Setting file permissions to public...');
     await drive.permissions.create({
-        fileId: response.data.id,
-        requestBody: {
-            role: 'reader',
-            type: 'anyone',
-        },
+      fileId: response.data.id,
+      requestBody: {
+        role: 'reader',
+        type: 'anyone',
+      },
     });
 
+    console.log('🧹 Cleaning up temporary file...');
     // Delete the temporary file after upload
     fs.unlink(uploadedFile.filepath, (err) => {
       if (err) console.error("Error deleting temp file:", err);
+      else console.log('✅ Temporary file deleted');
     });
 
+    // Prepare response
+    const responseData = {
+      url: response.data.webViewLink || response.data.webContentLink,
+      id: response.data.id,
+      fileName: uploadedFile.originalFilename
+    };
+
+    console.log('📤 Sending response:', responseData);
+
     // Return the URL for the frontend
-    // Prioritize webViewLink (viewable in browser) over webContentLink (downloadable)
-    res.status(200).json({ url: response.data.webViewLink || response.data.webContentLink, id: response.data.id });
+    res.status(200).json(responseData);
 
   } catch (error) {
-    console.error("❌ Error uploading file:", error);
-    res.status(500).json({ error: 'Failed to upload image.', details: error.message });
+    console.error("❌ Detailed error in upload-image API:", {
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      status: error.status
+    });
+    
+    res.status(500).json({ 
+      error: 'Failed to upload image.', 
+      details: error.message,
+      code: error.code
+    });
   }
 }
