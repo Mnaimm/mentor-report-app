@@ -3,6 +3,12 @@ import { google } from 'googleapis';
 // This helper function maps your form data to the correct columns in the Google Sheet.
 const mapDataToSheetRow = (data) => {
     const row = Array(100).fill(''); // Create a blank row with plenty of columns
+// Helper: extract row number from Sheets API updatedRange
+function getRowNumberFromUpdatedRange(updatedRange) {
+  // Example updatedRange: "V8!A37:T37" or "V8!C37:H37"
+  const m = String(updatedRange).match(/![A-Z]+(\d+):/);
+  return m ? Number(m[1]) : null;
+}
 
     // --- Basic Info (Common to all sessions) ---
     row[0] = new Date().toISOString(); // Timestamp (Column A)
@@ -100,10 +106,27 @@ export default async function handler(req, res) {
             spreadsheetId: process.env.GOOGLE_SHEETS_REPORT_ID,
             range: 'V8!A1', // Append to the 'V8' sheet
             valueInputOption: 'USER_ENTERED',
+            insertDataOption: 'INSERT_ROWS',
             requestBody: {
                 values: [rowData],
             },
         });
+        // --- NEW: Ping Apps Script automation for this row ---
+const updatedRange = appendRes.data?.updates?.updatedRange || '';
+const newRowNumber = getRowNumberFromUpdatedRange(updatedRange);
+
+if (newRowNumber) {
+  try {
+    await fetch(process.env.NEXT_PUBLIC_APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'processRow', rowNumber: newRowNumber })
+    });
+  } catch (e) {
+    console.error('Automation ping failed:', e);
+  }
+}
+
 
         res.status(200).json({ success: true, message: 'Laporan berjaya dihantar!' });
 
