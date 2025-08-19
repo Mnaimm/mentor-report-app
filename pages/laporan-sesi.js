@@ -1,3 +1,4 @@
+// pages/laporan-sesi.js
 import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
@@ -164,6 +165,13 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // --- Non-blocking toast (yellow notice) ---
+  const [toast, setToast] = useState({ show: false, message: '' });
+  const showToast = (message) => {
+    setToast({ show: true, message });
+    setTimeout(() => setToast({ show: false, message: '' }), 4000);
+  };
+
   // --- Autosave (local only) ---
   const getDraftKey = (menteeName, sessionNo, mentorEmail) =>
     `laporanSesi:draft:v1:${mentorEmail || 'unknown'}:${menteeName || 'none'}:s${sessionNo}`;
@@ -173,7 +181,6 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
   const isAdmin = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',').includes(session?.user?.email);
 
   const resetForm = () => {
-    // clear current draft (safe if none)
     try {
       const k = getDraftKey(selectedMentee?.Usahawan, currentSession, session?.user?.email);
       localStorage.removeItem(k);
@@ -201,7 +208,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
         setIsLoading(true);
         try {
           const [mappingRes, frameworkRes] = await Promise.all([
-            fetch('/api/mapping?programType=bangkit'), // <-- CHANGED HERE
+            fetch('/api/mapping?programType=bangkit'),
             fetch('/api/frameworkBank'),
           ]);
           const mappingData = await mappingRes.json();
@@ -234,7 +241,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
     if (!selectedMentee || !currentSession) return;
 
     const draftKey = getDraftKey(selectedMentee?.Usahawan, currentSession, session?.user?.email);
-    const payload = { ...formState }; // form fields only
+    const payload = { ...formState };
 
     const t = setTimeout(() => {
       try {
@@ -254,7 +261,31 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
     setSelectedAdminMentor(mentorName);
     setFilteredMentees(allMentees.filter((m) => m.Mentor === mentorName));
     setSelectedMentee(null);
-    setAutosaveArmed(false); // disarm until new mentee selected
+    setAutosaveArmed(false);
+  };
+
+  // --- Helper: normalize previous inisiatif from backend to text labels
+  const normalizePrevInisiatif = (raw, framework) => {
+    const focusAreas = [...new Set(framework.map(f => f.Focus_Area))];
+    const isNum = (v) => typeof v === 'number' || (/^\d+$/).test(String(v ?? '').trim());
+
+    return (raw || []).map((it) => {
+      let fa = (it?.focusArea ?? it?.Fokus_Area ?? it?.['Fokus Area'] ?? it?.[0] ?? '').toString();
+      let kp = (it?.keputusan ?? it?.Keputusan ?? it?.['Keputusan'] ?? it?.[1] ?? '').toString();
+      let pt = (it?.pelanTindakan ?? it?.Pelan_Tindakan ?? it?.['Pelan Tindakan'] ?? it?.[2] ?? '').toString();
+
+      if (isNum(fa)) {
+        const faIdx = Number(fa) - 1;
+        fa = focusAreas[faIdx] || fa;
+      }
+      if (isNum(kp)) {
+        const kpCandidates = framework.filter(f => f.Focus_Area === fa).map(f => f.Keputusan);
+        const kpIdx = Number(kp) - 1;
+        kp = kpCandidates[kpIdx] || kp;
+      }
+
+      return { focusArea: fa, keputusan: kp, pelanTindakan: pt };
+    });
   };
 
   const handleMenteeChange = async (menteeName) => {
@@ -272,7 +303,11 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
       if (res.ok) {
         setCurrentSession(data.lastSession + 1);
         setMenteeStatus(data.status || '');
-        const prevInisiatif = data.previousInisiatif || [];
+
+        // --- normalize previous inisiatif to readable text
+        const prevInisiatifRaw = data.previousInisiatif || [];
+        const prevInisiatif = normalizePrevInisiatif(prevInisiatifRaw, frameworkData);
+
         setPreviousData({
           sales: data.previousSales || [],
           inisiatif: prevInisiatif,
@@ -284,7 +319,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
           kemaskiniInisiatif: Array(prevInisiatif.length).fill(''),
         }));
 
-        // --- Restore draft (if any) for this mentor/mentee/session
+        // --- Restore draft
         try {
           const draftKey = getDraftKey(menteeName, data.lastSession + 1, session?.user?.email);
           const saved = localStorage.getItem(draftKey);
@@ -353,7 +388,10 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
       } else {
         if (files.sesi.length === 0) { setError('Sila muat naik sekurang-kurangnya satu Gambar Sesi Mentoring.'); return; }
         if (formState.sesi.platform === 'Face to Face' && !formState.sesi.lokasiF2F) { setError('Sila masukkan lokasi untuk sesi Face to Face.'); return; }
-        if (!previousData.premisDilawat && (files.premis?.length || 0) < 1) { setError('Sila muat naik Gambar Premis (wajib kerana belum dilawat).'); return; }
+        // --- Non-blocking reminder instead of blocking requirement for premis
+        if (!previousData.premisDilawat && (files.premis?.length || 0) < 1) {
+          showToast('Peringatan: Premis belum pernah dilawat. Pertimbangkan muat naik gambar premis pada sesi ini.');
+        }
       }
     }
 
@@ -373,21 +411,18 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
         const reader = new FileReader();
         reader.readAsDataURL(file);
         reader.onloadend = () => {
-     // Call our proxy API instead of Apps Script directly
-    fetch('/api/upload-proxy', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        fileData: reader.result.split(',')[1],
-        fileName: file.name,
-        fileType: file.type,
-        folderId: fId,
-        menteeName,
-        sessionNumber
-      })
-    })
+          fetch('/api/upload-proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fileData: reader.result.split(',')[1],
+              fileName: file.name,
+              fileType: file.type,
+              folderId: fId,
+              menteeName,
+              sessionNumber
+            })
+          })
             .then((res) => res.json())
             .then((result) => {
               if (result.error) reject(new Error(result.error));
@@ -412,20 +447,20 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
         }
       } else {
         files.sesi.forEach((file) => uploadPromises.push(uploadImage(file, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => imageUrls.sesi.push(url))));
-        if (!previousData.premisDilawat && (files.premis?.length || 0) > 0) {
+        // Optional premis upload for sesi 2+
+        if ((files.premis?.length || 0) > 0) {
           files.premis.forEach((file) => uploadPromises.push(uploadImage(file, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => imageUrls.premis.push(url))));
         }
       }
 
       await Promise.all(uploadPromises);
 
-      // Clear saved draft (for this mentee/session) BEFORE resetting
+      // Clear saved draft BEFORE resetting
       try {
         const k = getDraftKey(selectedMentee?.Usahawan, currentSession, session?.user?.email);
         localStorage.removeItem(k);
       } catch {}
 
-      // Build payload to send
       const reportData = {
         ...formState,
         status: isMIA ? 'MIA' : 'Selesai',
@@ -435,7 +470,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
         namaMentor: session.user.name,
         mentorEmail: session.user.email,
         imageUrls,
-        premisDilawatChecked: !!formState.sesi?.premisDilawat, // drives BW tick in sheet
+        premisDilawatChecked: !!formState.sesi?.premisDilawat,
       };
 
       const response = await fetch('/api/submitReport', {
@@ -687,7 +722,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
         {!previousData.premisDilawat && (
           <Section title="Status Lawatan Premis">
             <div className="p-3 bg-yellow-50 border border-yellow-200 rounded">
-              <p className="text-sm text-gray-800">Premis belum dilawat semasa sesi-sesi terdahulu. Sila lawat dan muat naik gambar premis dalam sesi ini.</p>
+              <p className="text-sm text-gray-800">Premis belum dilawat semasa sesi-sesi terdahulu. Sila lawat dan muat naik gambar premis dalam sesi ini (tidak wajib).</p>
             </div>
           </Section>
         )}
@@ -695,7 +730,16 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
         <Section title={`Muat Naik Gambar (Sesi ${currentSession})`}>
           <FileInput label="Gambar Sesi Mentoring" multiple onChange={(e) => handleFileChange('sesi', e.target.files, true)} required />
           {!previousData.premisDilawat && (
-            <FileInput label="Gambar Premis Perniagaan (wajib – belum dilawat)" multiple onChange={(e) => handleFileChange('premis', e.target.files, true)} required />
+            <>
+              <div className="text-sm text-yellow-800 bg-yellow-50 border border-yellow-200 rounded p-2 mb-2">
+                Premis belum pernah dilawat. Disarankan muat naik gambar premis pada sesi ini (tidak wajib).
+              </div>
+              <FileInput
+                label="Gambar Premis Perniagaan (disyorkan – belum dilawat)"
+                multiple
+                onChange={(e) => handleFileChange('premis', e.target.files, true)}
+              />
+            </>
           )}
         </Section>
       </div>
@@ -712,10 +756,17 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
   return (
     <div className="bg-gray-100 min-h-screen font-sans">
       <div className="max-w-4xl mx-auto p-4 sm:p-8 space-y-6">
-        <header className="text-center bg-white p-6 rounded-lg shadow-sm">
+        <header className="text-center bg-white p-6 rounded-lg shadow-sm relative">
           <img src="/logo1.png" alt="iTEKAD Logos" className="mx-auto h-20 mb-4" />
           <h1 className="text-3xl font-bold text-gray-800">Laporan Sesi Mentor</h1>
           <p className="text-gray-500 mt-1">Sila lengkapkan borang berdasarkan sesi semasa.</p>
+
+          {/* Non-blocking toast */}
+          {toast.show && (
+            <div className="absolute left-1/2 -translate-x-1/2 top-2 bg-yellow-100 border border-yellow-300 text-yellow-900 px-4 py-2 rounded shadow text-sm">
+              {toast.message}
+            </div>
+          )}
         </header>
 
         {error && (
