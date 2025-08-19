@@ -198,16 +198,40 @@ const LaporanMajuPage = () => {
       }
       const sessionData = await response.json();
 
+    // ADD THIS DEBUGGING CODE HERE:
+    console.log('🔍 DEBUG - API Response Data:', sessionData);
+    console.log('📋 Mentee Mapping from API:', sessionData.menteeMapping);
+    
+    if (sessionData.menteeMapping) {
+      console.log('✅ Mentee mapping exists');
+      console.log('🏢 NAMA_BISNES:', sessionData.menteeMapping.NAMA_BISNES);
+      console.log('📍 LOKASI_BISNES:', sessionData.menteeMapping.LOKASI_BISNES);
+      console.log('📞 NO_TELEFON:', sessionData.menteeMapping.NO_TELEFON);
+      console.log('💼 PRODUK_SERVIS:', sessionData.menteeMapping.PRODUK_SERVIS);
+      console.log('🗂️ Mentee_Folder_ID:', sessionData.menteeMapping.Mentee_Folder_ID);
+    } else {
+      console.log('❌ No mentee mapping found in API response');
+    }
       setFormData(prev => {
         const updatedFormData = { ...prev };
 
         if (sessionData.menteeMapping) {
+          console.log('📝 Setting form data from mentee mapping...');
           updatedFormData.NAMA_BISNES = sessionData.menteeMapping.NAMA_BISNES || '';
           updatedFormData.LOKASI_BISNES = sessionData.menteeMapping.LOKASI_BISNES || '';
           updatedFormData.PRODUK_SERVIS = sessionData.menteeMapping.PRODUK_SERVIS || '';
           updatedFormData.NO_TELEFON = sessionData.menteeMapping.NO_TELEFON || '';
           updatedFormData.Mentee_Folder_ID = sessionData.menteeMapping.Mentee_Folder_ID || '';
-        }
+          console.log('📄 Updated form data:', {
+          NAMA_BISNES: updatedFormData.NAMA_BISNES,
+          LOKASI_BISNES: updatedFormData.LOKASI_BISNES,
+          PRODUK_SERVIS: updatedFormData.PRODUK_SERVIS,
+          NO_TELEFON: updatedFormData.NO_TELEFON,
+          Mentee_Folder_ID: updatedFormData.Mentee_Folder_ID
+        });
+      } else {
+        console.log('⚠️ Skipping form data update - no mentee mapping');
+      }
 
         updatedFormData.SESI_NUMBER = sessionData.currentSession || 1;
         setCurrentSessionNumber(sessionData.currentSession || 1);

@@ -159,6 +159,18 @@ const mapEmailIdx = mappingHeaders.indexOf(normHeader('Emel'));
     if (mapMenteeIdx !== -1) {
         const menteeMapRow = mappingRows.slice(1).find(row => row && (row[mapMenteeIdx] || '') === name);
         if (menteeMapRow) {
+            {
+    console.log('🔍 DEBUG - Found mentee mapping row:', menteeMapRow);
+    console.log('📊 Mapping indices:', {
+        mapNamaSyarikatIdx,
+        mapAlamatIdx,
+        mapNoTelefonIdx,
+        mapJenisBisnesIdx,
+        mapFolderIdIdx,
+        mapMentorEmailIdx,
+        mapMentorNameIdx,
+        mapEmailIdx
+    });
             menteeMapping = {
                 // Map to the desired frontend field names
                 NAMA_BISNES: mapNamaSyarikatIdx !== -1 ? menteeMapRow[mapNamaSyarikatIdx] : '',
@@ -170,9 +182,11 @@ const mapEmailIdx = mappingHeaders.indexOf(normHeader('Emel'));
                 Mentee_Folder_ID: mapFolderIdIdx !== -1 ? menteeMapRow[mapFolderIdIdx] : '', // Pass this through
                 MENTEE_EMAIL_FROM_MAPPING: mapEmailIdx !== -1 ? menteeMapRow[mapEmailIdx] : '', // Pass mentee email
             };
-        }
-    }
-
+    
+    console.log('✅ Created mentee mapping:', menteeMapping);
+} else {
+    console.log('❌ No mentee mapping row found for:', name);
+}
     res.status(200).json({ 
         currentSession, 
         previousData: latestPreviousData, 
