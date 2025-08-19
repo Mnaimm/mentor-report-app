@@ -290,7 +290,19 @@ const LaporanMajuPage = () => {
   const handleFileChange = async (e, fieldName) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
+  // ADD THIS DEBUG CODE HERE:
+  console.log('🔍 DEBUG - Before upload check:');
+  console.log('📁 Selected files:', files.map(f => f.name));
+  console.log('🆔 Mentee_Folder_ID from formData:', formData.Mentee_Folder_ID);
+  console.log('👤 Selected mentee:', formData.NAMA_MENTEE);
+  console.log('🗂️ Full formData object:', formData);
 
+  if (!formData.Mentee_Folder_ID) {
+    console.log('❌ No Mentee_Folder_ID found in formData');
+    setMessage('Please select a mentee first to get their folder ID before uploading images.');
+    setMessageType('error');
+    return;
+  }
     if (!formData.Mentee_Folder_ID) {
       setMessage('Please select a mentee first to get their folder ID before uploading images.');
       setMessageType('error');
@@ -306,6 +318,10 @@ const LaporanMajuPage = () => {
       const fileFormData = new FormData();
       fileFormData.append('file', file);
       fileFormData.append('folderId', formData.Mentee_Folder_ID);
+
+    // ADD THIS DEBUG CODE HERE TOO:
+    console.log('📤 Uploading file:', file.name);
+    console.log('🆔 Using folder ID:', formData.Mentee_Folder_ID);
 
       try {
         const response = await fetch('/api/upload-image', {
