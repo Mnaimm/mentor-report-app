@@ -300,6 +300,25 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
     try {
       const res = await fetch(`/api/menteeData?name=${encodeURIComponent(menteeName)}`);
       const data = await res.json();
+
+      let fw = frameworkData;
+if (!fw || fw.length === 0) {
+  const fwRes = await fetch('/api/frameworkBank');
+  fw = await fwRes.json();
+}
+
+const prevInisiatif = normalizePrevInisiatif(data.previousInisiatif || [], fw);
+
+setPreviousData({
+  sales: data.previousSales || [],
+  inisiatif: prevInisiatif,
+  premisDilawat: !!data.previousPremisDilawat,
+});
+setFormState(p => ({
+  ...p,
+  jualanTerkini: data.previousSales || Array(12).fill(''),
+  kemaskiniInisiatif: Array(prevInisiatif.length).fill(''),
+}));
       if (res.ok) {
         setCurrentSession(data.lastSession + 1);
         setMenteeStatus(data.status || '');
@@ -323,11 +342,18 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
         try {
           const draftKey = getDraftKey(menteeName, data.lastSession + 1, session?.user?.email);
           const saved = localStorage.getItem(draftKey);
-          if (saved) {
-            const parsed = JSON.parse(saved);
-            setFormState((prev) => ({ ...prev, ...parsed }));
-            setSaveStatus('Draft restored');
-          }
+if (saved) {
+  const parsed = JSON.parse(saved);
+  setFormState(prev => ({
+    ...prev,
+    ...parsed,
+    // keep server’s previousSales if draft has nothing/empty
+    jualanTerkini: (Array.isArray(parsed.jualanTerkini) && parsed.jualanTerkini.some(v => v))
+      ? parsed.jualanTerkini
+      : (data.previousSales || prev.jualanTerkini),
+  }));
+  setSaveStatus('Draft restored');
+}
         } catch {}
         setAutosaveArmed(true);
       }

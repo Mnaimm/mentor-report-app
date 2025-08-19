@@ -143,7 +143,7 @@ export default async function handler(req, res) {
 
     const mappingHeaders = mappingRows[0].map(normHeader);
 
-   //Fix the header mapping section in laporanMajuData.js (around line 120-130)
+
 // Dynamic column finding for mapping sheet (using correct field names from mapping.js)
 const mapMenteeIdx = mappingHeaders.indexOf(normHeader('Usahawan'));
 const mapNamaSyarikatIdx = mappingHeaders.indexOf(normHeader('Nama_Syarikat'));
