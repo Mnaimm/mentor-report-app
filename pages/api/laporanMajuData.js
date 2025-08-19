@@ -71,7 +71,6 @@ export default async function handler(req, res) {
         console.warn(`Header 'MIA_STATUS' not found in '${LAPORAN_MAJU_TAB}' tab. MIA functionality might be limited.`);
     }
 
-
     const menteeReports = dataRows.filter(row => row && (row[menteeNameColIndex] || '') === name);
     
     let currentSession = 1;
@@ -137,40 +136,56 @@ export default async function handler(req, res) {
     if (!mappingRows || mappingRows.length < 1) {
         console.warn(`Mapping tab '${MAPPING_TAB}' is empty or does not exist.`);
         return res.status(200).json({
-          currentSession, previousData: latestPreviousData, latarBelakangUsahawanSesi1, hasPremisPhotos, menteeMapping: null, isMIA: isMIAStatus
+          currentSession, 
+          previousData: latestPreviousData, 
+          latarBelakangUsahawanSesi1, 
+          hasPremisPhotos, 
+          menteeMapping: null, 
+          isMIA: isMIAStatus
         });
     }
 
     const mappingHeaders = mappingRows[0].map(normHeader);
 
+    // DEBUG: Log the mapping headers
+    console.log('🔍 DEBUG - Mapping headers:', mappingHeaders);
+    console.log('👤 DEBUG - Looking for mentee:', name);
 
-// Dynamic column finding for mapping sheet (using correct field names from mapping.js)
-const mapMenteeIdx = mappingHeaders.indexOf(normHeader('Usahawan'));
-const mapNamaSyarikatIdx = mappingHeaders.indexOf(normHeader('Nama_Syarikat'));
-const mapAlamatIdx = mappingHeaders.indexOf(normHeader('Alamat'));
-const mapNoTelefonIdx = mappingHeaders.indexOf(normHeader('No_Tel'));
-const mapJenisBisnesIdx = mappingHeaders.indexOf(normHeader('Jenis_Bisnes'));
-const mapMentorEmailIdx = mappingHeaders.indexOf(normHeader('Mentor_Email'));
-const mapMentorNameIdx = mappingHeaders.indexOf(normHeader('Mentor'));
-const mapFolderIdIdx = mappingHeaders.indexOf(normHeader('Folder_ID')); // Fixed from 'fOLDER id'
-const mapEmailIdx = mappingHeaders.indexOf(normHeader('Emel'));
+    // Dynamic column finding for mapping sheet (using correct field names from mapping.js)
+    const mapMenteeIdx = mappingHeaders.indexOf(normHeader('Usahawan'));
+    const mapNamaSyarikatIdx = mappingHeaders.indexOf(normHeader('Nama_Syarikat'));
+    const mapAlamatIdx = mappingHeaders.indexOf(normHeader('Alamat'));
+    const mapNoTelefonIdx = mappingHeaders.indexOf(normHeader('No_Tel'));
+    const mapJenisBisnesIdx = mappingHeaders.indexOf(normHeader('Jenis_Bisnes'));
+    const mapMentorEmailIdx = mappingHeaders.indexOf(normHeader('Mentor_Email'));
+    const mapMentorNameIdx = mappingHeaders.indexOf(normHeader('Mentor'));
+    const mapFolderIdIdx = mappingHeaders.indexOf(normHeader('Folder_ID')); // Fixed from 'fOLDER id'
+    const mapEmailIdx = mappingHeaders.indexOf(normHeader('Emel'));
 
-    let menteeMapping = null;
-    if (mapMenteeIdx !== -1) {
-        const menteeMapRow = mappingRows.slice(1).find(row => row && (row[mapMenteeIdx] || '') === name);
-        if (menteeMapRow) {
-            {
-    console.log('🔍 DEBUG - Found mentee mapping row:', menteeMapRow);
-    console.log('📊 Mapping indices:', {
+    // DEBUG: Log the mapping indices
+    console.log('📊 DEBUG - Mapping indices:', {
+        mapMenteeIdx,
         mapNamaSyarikatIdx,
         mapAlamatIdx,
         mapNoTelefonIdx,
         mapJenisBisnesIdx,
-        mapFolderIdIdx,
         mapMentorEmailIdx,
         mapMentorNameIdx,
+        mapFolderIdIdx,
         mapEmailIdx
     });
+
+    let menteeMapping = null;
+    if (mapMenteeIdx !== -1) {
+        const menteeMapRow = mappingRows.slice(1).find(row => row && (row[mapMenteeIdx] || '') === name);
+        
+        // DEBUG: Log mentee search
+        console.log('🔍 DEBUG - Searching for mentee in mapping data...');
+        console.log('📋 DEBUG - Available mentees in mapping:', mappingRows.slice(1).map(row => row[mapMenteeIdx]).filter(Boolean));
+        
+        if (menteeMapRow) {
+            console.log('🔍 DEBUG - Found mentee mapping row:', menteeMapRow);
+            
             menteeMapping = {
                 // Map to the desired frontend field names
                 NAMA_BISNES: mapNamaSyarikatIdx !== -1 ? menteeMapRow[mapNamaSyarikatIdx] : '',
@@ -182,19 +197,28 @@ const mapEmailIdx = mappingHeaders.indexOf(normHeader('Emel'));
                 Mentee_Folder_ID: mapFolderIdIdx !== -1 ? menteeMapRow[mapFolderIdIdx] : '', // Pass this through
                 MENTEE_EMAIL_FROM_MAPPING: mapEmailIdx !== -1 ? menteeMapRow[mapEmailIdx] : '', // Pass mentee email
             };
-    
-    console.log('✅ Created mentee mapping:', menteeMapping);
-} else {
-    console.log('❌ No mentee mapping row found for:', name);
-}
-    res.status(200).json({ 
+            
+            console.log('✅ DEBUG - Created mentee mapping:', menteeMapping);
+        } else {
+            console.log('❌ DEBUG - No mentee mapping row found for:', name);
+        }
+    } else {
+        console.log('❌ DEBUG - mapMenteeIdx is -1, header "Usahawan" not found');
+    }
+
+    // Final response
+    const responseData = {
         currentSession, 
         previousData: latestPreviousData, 
         latarBelakangUsahawanSesi1,
         hasPremisPhotos,
         menteeMapping,
         isMIA: isMIAStatus // Return MIA status
-    });
+    };
+
+    console.log('📤 DEBUG - Final API response:', responseData);
+
+    res.status(200).json(responseData);
 
   } catch (error) {
     console.error("❌ Error in /api/laporanMajuData:", error);
