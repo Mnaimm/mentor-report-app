@@ -143,18 +143,17 @@ export default async function handler(req, res) {
 
     const mappingHeaders = mappingRows[0].map(normHeader);
 
-   / Fix the header mapping section in laporanMajuData.js (around line 120-130)
-// Replace the existing mapping header searches with these:
-
-const mapMenteeIdx = mappingHeaders.indexOf(normHeader('Usahawan')); // mapping.js uses 'Usahawan' for mentee name
-const mapNamaSyarikatIdx = mappingHeaders.indexOf(normHeader('Nama_Syarikat')); // mapping.js uses 'Nama_Syarikat'
-const mapAlamatIdx = mappingHeaders.indexOf(normHeader('Alamat')); // mapping.js uses 'Alamat'
-const mapNoTelefonIdx = mappingHeaders.indexOf(normHeader('No_Tel')); // mapping.js uses 'No_Tel'
-const mapJenisBisnesIdx = mappingHeaders.indexOf(normHeader('Jenis_Bisnes')); // mapping.js uses 'Jenis_Bisnes'
-const mapMentorEmailIdx = mappingHeaders.indexOf(normHeader('Mentor_Email')); // mapping.js uses 'Mentor_Email'
-const mapMentorNameIdx = mappingHeaders.indexOf(normHeader('Mentor')); // mapping.js uses 'Mentor'
-const mapFolderIdIdx = mappingHeaders.indexOf(normHeader('Folder_ID')); // mapping.js uses 'Folder_ID' (THIS WAS THE KEY ISSUE!)
-const mapEmailIdx = mappingHeaders.indexOf(normHeader('Emel')); // mapping.js uses 'Emel'
+   //Fix the header mapping section in laporanMajuData.js (around line 120-130)
+// Dynamic column finding for mapping sheet (using correct field names from mapping.js)
+const mapMenteeIdx = mappingHeaders.indexOf(normHeader('Usahawan'));
+const mapNamaSyarikatIdx = mappingHeaders.indexOf(normHeader('Nama_Syarikat'));
+const mapAlamatIdx = mappingHeaders.indexOf(normHeader('Alamat'));
+const mapNoTelefonIdx = mappingHeaders.indexOf(normHeader('No_Tel'));
+const mapJenisBisnesIdx = mappingHeaders.indexOf(normHeader('Jenis_Bisnes'));
+const mapMentorEmailIdx = mappingHeaders.indexOf(normHeader('Mentor_Email'));
+const mapMentorNameIdx = mappingHeaders.indexOf(normHeader('Mentor'));
+const mapFolderIdIdx = mappingHeaders.indexOf(normHeader('Folder_ID')); // Fixed from 'fOLDER id'
+const mapEmailIdx = mappingHeaders.indexOf(normHeader('Emel'));
 
     let menteeMapping = null;
     if (mapMenteeIdx !== -1) {
