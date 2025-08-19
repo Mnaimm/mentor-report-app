@@ -152,7 +152,7 @@ export default async function handler(req, res) {
     console.log('👤 DEBUG - Looking for mentee:', name);
 
     // Dynamic column finding for mapping sheet (using correct field names from mapping.js)
-    const mapMenteeIdx = mappingHeaders.indexOf(normHeader('Usahawan'));
+    const mapMenteeIdx = mappingHeaders.indexOf(normHeader('Mentee'));
     const mapNamaSyarikatIdx = mappingHeaders.indexOf(normHeader('Nama_Syarikat'));
     const mapAlamatIdx = mappingHeaders.indexOf(normHeader('Alamat'));
     const mapNoTelefonIdx = mappingHeaders.indexOf(normHeader('No_Tel'));
