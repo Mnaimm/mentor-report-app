@@ -151,16 +151,26 @@ export default async function handler(req, res) {
     console.log('🔍 DEBUG - Mapping headers:', mappingHeaders);
     console.log('👤 DEBUG - Looking for mentee:', name);
 
-    // Dynamic column finding for mapping sheet (using correct field names from mapping.js)
-    const mapMenteeIdx = mappingHeaders.indexOf(normHeader('Mentee'));
-    const mapNamaSyarikatIdx = mappingHeaders.indexOf(normHeader('Nama_Syarikat'));
-    const mapAlamatIdx = mappingHeaders.indexOf(normHeader('Alamat'));
-    const mapNoTelefonIdx = mappingHeaders.indexOf(normHeader('No_Tel'));
-    const mapJenisBisnesIdx = mappingHeaders.indexOf(normHeader('Jenis_Bisnes'));
-    const mapMentorEmailIdx = mappingHeaders.indexOf(normHeader('Mentor_Email'));
-    const mapMentorNameIdx = mappingHeaders.indexOf(normHeader('Mentor'));
-    const mapFolderIdIdx = mappingHeaders.indexOf(normHeader('Folder_ID')); // Fixed from 'fOLDER id'
-    const mapEmailIdx = mappingHeaders.indexOf(normHeader('Emel'));
+// Replace the header mapping section in laporanMajuData.js with this:
+
+// Dynamic column finding for mapping sheet (using EXACT headers from your mapping sheet)
+// Remember: normHeader converts to lowercase and normalizes spaces
+const mapMenteeIdx = mappingHeaders.indexOf(normHeader('Mentee'));
+const mapNamaSyarikatIdx = mappingHeaders.indexOf(normHeader('Nama Syarikat')); // Note the space
+const mapAlamatIdx = mappingHeaders.indexOf(normHeader('Alamat'));
+const mapNoTelefonIdx = mappingHeaders.indexOf(normHeader('no Telefon')); // Note the space and lowercase 'n'
+const mapJenisBisnesIdx = mappingHeaders.indexOf(normHeader('JENIS BISNES')); // Note the space
+const mapMentorEmailIdx = mappingHeaders.indexOf(normHeader('Mentor_Email'));
+const mapMentorNameIdx = mappingHeaders.indexOf(normHeader('Mentor'));
+const mapFolderIdIdx = mappingHeaders.indexOf(normHeader('fOLDER id')); // Note the space and mixed case
+const mapEmailIdx = mappingHeaders.indexOf(normHeader('EMAIL'));
+
+// DEBUG: Let's also add a debug log to see what the normHeader function produces
+console.log('🔍 DEBUG - Normalized header examples:');
+console.log('  "Nama Syarikat" becomes:', normHeader('Nama Syarikat'));
+console.log('  "no Telefon" becomes:', normHeader('no Telefon'));
+console.log('  "JENIS BISNES" becomes:', normHeader('JENIS BISNES'));
+console.log('  "fOLDER id" becomes:', normHeader('fOLDER id'));
 
     // DEBUG: Log the mapping indices
     console.log('📊 DEBUG - Mapping indices:', {
