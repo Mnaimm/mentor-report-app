@@ -23,38 +23,217 @@ const safeJSONParse = (str) => {
   }
 };
 
+// Enhanced TextArea component for laporan-maju.js
+// Add this component near the top of your file, after the imports
+
+const EnhancedTextArea = ({ label, name, value, onChange, placeholder, rows = 5, required = false, disabled = false }) => {
+  const [showPlaceholder, setShowPlaceholder] = useState(true);
+  const [textValue, setTextValue] = useState(value || '');
+
+  // Update textValue when value prop changes
+  useEffect(() => {
+    setTextValue(value || '');
+    setShowPlaceholder(!value || value.trim() === '');
+  }, [value]);
+
+  const handleTextChange = (e) => {
+    const newValue = e.target.value;
+    setTextValue(newValue);
+    setShowPlaceholder(false);
+    
+    // Call the parent's onChange
+    if (onChange) {
+      onChange(e);
+    }
+  };
+
+  const handleClearPlaceholder = () => {
+    setShowPlaceholder(false);
+    setTextValue('');
+    
+    // Create a synthetic event to update the parent
+    const syntheticEvent = {
+      target: {
+        name: name,
+        value: ''
+      }
+    };
+    if (onChange) {
+      onChange(syntheticEvent);
+    }
+  };
+
+  const displayValue = showPlaceholder ? placeholder : textValue;
+
+  return (
+    <div className="mb-4">
+      <label className="block text-sm font-medium text-gray-700 mb-2">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      <div className="relative">
+        <textarea
+          name={name}
+          value={displayValue}
+          onChange={handleTextChange}
+          onClick={() => {
+            if (showPlaceholder) {
+              setShowPlaceholder(false);
+              setTextValue('');
+            }
+          }}
+          className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-vertical ${
+            showPlaceholder ? 'text-gray-400 italic' : 'text-gray-900'
+          } ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+          rows={rows}
+          required={required}
+          disabled={disabled}
+        />
+        {showPlaceholder && !disabled && (
+          <button
+            type="button"
+            onClick={handleClearPlaceholder}
+            className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 text-sm bg-white px-2 py-1 rounded border border-gray-300"
+            title="Clear placeholder and start writing"
+          >
+            ✕ Clear
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Replace your existing "Latar Belakang Usahawan & Situasi Bisnes" section with this:
+
+{/* --- Enhanced Latar Belakang Section --- */}
+<div className="bg-white p-6 rounded-lg shadow-sm">
+  <Section title="Latar Belakang Usahawan & Situasi Bisnes">
+    {currentSessionNumber > 1 && previousLatarBelakangUsahawan && (
+      <InfoCard title="Ringkasan Latar Belakang Usahawan (Sesi 1)" type="info">
+        <p className="whitespace-pre-wrap">{previousLatarBelakangUsahawan}</p>
+      </InfoCard>
+    )}
+    
+    {currentSessionNumber === 1 ? (
+      <EnhancedTextArea
+        label="Latar Belakang Usahawan"
+        name="LATARBELAKANG_USAHAWAN"
+        value={formData.LATARBELAKANG_USAHAWAN}
+        onChange={handleChange}
+        required={true}
+        rows={8}
+        placeholder={`Panduan:
+Latarbelakang usahawan.
+Penerangan produk/perkhidmatan.
+Situasi bisnes ketika ini:
+- Sistem bisnes
+- Sejauh mana usahawan jelas dengan segmen pelanggan dan nilai yang ditawarkan
+- Aktiviti pemasaran dan jualan
+- Perekodan maklumat akaun, sistem yang digunakan
+Apa yang usahawan mahu capai kedepan.
+Pemerhatian Mentor/Coach (apa yang bagus, apa yang kurang dan boleh ditambahbaik oleh usahawan)
+Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun lalui program:
+- Pendapatan
+- Keuntungan
+- Penambahan pekerja
+- Adaptasi teknologi
+- Peningkatan skil/pengetahuan`}
+      />
+    ) : (
+      <TextArea
+        label="Latar Belakang Usahawan"
+        name="LATARBELAKANG_USAHAWAN"
+        value={previousLatarBelakangUsahawan}
+        disabled={true}
+        rows={5}
+        placeholder="Latar Belakang Usahawan can only be edited in Sesi 1. Displaying previous entry."
+      />
+    )}
+  </Section>
+</div>
+
+{/* --- New Rumusan & Langkah Kehadapan Section (Sesi 2+) --- */}
+{currentSessionNumber >= 2 && (
+  <div className="bg-white p-6 rounded-lg shadow-sm">
+    <Section title="Rumusan Keseluruhan dan Langkah Kehadapan">
+      <EnhancedTextArea
+        label="Status Perniagaan Keseluruhan"
+        name="STATUS_PERNIAGAAN_KESELURUHAN"
+        value={formData.STATUS_PERNIAGAAN_KESELURUHAN || ''}
+        onChange={handleChange}
+        required={false}
+        rows={6}
+        placeholder={`Panduan:
+- Aktiviti pemasaran dan jualan
+- Perekodan maklumat akaun, sistem yang digunakan
+Apa yang usahawan mahu capai kedepan.
+Pemerhatian Mentor/Coach (apa yang bagus, apa yang kurang dan boleh ditambahbaik oleh usahawan)
+Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun lalui program:
+- Pendapatan
+- Keuntungan
+- Penambahan pekerja
+- Adaptasi teknologi
+- Peningkatan skil/pengetahuan`}
+      />
+      
+      <EnhancedTextArea
+        label="Rumusan Keseluruhan dan Langkah Kehadapan"
+        name="RUMUSAN_DAN_LANGKAH_KEHADAPAN"
+        value={formData.RUMUSAN_DAN_LANGKAH_KEHADAPAN || ''}
+        onChange={handleChange}
+        required={false}
+        rows={8}
+        placeholder={`Nota: 
+Pastikan peserta pulang dengan Keputusan dan Tindakan yang perlu diusahakan, siapa dan bila. (Kongsikan/pastika usahawan juga jelas)
+Apakah ada homework untuk peserta.
+Sebaiknya, tetapkan masa pertemuan sesi akan datang, dan mod perbincangan.
+Apakah bantuan, latihan yang mahu dicadangkan kepada HQ untuk membantu usahawan.
+Apakah mentor ada bahan tambahan yang dapat membantu usahawan.
+Apakah mentor perlukan bahan tambahan/banuan dari mentor mentor lain atau HQ.
+Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berkaitan bisnes mahupun tingkahlaku atau komitmen peserta.`}
+      />
+    </Section>
+  </div>
+)}
+
 const LaporanMajuPage = () => {
   const { data: session } = useSession();
   const isAdmin = session?.user?.email && process.env.NEXT_PUBLIC_ADMIN_EMAILS?.includes(session.user.email);
 
-  const initialFormState = {
-    // These match your LaporanMaju sheet headers for direct submission
-    Timestamp: '', 
-    NAMA_MENTOR: '',
-    EMAIL_MENTOR: '',
-    NAMA_MENTEE: '',
-    NAMA_BISNES: '',
-    LOKASI_BISNES: '',
-    PRODUK_SERVIS: '',
-    NO_TELEFON: '',
-    TARIKH_SESI: format(new Date(), 'yyyy-MM-dd'),
-    SESI_NUMBER: 1, 
-    MOD_SESI: '',
-    LOKASI_F2F: '',
-    MASA_MULA: '',
-    MASA_TAMAT: '',
-    LATARBELAKANG_USAHAWAN: '',
-    DATA_KEWANGAN_BULANAN_JSON: [],
-    MENTORING_FINDINGS_JSON: [],
-    REFLEKSI_MENTOR_PERASAAN: '',
-    REFLEKSI_MENTOR_KOMITMEN: '',
-    REFLEKSI_MENTOR_LAIN: '',
-    URL_GAMBAR_PREMIS_JSON: [],
-    URL_GAMBAR_SESI_JSON: [],
-    URL_GAMBAR_GW360: '',
-    Mentee_Folder_ID: '', 
-    Laporan_Maju_Doc_ID: '', 
-  };
+
+// Update your initialFormState to include the new fields
+const initialFormState = {
+  // Existing fields...
+  Timestamp: '', 
+  NAMA_MENTOR: '',
+  EMAIL_MENTOR: '',
+  NAMA_MENTEE: '',
+  NAMA_BISNES: '',
+  LOKASI_BISNES: '',
+  PRODUK_SERVIS: '',
+  NO_TELEFON: '',
+  TARIKH_SESI: format(new Date(), 'yyyy-MM-dd'),
+  SESI_NUMBER: 1, 
+  MOD_SESI: '',
+  LOKASI_F2F: '',
+  MASA_MULA: '',
+  MASA_TAMAT: '',
+  LATARBELAKANG_USAHAWAN: '',
+  DATA_KEWANGAN_BULANAN_JSON: [],
+  MENTORING_FINDINGS_JSON: [],
+  REFLEKSI_MENTOR_PERASAAN: '',
+  REFLEKSI_MENTOR_KOMITMEN: '',
+  REFLEKSI_MENTOR_LAIN: '',
+  URL_GAMBAR_PREMIS_JSON: [],
+  URL_GAMBAR_SESI_JSON: [],
+  URL_GAMBAR_GW360: '',
+  Mentee_Folder_ID: '', 
+  Laporan_Maju_Doc_ID: '',
+  
+  // NEW FIELDS for Sesi 2+
+  STATUS_PERNIAGAAN_KESELURUHAN: '',
+  RUMUSAN_DAN_LANGKAH_KEHADAPAN: '',
+};
 
   const [formData, setFormData] = useState(initialFormState);
   const [allMenteesMapping, setAllMenteesMapping] = useState([]);
