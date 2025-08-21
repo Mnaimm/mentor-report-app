@@ -398,128 +398,146 @@ if (saved) {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!selectedMentee) {
-      setError('Sila pilih usahawan terlebih dahulu.');
-      return;
-    }
+  e.preventDefault();
+  // Check if a mentee is selected
+  if (!selectedMentee) {
+    setError('Sila pilih usahawan terlebih dahulu.');
+    return;
+  }
 
-    if (!isMIA) {
-      if (currentSession === 1) {
-        if (!files.gw) { setError('Sila muat naik Gambar Carta GrowthWheel.'); return; }
-        if (!files.profil) { setError('Sila muat naik Gambar Individu Usahawan.'); return; }
-        if (files.sesi.length === 0) { setError('Sila muat naik sekurang-kurangnya satu Gambar Sesi Mentoring.'); return; }
-        if (formState.sesi.platform === 'Face to Face' && !formState.sesi.lokasiF2F) { setError('Sila masukkan lokasi untuk sesi Face to Face.'); return; }
-        if (formState.sesi.premisDilawat && (files.premis?.length || 0) < 1) { setError("Sila muat naik Gambar Premis kerana 'Premis dilawat' ditandakan."); return; }
-      } else {
-        if (files.sesi.length === 0) { setError('Sila muat naik sekurang-kurangnya satu Gambar Sesi Mentoring.'); return; }
-        if (formState.sesi.platform === 'Face to Face' && !formState.sesi.lokasiF2F) { setError('Sila masukkan lokasi untuk sesi Face to Face.'); return; }
-        // --- Non-blocking reminder instead of blocking requirement for premis
-        if (!previousData.premisDilawat && (files.premis?.length || 0) < 1) {
-          showToast('Peringatan: Premis belum pernah dilawat. Pertimbangkan muat naik gambar premis pada sesi ini.');
-        }
+  // --- Start Validation (Sesi 1 vs Sesi 2+) ---
+  // Validation for MIA status
+  if (isMIA && !formState.mia.alasan) {
+    setError('Sila berikan alasan untuk status MIA.');
+    return;
+  }
+
+  // Validation for active sessions (not MIA)
+  if (!isMIA) {
+    if (currentSession === 1) {
+      if (!files.gw) { setError('Sila muat naik Gambar Carta GrowthWheel.'); return; }
+      if (!files.profil) { setError('Sila muat naik Gambar Individu Usahawan.'); return; }
+      if (files.sesi.length === 0) { setError('Sila muat naik sekurang-kurangnya satu Gambar Sesi Mentoring.'); return; }
+      if (formState.sesi.platform === 'Face to Face' && !formState.sesi.lokasiF2F) { setError('Sila masukkan lokasi untuk sesi Face to Face.'); return; }
+      if (formState.sesi.premisDilawat && (files.premis?.length || 0) < 1) { setError("Sila muat naik Gambar Premis kerana 'Premis dilawat' ditandakan."); return; }
+    } else { // Sesi 2+
+      if (files.sesi.length === 0) { setError('Sila muat naik sekurang-kurangnya satu Gambar Sesi Mentoring.'); return; }
+      if (formState.sesi.platform === 'Face to Face' && !formState.sesi.lokasiF2F) { setError('Sila masukkan lokasi untuk sesi Face to Face.'); return; }
+      // Non-blocking reminder for premis visits
+      if (!previousData.premisDilawat && (files.premis?.length || 0) < 1) {
+        showToast('Peringatan: Premis belum pernah dilawat. Pertimbangkan muat naik gambar premis pada sesi ini.');
       }
     }
+  }
+  // --- End Validation ---
 
-    if (isMIA && !formState.mia.alasan) { setError('Sila berikan alasan untuk status MIA.'); return; }
+  setIsSubmitting(true);
+  setError('');
+  setSuccess('');
 
-    setIsSubmitting(true);
-    setError('');
-    setSuccess('');
+  try {
+    const imageUrls = { growthwheel: '', profil: '', sesi: [], premis: [], mia: '' };
+    const uploadPromises = [];
+    const folderId = selectedMentee.Folder_ID;
+    if (!folderId) {
+      throw new Error(`Folder ID tidak ditemui untuk usahawan: ${selectedMentee.Usahawan}`);
+    }
 
-    try {
-      const imageUrls = { growthwheel: '', profil: '', sesi: [], premis: [], mia: '' };
-      const uploadPromises = [];
-      const folderId = selectedMentee.Folder_ID;
-      if (!folderId) throw new Error(`Folder ID tidak ditemui untuk usahawan: ${selectedMentee.Usahawan}`);
-
-      const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onloadend = () => {
-          fetch('/api/upload-proxy', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              fileData: reader.result.split(',')[1],
-              fileName: file.name,
-              fileType: file.type,
-              folderId: fId,
-              menteeName,
-              sessionNumber
-            })
+    // Generic function to upload a single file
+    const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onloadend = () => {
+        fetch('/api/upload-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileData: reader.result.split(',')[1],
+            fileName: file.name,
+            fileType: file.type,
+            folderId: fId,
+            menteeName,
+            sessionNumber,
+          }),
+        })
+          .then((res) => res.json())
+          .then((result) => {
+            if (result.error) reject(new Error(result.error));
+            else resolve(result.url);
           })
-            .then((res) => res.json())
-            .then((result) => {
-              if (result.error) reject(new Error(result.error));
-              else resolve(result.url);
-            })
-            .catch(reject);
-        };
-        reader.onerror = reject;
-      });
-
-      const menteeNameForUpload = selectedMentee.Usahawan;
-      const sessionNumberForUpload = currentSession;
-
-      if (isMIA) {
-        if (files.mia) uploadPromises.push(uploadImage(files.mia, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => (imageUrls.mia = url)));
-      } else if (currentSession === 1) {
-        if (files.gw) uploadPromises.push(uploadImage(files.gw, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => (imageUrls.growthwheel = url)));
-        if (files.profil) uploadPromises.push(uploadImage(files.profil, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => (imageUrls.profil = url)));
-        files.sesi.forEach((file) => uploadPromises.push(uploadImage(file, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => imageUrls.sesi.push(url))));
-        if (formState.sesi.premisDilawat) {
-          files.premis.forEach((file) => uploadPromises.push(uploadImage(file, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => imageUrls.premis.push(url))));
-        }
-      } else {
-        files.sesi.forEach((file) => uploadPromises.push(uploadImage(file, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => imageUrls.sesi.push(url))));
-        // Optional premis upload for sesi 2+
-        if ((files.premis?.length || 0) > 0) {
-          files.premis.forEach((file) => uploadPromises.push(uploadImage(file, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => imageUrls.premis.push(url))));
-        }
-      }
-
-      await Promise.all(uploadPromises);
-
-      // Clear saved draft BEFORE resetting
-      try {
-        const k = getDraftKey(selectedMentee?.Usahawan, currentSession, session?.user?.email);
-        localStorage.removeItem(k);
-      } catch {}
-
-      const reportData = {
-        ...formState,
-        status: isMIA ? 'MIA' : 'Selesai',
-        sesiLaporan: currentSession,
-        usahawan: selectedMentee.Usahawan,
-        namaSyarikat: selectedMentee.Nama_Syarikat,
-        namaMentor: session.user.name,
-        mentorEmail: session.user.email,
-        imageUrls,
-        premisDilawatChecked: !!formState.sesi?.premisDilawat,
+          .catch(reject);
       };
+      reader.onerror = reject;
+    });
 
-      const response = await fetch('/api/submitReport', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(reportData),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Gagal menghantar laporan.');
+    const menteeNameForUpload = selectedMentee.Usahawan;
+    const sessionNumberForUpload = currentSession;
 
-      setSuccess('Laporan berjaya dihantar! Borang akan direset.');
-      window.scrollTo(0, 0);
-      setTimeout(() => {
-        resetForm();
-        setSuccess('');
-      }, 3000);
-    } catch (err) {
-      setError(err.message);
-      window.scrollTo(0, 0);
-    } finally {
-      setIsSubmitting(false);
+    // Build the upload promises based on the form state and session number
+    if (isMIA) {
+      if (files.mia) uploadPromises.push(uploadImage(files.mia, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => (imageUrls.mia = url)));
+    } else if (currentSession === 1) {
+      if (files.gw) uploadPromises.push(uploadImage(files.gw, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => (imageUrls.growthwheel = url)));
+      if (files.profil) uploadPromises.push(uploadImage(files.profil, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => (imageUrls.profil = url)));
+      files.sesi.forEach((file) => uploadPromises.push(uploadImage(file, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => imageUrls.sesi.push(url))));
+      if (formState.sesi.premisDilawat) {
+        files.premis.forEach((file) => uploadPromises.push(uploadImage(file, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => imageUrls.premis.push(url))));
+      }
+    } else { // Sesi 2+
+      files.sesi.forEach((file) => uploadPromises.push(uploadImage(file, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => imageUrls.sesi.push(url))));
+      if ((files.premis?.length || 0) > 0) {
+        files.premis.forEach((file) => uploadPromises.push(uploadImage(file, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => imageUrls.premis.push(url))));
+      }
     }
-  };
+
+    // Wait for all image uploads to complete
+    await Promise.all(uploadPromises);
+
+    // Clear saved draft before submitting
+    try {
+      const k = getDraftKey(selectedMentee?.Usahawan, currentSession, session?.user?.email);
+      localStorage.removeItem(k);
+    } catch {}
+
+    // Construct the final report payload
+    const reportData = {
+      ...formState,
+      status: isMIA ? 'MIA' : 'Selesai',
+      sesiLaporan: currentSession,
+      usahawan: selectedMentee.Usahawan,
+      namaSyarikat: selectedMentee.Nama_Syarikat,
+      namaMentor: session.user.name,
+      mentorEmail: session.user.email,
+      imageUrls,
+      premisDilawatChecked: !!formState.sesi?.premisDilawat,
+      programType: 'bangkit', // This is the crucial line to fix the bug
+    };
+
+    // Send the report data to the universal submitReport API
+    const response = await fetch('/api/submitReport', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(reportData),
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.error || 'Gagal menghantar laporan.');
+    }
+
+    setSuccess('Laporan berjaya dihantar! Borang akan direset.');
+    window.scrollTo(0, 0);
+    setTimeout(() => {
+      resetForm();
+      setSuccess('');
+    }, 3000);
+  } catch (err) {
+    setError(err.message);
+    window.scrollTo(0, 0);
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+
 
   const renderSesi1Form = () => {
     const focusAreaOptions = [...new Set(frameworkData.map((item) => item.Focus_Area))];

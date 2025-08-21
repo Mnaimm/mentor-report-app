@@ -101,42 +101,60 @@ const mapBangkitDataToSheetRow = (data) => {
 /**
  * Maps data from laporan-alt.js (Maju program) to its Google Sheet row.
  * Make sure these indices and data points match your Maju Google Sheet's 'LaporanMaju' tab.
+ *
+ * IMPORTANT: For DATA_KEWANGAN_BULANAN_JSON and MENTORING_FINDINGS_JSON,
+ * the frontend (`laporan-alt.js`) is responsible for combining
+ * previous findings/data with new inputs/updates before sending to this API.
+ * This function will then store the CUMULATIVE array for the current session.
+ */
+/**
+ * Maps data from laporan-maju.js to its Google Sheet row.
+ * Updated to match the exact LaporanMaju sheet column structure.
  */
 const mapMajuDataToSheetRow = (data) => {
-  const row = Array(100).fill(''); // Adjust size if needed based on your Maju sheet's final columns
+  const row = Array(100).fill(''); // Adjust size if needed
 
-  row[0] = new Date().toISOString();                       // Timestamp
-  row[1] = data.namaMentor || '';                          // NAMA_MENTOR
-  row[2] = data.mentorEmail || '';                         // EMAIL_MENTOR
-  row[3] = data.usahawan || '';                            // NAMA_MENTEE (from payload.usahawan)
-  row[4] = data.namaSyarikat || '';                        // NAMA_BISNES (from payload.namaSyarikat)
-  row[5] = data.LOKASI_BISNES || '';                       // LOKASI_BISNES
-  row[6] = data.PRODUK_SERVIS || '';                       // PRODUK_SERVIS
-  row[7] = data.NO_TELEFON || '';                          // NO_TELEFON
-  row[8] = data.TARIKH_SESI || '';                         // TARIKH_SESI
-  row[9] = data.sesiLaporan || '';                         // SESI_NUMBER (from payload.sesiLaporan)
-  row[10] = data.MOD_SESI || '';                           // MOD_SESI
-  row[11] = data.LOKASI_F2F || '';                         // LOKASI_F2F
-  row[12] = data.MASA_MULA || '';                          // MASA_MULA
-  row[13] = data.MASA_TAMAT || '';                         // MASA_TAMAT
-  row[14] = data.LATARBELAKANG_USAHAWAN || '';             // LATARBELAKANG_USAHAWAN (Sesi 1 only, taken from previous history)
-  row[15] = JSON.stringify(data.DATA_KEWANGAN_BULANAN_JSON || []); // DATA_KEWANGAN_BULANAN_JSON
-  row[16] = JSON.stringify(data.MENTORING_FINDINGS_JSON || []); // MENTORING_FINDINGS_JSON
-  row[17] = data.REFLEKSI_MENTOR_PERASAAN || '';           // REFLEKSI_MENTOR_PERASAAN
-  row[18] = data.REFLEKSI_MENTOR_KOMITMEN || '';           // REFLEKSI_MENTOR_KOMITMEN
-  row[19] = data.REFLEKSI_MENTOR_LAIN || '';               // REFLEKSI_MENTOR_LAIN
-  // New fields for Maju program, placed next to REFLEKSI_MENTOR_LAIN as per your instruction (Column U in Sheet)
-  row[20] = data.STATUS_PERNIAGAAN_KESELURUHAN || '';      // STATUS_PERNIAGAAN_KESELURUHAN (Column U)
-  row[21] = data.RUMUSAN_DAN_LANGKAH_KEHADAPAN || '';      // RUMUSAN_DAN_LANGKAH_KEHADAPAN (Column V)
-  // Continue with other image URLs and MIA fields
-  row[22] = JSON.stringify(data.URL_GAMBAR_PREMIS_JSON || []); // URL_GAMBAR_PREMIS_JSON
-  row[23] = JSON.stringify(data.URL_GAMBAR_SESI_JSON || []); // URL_GAMBAR_SESI_JSON
-  row[24] = data.URL_GAMBAR_GW360 || '';                   // URL_GAMBAR_GW360
-  row[25] = data.Mentee_Folder_ID || '';                   // Mentee_Folder_ID
-  row[26] = data.Laporan_Maju_Doc_ID || '';                // Laporan_Maju_Doc_ID (Apps Script fills this)
-  row[27] = data.MIA_STATUS || 'Tidak MIA';                // MIA_STATUS
-  row[28] = data.MIA_REASON || '';                         // MIA_REASON
-  row[29] = data.MIA_PROOF_URL || '';                      // MIA_PROOF_URL
+  // A-N: Basic session info
+  row[0] = new Date().toISOString();                       // A: Timestamp
+  row[1] = data.NAMA_MENTOR || '';                         // B: NAMA_MENTOR
+  row[2] = data.EMAIL_MENTOR || '';                        // C: EMAIL_MENTOR
+  row[3] = data.NAMA_MENTEE || '';                         // D: NAMA_MENTEE
+  row[4] = data.NAMA_BISNES || '';                         // E: NAMA_BISNES
+  row[5] = data.LOKASI_BISNES || '';                       // F: LOKASI_BISNES
+  row[6] = data.PRODUK_SERVIS || '';                       // G: PRODUK_SERVIS
+  row[7] = data.NO_TELEFON || '';                          // H: NO_TELEFON
+  row[8] = data.TARIKH_SESI || '';                         // I: TARIKH_SESI
+  row[9] = data.SESI_NUMBER || '';                         // J: SESI_NUMBER
+  row[10] = data.MOD_SESI || '';                           // K: MOD_SESI
+  row[11] = data.LOKASI_F2F || '';                         // L: LOKASI_F2F
+  row[12] = data.MASA_MULA || '';                          // M: MASA_MULA
+  row[13] = data.MASA_TAMAT || '';                         // N: MASA_TAMAT
+
+  // O-T: Content sections
+  row[14] = data.LATARBELAKANG_USAHAWAN || '';             // O: LATARBELAKANG_USAHAWAN
+  row[15] = JSON.stringify(data.DATA_KEWANGAN_BULANAN_JSON || []); // P: DATA_KEWANGAN_BULANAN_JSON
+  row[16] = JSON.stringify(data.MENTORING_FINDINGS_JSON || []); // Q: MENTORING_FINDINGS_JSON
+  row[17] = data.REFLEKSI_MENTOR_PERASAAN || '';           // R: REFLEKSI_MENTOR_PERASAAN
+  row[18] = data.REFLEKSI_MENTOR_KOMITMEN || '';           // S: REFLEKSI_MENTOR_KOMITMEN
+  row[19] = data.REFLEKSI_MENTOR_LAIN || '';               // T: REFLEKSI_MENTOR_LAIN
+
+  // U-V: Enhanced sections (Sesi 2+)
+  row[20] = data.STATUS_PERNIAGAAN_KESELURUHAN || '';      // U: STATUS_PERNIAGAAN_KESELURUHAN
+  row[21] = data.RUMUSAN_DAN_LANGKAH_KEHADAPAN || '';      // V: RUMUSAN_DAN_LANGKAH_KEHADAPAN
+
+  // W-Y: Image URLs
+  row[22] = JSON.stringify(data.URL_GAMBAR_PREMIS_JSON || []); // W: URL_GAMBAR_PREMIS_JSON
+  row[23] = JSON.stringify(data.URL_GAMBAR_SESI_JSON || []); // X: URL_GAMBAR_SESI_JSON
+  row[24] = data.URL_GAMBAR_GW360 || '';                   // Y: URL_GAMBAR_GW360
+
+  // Z-AA: Folder and Doc IDs
+  row[25] = data.Mentee_Folder_ID || '';                   // Z: Mentee_Folder_ID
+  row[26] = data.Laporan_Maju_Doc_ID || '';                // AA: Laporan_Maju_Doc_ID (Apps Script fills this)
+
+  // AB-AD: MIA fields
+  row[27] = data.MIA_STATUS || 'Tidak MIA';                // AB: MIA_STATUS
+  row[28] = data.MIA_REASON || '';                         // AC: MIA_REASON
+  row[29] = data.MIA_PROOF_URL || '';                      // AD: MIA_PROOF_URL
 
   return row;
 };
@@ -163,13 +181,20 @@ export default async function handler(req, res) {
     });
     const sheets = google.sheets({ version: 'v4', auth });
 
-    let spreadsheetId = process.env.GOOGLE_SHEETS_REPORT_ID; // The single sheet ID
+    // IMPORTANT: This 'spreadsheetId' MUST be the one that contains BOTH Bangkit and Maju tabs.
+    // If you have separate spreadsheets for Bangkit and Maju, you need to revisit this logic
+    // and use `process.env.GOOGLE_SHEETS_MAJU_REPORT_ID` for 'maju' programType,
+    // and `process.env.GOOGLE_SHEETS_REPORT_ID` for 'bangkit'.
+    // Your previous conversation implies two separate sheets (`GOOGLE_SHEETS_REPORT_ID` and `GOOGLE_SHEETS_MAJU_REPORT_ID`).
+    // So, I'll update this section to use separate spreadsheet IDs.
+    let spreadsheetId;
     let range;
     let rowData;
     let appsScriptUrl; // URL for the Apps Script to trigger document generation
 
-    // Determine which tab, mapping function, and Apps Script URL to use based on programType
+    // Determine which sheet, tab, mapping function, and Apps Script URL to use based on programType
     if (programType === 'bangkit') {
+      spreadsheetId = process.env.GOOGLE_SHEETS_REPORT_ID; // Your existing Bangkit sheet ID
       range = 'V8!A1'; // The tab for Bangkit reports
       rowData = mapBangkitDataToSheetRow(reportData);
       appsScriptUrl = process.env.NEXT_PUBLIC_APPS_SCRIPT_URL; // Your existing Bangkit Apps Script URL
@@ -177,11 +202,12 @@ export default async function handler(req, res) {
           throw new Error('Missing environment variables for Bangkit program.');
       }
     } else if (programType === 'maju') {
+      spreadsheetId = process.env.GOOGLE_SHEETS_MAJU_REPORT_ID; // Your NEW Maju sheet ID
       range = process.env.LAPORAN_MAJU_TAB + '!A1'; // Use the environment variable for the tab name
       rowData = mapMajuDataToSheetRow(reportData);
-      appsScriptUrl = process.env.NEXT_PUBLIC_APPS_SCRIPT_LAPORAN_MAJU_URL; // Your existing Maju Apps Script URL
-      if (!spreadsheetId || !appsScriptUrl) {
-          throw new Error('Missing environment variables for Maju program. Please check LAPORAN_MAJU_TAB and NEXT_PUBLIC_APPS_SCRIPT_LAPORAN_MAJU_URL in .env.local');
+      appsScriptUrl = process.env.NEXT_PUBLIC_APPS_SCRIPT_MAJU_URL; // Your NEW Maju Apps Script URL (renamed from LAPORAN_MAJU_URL for clarity)
+      if (!spreadsheetId || !appsScriptUrl || !process.env.LAPORAN_MAJU_TAB) {
+          throw new Error('Missing environment variables for Maju program. Please check GOOGLE_SHEETS_MAJU_REPORT_ID, LAPORAN_MAJU_TAB and NEXT_PUBLIC_APPS_SCRIPT_MAJU_URL in .env.local');
       }
     } else {
       return res.status(400).json({ error: 'Invalid programType specified.' });
