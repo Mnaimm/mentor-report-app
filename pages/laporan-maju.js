@@ -37,7 +37,7 @@ const EnhancedTextArea = ({ label, name, value, onChange, placeholder, rows = 5,
     const newValue = e.target.value;
     setTextValue(newValue);
     setShowPlaceholder(false);
-    
+
     if (onChange) {
       onChange(e);
     }
@@ -46,7 +46,7 @@ const EnhancedTextArea = ({ label, name, value, onChange, placeholder, rows = 5,
   const handleClearPlaceholder = () => {
     setShowPlaceholder(false);
     setTextValue('');
-    
+
     const syntheticEvent = {
       target: {
         name: name,
@@ -104,7 +104,7 @@ const LaporanMajuPage = () => {
 
   const initialFormState = {
     // These match your LaporanMaju sheet headers for direct submission
-    Timestamp: '', 
+    Timestamp: '',
     NAMA_MENTOR: '',
     EMAIL_MENTOR: '',
     NAMA_MENTEE: '',
@@ -113,7 +113,7 @@ const LaporanMajuPage = () => {
     PRODUK_SERVIS: '',
     NO_TELEFON: '',
     TARIKH_SESI: format(new Date(), 'yyyy-MM-dd'),
-    SESI_NUMBER: 1, 
+    SESI_NUMBER: 1,
     MOD_SESI: '',
     LOKASI_F2F: '',
     MASA_MULA: '',
@@ -127,13 +127,13 @@ const LaporanMajuPage = () => {
     URL_GAMBAR_PREMIS_JSON: [],
     URL_GAMBAR_SESI_JSON: [],
     URL_GAMBAR_GW360: '',
-    Mentee_Folder_ID: '', 
+    Mentee_Folder_ID: '',
     Laporan_Maju_Doc_ID: '',
     // NEW FIELDS for Sesi 2+
     STATUS_PERNIAGAAN_KESELURUHAN: '',
     RUMUSAN_DAN_LANGKAH_KEHADAPAN: '',
-      // MIA fields
-  MIA_PROOF_URL: '',
+    // MIA fields
+    MIA_PROOF_URL: '',
   };
 
   const [formData, setFormData] = useState(initialFormState);
@@ -229,7 +229,7 @@ const LaporanMajuPage = () => {
     const selectedMenteeName = e.target.value;
 
     setFormData(prev => ({
-      ...prev, 
+      ...prev,
       NAMA_MENTEE: selectedMenteeName,
       NAMA_BISNES: '',
       LOKASI_BISNES: '',
@@ -248,7 +248,7 @@ const LaporanMajuPage = () => {
       URL_GAMBAR_GW360: '',
       URL_GAMBAR_SESI_JSON: [],
       URL_GAMBAR_PREMIS_JSON: [],
-      Mentee_Folder_ID: '', 
+      Mentee_Folder_ID: '',
       Laporan_Maju_Doc_ID: '',
       STATUS_PERNIAGAAN_KESELURUHAN: '',
       RUMUSAN_DAN_LANGKAH_KEHADAPAN: '',
@@ -369,32 +369,117 @@ const LaporanMajuPage = () => {
     }));
   };
 
-// Replace your handleFileChange function with this working version:
+  // UPDATED: handleFileChange to use reportType: 'sesi' for all image uploads
+  const handleFileChange = async (e, fieldName) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
 
-const handleFileChange = async (e, fieldName) => {
-  const files = Array.from(e.target.files);
-  if (!files.length) return;
+    if (!formData.Mentee_Folder_ID) {
+      setMessage('Please select a mentee first to get their folder ID before uploading images.');
+      setMessageType('error');
+      return;
+    }
 
-  if (!formData.Mentee_Folder_ID) {
-    setMessage('Please select a mentee first to get their folder ID before uploading images.');
-    setMessageType('error');
-    return;
-  }
+    setLoading(true);
+    setMessage(`Uploading ${files.length} file(s)...`);
+    setMessageType('');
 
-  setLoading(true);
-  setMessage(`Uploading ${files.length} file(s)...`);
-  setMessageType('');
+    const uploadedUrls = [];
 
-  const uploadedUrls = [];
-  
-  for (const file of files) {
+    for (const file of files) {
+      try {
+        const fileData = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result;
+            const base64Data = result.split(',')[1];
+            resolve(base64Data);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        let imageType = '';
+        if (fieldName === 'URL_GAMBAR_GW360') {
+          imageType = 'gw';
+        } else if (fieldName === 'URL_GAMBAR_SESI_JSON') {
+          imageType = 'sesi';
+        } else if (fieldName === 'URL_GAMBAR_PREMIS_JSON') {
+          imageType = 'premis';
+        }
+
+        const uploadPayload = {
+          action: 'uploadImage',
+          fileData: fileData,
+          fileName: file.name,
+          fileType: file.type,
+          folderId: formData.Mentee_Folder_ID,
+          menteeName: formData.NAMA_MENTEE,
+          sessionNumber: currentSessionNumber,
+          reportType: 'sesi', // <--- IMPORTANT CHANGE: Route image uploads to Sesi Apps Script
+          isMIAProof: false,
+          imageType: imageType
+        };
+
+        console.log('📤 Uploading file via Apps Script proxy:', file.name);
+        console.log('🆔 Using folder ID:', formData.Mentee_Folder_ID);
+
+        const response = await fetch('/api/upload-proxy', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(uploadPayload),
+        });
+
+        console.log('📥 Upload response status:', response.status);
+
+        const data = await response.json();
+        console.log('📄 Upload response data:', data);
+
+        if (data.url) {
+          uploadedUrls.push(data.url);
+        } else {
+          throw new Error('No URL returned from upload');
+        }
+      } catch (error) {
+        console.error(`❌ Error uploading ${file.name}:`, error);
+        setMessage(`Failed to upload ${file.name}.`);
+        setMessageType('error');
+        setLoading(false);
+        return;
+      }
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      [fieldName]: fieldName === 'URL_GAMBAR_GW360' ? uploadedUrls[0] : [...prev[fieldName], ...uploadedUrls]
+    }));
+    setMessage('Files uploaded successfully!');
+    setMessageType('success');
+    setLoading(false);
+  };
+
+  // NEW: handleMiaProofFileChange function for MIA proof uploads
+  const handleMiaProofFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!formData.Mentee_Folder_ID) {
+      setMessage('Please select a mentee first to get their folder ID before uploading MIA proof.');
+      setMessageType('error');
+      return;
+    }
+
+    setLoading(true);
+    setMessage(`Uploading MIA proof: ${file.name}...`);
+    setMessageType('');
+
     try {
-      // Convert file to base64 (same as working version)
       const fileData = await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => {
           const result = reader.result;
-          // Remove the data URL prefix to get just the base64 data
           const base64Data = result.split(',')[1];
           resolve(base64Data);
         };
@@ -402,34 +487,21 @@ const handleFileChange = async (e, fieldName) => {
         reader.readAsDataURL(file);
       });
 
-      // Determine imageType for maju reports
-      let imageType = '';
-      if (fieldName === 'URL_GAMBAR_GW360') {
-        imageType = 'gw';
-      } else if (fieldName === 'URL_GAMBAR_SESI_JSON') {
-        imageType = 'sesi';
-      } else if (fieldName === 'URL_GAMBAR_PREMIS_JSON') {
-        imageType = 'premis';
-      }
-
-      // Upload using the working proxy system that goes directly to Apps Script
       const uploadPayload = {
-        action: 'uploadImage', // Tell Apps Script this is an upload action
-        fileData: fileData, // Just the base64 data without prefix
+        action: 'uploadImage', // Action for image upload
+        fileData: fileData,
         fileName: file.name,
         fileType: file.type,
         folderId: formData.Mentee_Folder_ID,
         menteeName: formData.NAMA_MENTEE,
         sessionNumber: currentSessionNumber,
-        reportType: 'maju', // Specify this is for maju reports
-        isMIAProof: false,
-        imageType: imageType
+        reportType: 'sesi', // <--- IMPORTANT CHANGE: Route MIA proof to Sesi Apps Script
+        isMIAProof: true,
+        imageType: 'mia'
       };
 
-      console.log('📤 Uploading file via Apps Script proxy:', file.name);
-      console.log('🆔 Using folder ID:', formData.Mentee_Folder_ID);
+      console.log('📤 Uploading MIA proof via Apps Script proxy:', file.name);
 
-      // Use the working upload-proxy that forwards to Apps Script
       const response = await fetch('/api/upload-proxy', {
         method: 'POST',
         headers: {
@@ -438,69 +510,63 @@ const handleFileChange = async (e, fieldName) => {
         body: JSON.stringify(uploadPayload),
       });
 
-      console.log('📥 Upload response status:', response.status);
-      
       const data = await response.json();
-      console.log('📄 Upload response data:', data);
-      
+
       if (data.url) {
-        uploadedUrls.push(data.url);
+        setFormData(prev => ({
+          ...prev,
+          MIA_PROOF_URL: data.url
+        }));
+        setMiaProofFile(file);
+        setMessage('MIA proof uploaded successfully!');
+        setMessageType('success');
       } else {
-        throw new Error('No URL returned from upload');
+        throw new Error(data.message || 'No URL returned from MIA proof upload');
       }
     } catch (error) {
-      console.error(`❌ Error uploading ${file.name}:`, error);
-      setMessage(`Failed to upload ${file.name}.`);
+      console.error(`❌ Error uploading MIA proof ${file.name}:`, error);
+      setMessage(`Failed to upload MIA proof: ${error.message}`);
       setMessageType('error');
+      setMiaProofFile(null);
+    } finally {
       setLoading(false);
-      return;
     }
-  }
-
-  setFormData(prev => ({
-    ...prev,
-    [fieldName]: fieldName === 'URL_GAMBAR_GW360' ? uploadedUrls[0] : [...prev[fieldName], ...uploadedUrls]
-  }));
-  setMessage('Files uploaded successfully!');
-  setMessageType('success');
-  setLoading(false);
-};
-
-// Update your resetForm function to also clear the file inputs:
-
-const resetForm = () => {
-  setFormData({
-    ...initialFormState,
-    NAMA_MENTOR: isAdmin ? (mentorsInMapping.find(m => m.value === selectedMentorEmail)?.label || '') : (session?.user?.name || ''),
-    EMAIL_MENTOR: isAdmin ? selectedMentorEmail : (session?.user?.email || ''),
-    TARIKH_SESI: format(new Date(), 'yyyy-MM-dd'),
-  });
-  setCurrentSessionNumber(1);
-  setPreviousMentoringFindings([]);
-  setPreviousLatarBelakangUsahawan('');
-  setHasPremisPhotosUploaded(false);
-  setLawatanPremisChecked(false);
-  setMessage('');
-  setMessageType('');
-  setLoading(false);
-  setIsMIA(false);
-  setMiaReason('');
-  setMiaProofFile(null);
-
-  // Clear all file inputs in the DOM
-  const fileInputs = document.querySelectorAll('input[type="file"]');
-  fileInputs.forEach(input => {
-    input.value = '';
-  });
-
-  // Clear any "Uploaded" status messages by resetting the page display
-  // This will clear the "Uploaded GW360: View Image" links etc.
-  console.log('✅ Form reset complete - all fields and file inputs cleared');
-};
-// Replace your handleSubmit function with this working version:
+  };
 
 
-// Replace your handleSubmit function with this fixed version:
+  const resetForm = () => {
+    setFormData({
+      ...initialFormState,
+      NAMA_MENTOR: isAdmin ? (mentorsInMapping.find(m => m.value === selectedMentorEmail)?.label || '') : (session?.user?.name || ''),
+      EMAIL_MENTOR: isAdmin ? selectedMentorEmail : (session?.user?.email || ''),
+      TARIKH_SESI: format(new Date(), 'yyyy-MM-dd'),
+    });
+    setCurrentSessionNumber(1);
+    setPreviousMentoringFindings([]);
+    setPreviousLatarBelakangUsahawan('');
+    setHasPremisPhotosUploaded(false);
+    setLawatanPremisChecked(false);
+    setMessage('');
+    setMessageType('');
+    setLoading(false);
+    setIsMIA(false);
+    setMiaReason('');
+    setMiaProofFile(null);
+
+    // Clear all file inputs in the DOM
+    const fileInputs = document.querySelectorAll('input[type="file"]');
+    fileInputs.forEach(input => {
+      input.value = '';
+    });
+
+    // Clear any "Uploaded" status messages by resetting the page display
+    console.log('✅ Form reset complete - all fields and file inputs cleared');
+  };
+
+  // UPDATED: handleSubmit to include 'action' and 'reportType: maju'
+// In your laporan-maju.js, update the handleSubmit function's response handling:
+
+// In your laporan-maju.js handleSubmit function, make sure dataToSend is properly defined:
 
 const handleSubmit = async (e) => {
   e.preventDefault();
@@ -510,112 +576,97 @@ const handleSubmit = async (e) => {
 
   console.log('🚀 Starting form submission...');
 
-  // ... keep all your existing validation logic ...
-
   try {
-    let dataToSend = {};
+    // ✅ MAKE SURE dataToSend is declared in the correct scope
+    let dataToSend = {}; // ← Declare it here at the top
 
     // CONDITIONALLY BUILD dataToSend BASED ON MIA STATUS
-// Replace the dataToSend building section in your handleSubmit function:
+    if (isMIA) {
+      const miaProofUrl = formData.MIA_PROOF_URL || '';
+      console.log('📋 Building MIA data to send...');
+      
+      dataToSend = {
+        NAMA_MENTOR: formData.NAMA_MENTOR,
+        EMAIL_MENTOR: formData.EMAIL_MENTOR,
+        NAMA_MENTEE: formData.NAMA_MENTEE,
+        NAMA_BISNES: formData.NAMA_BISNES,
+        SESI_NUMBER: currentSessionNumber,
+        LOKASI_BISNES: '',
+        PRODUK_SERVIS: '',
+        NO_TELEFON: '',
+        TARIKH_SESI: '',
+        MOD_SESI: '',
+        LOKASI_F2F: '',
+        MASA_MULA: '',
+        MASA_TAMAT: '',
+        LATARBELAKANG_USAHAWAN: '',
+        DATA_KEWANGAN_BULANAN_JSON: [],
+        MENTORING_FINDINGS_JSON: [],
+        REFLEKSI_MENTOR_PERASAAN: '',
+        REFLEKSI_MENTOR_KOMITMEN: '',
+        REFLEKSI_MENTOR_LAIN: '',
+        URL_GAMBAR_PREMIS_JSON: [],
+        URL_GAMBAR_SESI_JSON: [],
+        URL_GAMBAR_GW360: '',
+        Mentee_Folder_ID: formData.Mentee_Folder_ID,
+        Laporan_Maju_Doc_ID: '',
+        STATUS_PERNIAGAAN_KESELURUHAN: '',
+        RUMUSAN_DAN_LANGKAH_KEHADAPAN: '',
+        MIA_STATUS: 'MIA',
+        MIA_REASON: miaReason,
+        MIA_PROOF_URL: miaProofUrl,
+      };
+    } else {
+      console.log('📋 Building regular report data to send...');
+      
+      dataToSend = {
+        NAMA_MENTOR: formData.NAMA_MENTOR,
+        EMAIL_MENTOR: formData.EMAIL_MENTOR,
+        NAMA_MENTEE: formData.NAMA_MENTEE,
+        NAMA_BISNES: formData.NAMA_BISNES,
+        SESI_NUMBER: currentSessionNumber,
+        LOKASI_BISNES: formData.LOKASI_BISNES,
+        PRODUK_SERVIS: formData.PRODUK_SERVIS,
+        NO_TELEFON: formData.NO_TELEFON,
+        TARIKH_SESI: formData.TARIKH_SESI,
+        MOD_SESI: formData.MOD_SESI,
+        LOKASI_F2F: formData.LOKASI_F2F,
+        MASA_MULA: formData.MASA_MULA,
+        MASA_TAMAT: formData.MASA_TAMAT,
+        LATARBELAKANG_USAHAWAN: currentSessionNumber === 1 ? formData.LATARBELAKANG_USAHAWAN : previousLatarBelakangUsahawan,
+        DATA_KEWANGAN_BULANAN_JSON: formData.DATA_KEWANGAN_BULANAN_JSON,
+        MENTORING_FINDINGS_JSON: formData.MENTORING_FINDINGS_JSON,
+        REFLEKSI_MENTOR_PERASAAN: formData.REFLEKSI_MENTOR_PERASAAN,
+        REFLEKSI_MENTOR_KOMITMEN: formData.REFLEKSI_MENTOR_KOMITMEN,
+        REFLEKSI_MENTOR_LAIN: formData.REFLEKSI_MENTOR_LAIN,
+        URL_GAMBAR_PREMIS_JSON: formData.URL_GAMBAR_PREMIS_JSON,
+        URL_GAMBAR_SESI_JSON: formData.URL_GAMBAR_SESI_JSON,
+        URL_GAMBAR_GW360: formData.URL_GAMBAR_GW360,
+        Mentee_Folder_ID: formData.Mentee_Folder_ID,
+        Laporan_Maju_Doc_ID: '',
+        STATUS_PERNIAGAAN_KESELURUHAN: formData.STATUS_PERNIAGAAN_KESELURUHAN || '',
+        RUMUSAN_DAN_LANGKAH_KEHADAPAN: formData.RUMUSAN_DAN_LANGKAH_KEHADAPAN || '',
+        MIA_STATUS: 'Tidak MIA',
+        MIA_REASON: '',
+        MIA_PROOF_URL: '',
+      };
+    }
 
-// CONDITIONALLY BUILD dataToSend BASED ON MIA STATUS
-// Your Apps Script is expecting the data to come WITHOUT the action field
-    // and in the exact format it processes in prepareRowDataForSheet()
-
-// CONDITIONALLY BUILD dataToSend BASED ON MIA STATUS
-if (isMIA) {
-  const miaProofUrl = formData.MIA_PROOF_URL || '';
-  console.log('📋 Building MIA data to send...');
-  
-  dataToSend = {
-    // ONLY use the field names your API expects
-    NAMA_MENTOR: formData.NAMA_MENTOR,
-    EMAIL_MENTOR: formData.EMAIL_MENTOR,
-    NAMA_MENTEE: formData.NAMA_MENTEE,
-    NAMA_BISNES: formData.NAMA_BISNES,
-    SESI_NUMBER: currentSessionNumber,
-    LOKASI_BISNES: '',
-    PRODUK_SERVIS: '',
-    NO_TELEFON: '',
-    TARIKH_SESI: '',
-    MOD_SESI: '',
-    LOKASI_F2F: '',
-    MASA_MULA: '',
-    MASA_TAMAT: '',
-    LATARBELAKANG_USAHAWAN: '',
-    DATA_KEWANGAN_BULANAN_JSON: [],
-    MENTORING_FINDINGS_JSON: [],
-    REFLEKSI_MENTOR_PERASAAN: '',
-    REFLEKSI_MENTOR_KOMITMEN: '',
-    REFLEKSI_MENTOR_LAIN: '',
-    URL_GAMBAR_PREMIS_JSON: [],
-    URL_GAMBAR_SESI_JSON: [],
-    URL_GAMBAR_GW360: '',
-    Mentee_Folder_ID: formData.Mentee_Folder_ID,
-    Laporan_Maju_Doc_ID: '',
-    STATUS_PERNIAGAAN_KESELURUHAN: '',
-    RUMUSAN_DAN_LANGKAH_KEHADAPAN: '',
-    MIA_STATUS: 'MIA',
-    MIA_REASON: miaReason,
-    MIA_PROOF_URL: miaProofUrl,
-  };
-} else {
-  console.log('📋 Building regular report data to send...');
-  
-  dataToSend = {
-    // ONLY use the field names your API expects - NO MORE namaMentor, mentorEmail, usahawan!
-    NAMA_MENTOR: formData.NAMA_MENTOR,
-    EMAIL_MENTOR: formData.EMAIL_MENTOR,
-    NAMA_MENTEE: formData.NAMA_MENTEE,
-    NAMA_BISNES: formData.NAMA_BISNES,
-    SESI_NUMBER: currentSessionNumber,
-    LOKASI_BISNES: formData.LOKASI_BISNES,
-    PRODUK_SERVIS: formData.PRODUK_SERVIS,
-    NO_TELEFON: formData.NO_TELEFON,
-    TARIKH_SESI: formData.TARIKH_SESI,
-    MOD_SESI: formData.MOD_SESI,
-    LOKASI_F2F: formData.LOKASI_F2F,
-    MASA_MULA: formData.MASA_MULA,
-    MASA_TAMAT: formData.MASA_TAMAT,
-    LATARBELAKANG_USAHAWAN: currentSessionNumber === 1 ? formData.LATARBELAKANG_USAHAWAN : previousLatarBelakangUsahawan,
-    DATA_KEWANGAN_BULANAN_JSON: formData.DATA_KEWANGAN_BULANAN_JSON,
-    MENTORING_FINDINGS_JSON: formData.MENTORING_FINDINGS_JSON,
-    REFLEKSI_MENTOR_PERASAAN: formData.REFLEKSI_MENTOR_PERASAAN,
-    REFLEKSI_MENTOR_KOMITMEN: formData.REFLEKSI_MENTOR_KOMITMEN,
-    REFLEKSI_MENTOR_LAIN: formData.REFLEKSI_MENTOR_LAIN,
-    URL_GAMBAR_PREMIS_JSON: formData.URL_GAMBAR_PREMIS_JSON,
-    URL_GAMBAR_SESI_JSON: formData.URL_GAMBAR_SESI_JSON,
-    URL_GAMBAR_GW360: formData.URL_GAMBAR_GW360,
-    Mentee_Folder_ID: formData.Mentee_Folder_ID,
-    Laporan_Maju_Doc_ID: '',
-    STATUS_PERNIAGAAN_KESELURUHAN: formData.STATUS_PERNIAGAAN_KESELURUHAN || '',
-    RUMUSAN_DAN_LANGKAH_KEHADAPAN: formData.RUMUSAN_DAN_LANGKAH_KEHADAPAN || '',
-    MIA_STATUS: 'Tidak MIA',
-    MIA_REASON: '',
-    MIA_PROOF_URL: '',
-  };
-}
-
+    // ✅ Now dataToSend is properly defined and can be used
     console.log('📤 Data to send:', dataToSend);
-    console.log('🌐 Submitting to /api/upload-proxy...');
+    console.log('🌐 Submitting to /api/submitMajuReport...');
 
-// In your handleSubmit function, change the submission part to:
-
-console.log('🌐 Submitting to /api/submitMajuReport...');
-
-// Use the separate maju API instead of shared submitReport
-const response = await fetch('/api/submitMajuReport', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify(dataToSend),
-});
+    const response = await fetch('/api/submitMajuReport', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(dataToSend), // ← This should work now
+    });
 
     console.log('📥 Response status:', response.status);
     console.log('📥 Response ok:', response.ok);
 
-    // Try to get response as text first, then parse as JSON
     const responseText = await response.text();
     console.log('📄 Raw response text:', responseText);
 
@@ -628,15 +679,14 @@ const response = await fetch('/api/submitMajuReport', {
       throw new Error(`Server returned non-JSON response: ${responseText}`);
     }
 
-    // Check for success (your Apps Script returns {success: true})
     if (response.ok && result.success === true) {
       console.log('✅ Submission successful!');
-      setMessage('Laporan submitted successfully!');
+      setMessage(result.message || 'Laporan submitted successfully!');
       setMessageType('success');
       resetForm();
     } else {
       console.error('❌ Submission failed:', result);
-      const errorMessage = result.message || result.error || 'Submission failed';
+      const errorMessage = result.error || result.message || 'Submission failed';
       throw new Error(errorMessage);
     }
 
@@ -759,7 +809,7 @@ const response = await fetch('/api/submitMajuReport', {
                 <FileInput
                   label="Muat Naik Bukti (Cth: Screenshot Perbualan)"
                   name="miaProof"
-                  onFileChange={handleMiaProofFileChange}
+                  onFileChange={handleMiaProofFileChange} // <--- Ensure this uses the new handler
                   multiple={false}
                 />
                 {miaProofFile && (
@@ -857,7 +907,7 @@ const response = await fetch('/api/submitMajuReport', {
                       <p className="whitespace-pre-wrap">{previousLatarBelakangUsahawan}</p>
                     </InfoCard>
                   )}
-                  
+
                   {currentSessionNumber === 1 ? (
                     <EnhancedTextArea
                       label="Latar Belakang Usahawan"
@@ -1169,7 +1219,7 @@ Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun la
 - Adaptasi teknologi
 - Peningkatan skil/pengetahuan`}
                     />
-                    
+
                     <EnhancedTextArea
                       label="Rumusan Keseluruhan dan Langkah Kehadapan"
                       name="RUMUSAN_DAN_LANGKAH_KEHADAPAN"
@@ -1177,7 +1227,7 @@ Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun la
                       onChange={handleChange}
                       required={false}
                       rows={8}
-                      placeholder={`Nota: 
+                      placeholder={`Nota:
 Pastikan peserta pulang dengan Keputusan dan Tindakan yang perlu diusahakan, siapa dan bila. (Kongsikan/pastika usahawan juga jelas)
 Apakah ada homework untuk peserta.
 Sebaiknya, tetapkan masa pertemuan sesi akan datang, dan mod perbincangan.
