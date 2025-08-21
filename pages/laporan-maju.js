@@ -23,14 +23,11 @@ const safeJSONParse = (str) => {
   }
 };
 
-// Enhanced TextArea component for laporan-maju.js
-// Add this component near the top of your file, after the imports
-
+// Enhanced TextArea component with removable placeholder
 const EnhancedTextArea = ({ label, name, value, onChange, placeholder, rows = 5, required = false, disabled = false }) => {
   const [showPlaceholder, setShowPlaceholder] = useState(true);
   const [textValue, setTextValue] = useState(value || '');
 
-  // Update textValue when value prop changes
   useEffect(() => {
     setTextValue(value || '');
     setShowPlaceholder(!value || value.trim() === '');
@@ -40,8 +37,7 @@ const EnhancedTextArea = ({ label, name, value, onChange, placeholder, rows = 5,
     const newValue = e.target.value;
     setTextValue(newValue);
     setShowPlaceholder(false);
-    
-    // Call the parent's onChange
+
     if (onChange) {
       onChange(e);
     }
@@ -50,8 +46,7 @@ const EnhancedTextArea = ({ label, name, value, onChange, placeholder, rows = 5,
   const handleClearPlaceholder = () => {
     setShowPlaceholder(false);
     setTextValue('');
-    
-    // Create a synthetic event to update the parent
+
     const syntheticEvent = {
       target: {
         name: name,
@@ -103,137 +98,43 @@ const EnhancedTextArea = ({ label, name, value, onChange, placeholder, rows = 5,
   );
 };
 
-// Replace your existing "Latar Belakang Usahawan & Situasi Bisnes" section with this:
-
-{/* --- Enhanced Latar Belakang Section --- */}
-<div className="bg-white p-6 rounded-lg shadow-sm">
-  <Section title="Latar Belakang Usahawan & Situasi Bisnes">
-    {currentSessionNumber > 1 && previousLatarBelakangUsahawan && (
-      <InfoCard title="Ringkasan Latar Belakang Usahawan (Sesi 1)" type="info">
-        <p className="whitespace-pre-wrap">{previousLatarBelakangUsahawan}</p>
-      </InfoCard>
-    )}
-    
-    {currentSessionNumber === 1 ? (
-      <EnhancedTextArea
-        label="Latar Belakang Usahawan"
-        name="LATARBELAKANG_USAHAWAN"
-        value={formData.LATARBELAKANG_USAHAWAN}
-        onChange={handleChange}
-        required={true}
-        rows={8}
-        placeholder={`Panduan:
-Latarbelakang usahawan.
-Penerangan produk/perkhidmatan.
-Situasi bisnes ketika ini:
-- Sistem bisnes
-- Sejauh mana usahawan jelas dengan segmen pelanggan dan nilai yang ditawarkan
-- Aktiviti pemasaran dan jualan
-- Perekodan maklumat akaun, sistem yang digunakan
-Apa yang usahawan mahu capai kedepan.
-Pemerhatian Mentor/Coach (apa yang bagus, apa yang kurang dan boleh ditambahbaik oleh usahawan)
-Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun lalui program:
-- Pendapatan
-- Keuntungan
-- Penambahan pekerja
-- Adaptasi teknologi
-- Peningkatan skil/pengetahuan`}
-      />
-    ) : (
-      <TextArea
-        label="Latar Belakang Usahawan"
-        name="LATARBELAKANG_USAHAWAN"
-        value={previousLatarBelakangUsahawan}
-        disabled={true}
-        rows={5}
-        placeholder="Latar Belakang Usahawan can only be edited in Sesi 1. Displaying previous entry."
-      />
-    )}
-  </Section>
-</div>
-
-{/* --- New Rumusan & Langkah Kehadapan Section (Sesi 2+) --- */}
-{currentSessionNumber >= 2 && (
-  <div className="bg-white p-6 rounded-lg shadow-sm">
-    <Section title="Rumusan Keseluruhan dan Langkah Kehadapan">
-      <EnhancedTextArea
-        label="Status Perniagaan Keseluruhan"
-        name="STATUS_PERNIAGAAN_KESELURUHAN"
-        value={formData.STATUS_PERNIAGAAN_KESELURUHAN || ''}
-        onChange={handleChange}
-        required={false}
-        rows={6}
-        placeholder={`Panduan:
-- Aktiviti pemasaran dan jualan
-- Perekodan maklumat akaun, sistem yang digunakan
-Apa yang usahawan mahu capai kedepan.
-Pemerhatian Mentor/Coach (apa yang bagus, apa yang kurang dan boleh ditambahbaik oleh usahawan)
-Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun lalui program:
-- Pendapatan
-- Keuntungan
-- Penambahan pekerja
-- Adaptasi teknologi
-- Peningkatan skil/pengetahuan`}
-      />
-      
-      <EnhancedTextArea
-        label="Rumusan Keseluruhan dan Langkah Kehadapan"
-        name="RUMUSAN_DAN_LANGKAH_KEHADAPAN"
-        value={formData.RUMUSAN_DAN_LANGKAH_KEHADAPAN || ''}
-        onChange={handleChange}
-        required={false}
-        rows={8}
-        placeholder={`Nota: 
-Pastikan peserta pulang dengan Keputusan dan Tindakan yang perlu diusahakan, siapa dan bila. (Kongsikan/pastika usahawan juga jelas)
-Apakah ada homework untuk peserta.
-Sebaiknya, tetapkan masa pertemuan sesi akan datang, dan mod perbincangan.
-Apakah bantuan, latihan yang mahu dicadangkan kepada HQ untuk membantu usahawan.
-Apakah mentor ada bahan tambahan yang dapat membantu usahawan.
-Apakah mentor perlukan bahan tambahan/banuan dari mentor mentor lain atau HQ.
-Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berkaitan bisnes mahupun tingkahlaku atau komitmen peserta.`}
-      />
-    </Section>
-  </div>
-)}
-
 const LaporanMajuPage = () => {
   const { data: session } = useSession();
   const isAdmin = session?.user?.email && process.env.NEXT_PUBLIC_ADMIN_EMAILS?.includes(session.user.email);
 
-
-// Update your initialFormState to include the new fields
-const initialFormState = {
-  // Existing fields...
-  Timestamp: '', 
-  NAMA_MENTOR: '',
-  EMAIL_MENTOR: '',
-  NAMA_MENTEE: '',
-  NAMA_BISNES: '',
-  LOKASI_BISNES: '',
-  PRODUK_SERVIS: '',
-  NO_TELEFON: '',
-  TARIKH_SESI: format(new Date(), 'yyyy-MM-dd'),
-  SESI_NUMBER: 1, 
-  MOD_SESI: '',
-  LOKASI_F2F: '',
-  MASA_MULA: '',
-  MASA_TAMAT: '',
-  LATARBELAKANG_USAHAWAN: '',
-  DATA_KEWANGAN_BULANAN_JSON: [],
-  MENTORING_FINDINGS_JSON: [],
-  REFLEKSI_MENTOR_PERASAAN: '',
-  REFLEKSI_MENTOR_KOMITMEN: '',
-  REFLEKSI_MENTOR_LAIN: '',
-  URL_GAMBAR_PREMIS_JSON: [],
-  URL_GAMBAR_SESI_JSON: [],
-  URL_GAMBAR_GW360: '',
-  Mentee_Folder_ID: '', 
-  Laporan_Maju_Doc_ID: '',
-  
-  // NEW FIELDS for Sesi 2+
-  STATUS_PERNIAGAAN_KESELURUHAN: '',
-  RUMUSAN_DAN_LANGKAH_KEHADAPAN: '',
-};
+  const initialFormState = {
+    // These match your LaporanMaju sheet headers for direct submission
+    Timestamp: '',
+    NAMA_MENTOR: '',
+    EMAIL_MENTOR: '',
+    NAMA_MENTEE: '',
+    NAMA_BISNES: '',
+    LOKASI_BISNES: '',
+    PRODUK_SERVIS: '',
+    NO_TELEFON: '',
+    TARIKH_SESI: format(new Date(), 'yyyy-MM-dd'),
+    SESI_NUMBER: 1,
+    MOD_SESI: '',
+    LOKASI_F2F: '',
+    MASA_MULA: '',
+    MASA_TAMAT: '',
+    LATARBELAKANG_USAHAWAN: '',
+    DATA_KEWANGAN_BULANAN_JSON: [],
+    MENTORING_FINDINGS_JSON: [],
+    REFLEKSI_MENTOR_PERASAAN: '',
+    REFLEKSI_MENTOR_KOMITMEN: '',
+    REFLEKSI_MENTOR_LAIN: '',
+    URL_GAMBAR_PREMIS_JSON: [],
+    URL_GAMBAR_SESI_JSON: [],
+    URL_GAMBAR_GW360: '',
+    Mentee_Folder_ID: '',
+    Laporan_Maju_Doc_ID: '',
+    // NEW FIELDS for Sesi 2+
+    STATUS_PERNIAGAAN_KESELURUHAN: '',
+    RUMUSAN_DAN_LANGKAH_KEHADAPAN: '',
+    // MIA fields
+    MIA_PROOF_URL: '',
+  };
 
   const [formData, setFormData] = useState(initialFormState);
   const [allMenteesMapping, setAllMenteesMapping] = useState([]);
@@ -257,7 +158,7 @@ const initialFormState = {
     const fetchMappingData = async () => {
       setLoading(true);
       try {
-        const response = await fetch('/api/mapping?programType=maju'); // <-- CHANGED HERE
+        const response = await fetch('/api/mapping?programType=maju');
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -328,7 +229,7 @@ const initialFormState = {
     const selectedMenteeName = e.target.value;
 
     setFormData(prev => ({
-      ...prev, 
+      ...prev,
       NAMA_MENTEE: selectedMenteeName,
       NAMA_BISNES: '',
       LOKASI_BISNES: '',
@@ -347,8 +248,10 @@ const initialFormState = {
       URL_GAMBAR_GW360: '',
       URL_GAMBAR_SESI_JSON: [],
       URL_GAMBAR_PREMIS_JSON: [],
-      Mentee_Folder_ID: '', 
-      Laporan_Maju_Doc_ID: '', 
+      Mentee_Folder_ID: '',
+      Laporan_Maju_Doc_ID: '',
+      STATUS_PERNIAGAAN_KESELURUHAN: '',
+      RUMUSAN_DAN_LANGKAH_KEHADAPAN: '',
     }));
 
     setCurrentSessionNumber(1);
@@ -356,9 +259,9 @@ const initialFormState = {
     setPreviousLatarBelakangUsahawan('');
     setHasPremisPhotosUploaded(false);
     setLawatanPremisChecked(false);
-    setIsMIA(false); // Reset MIA status on mentee change
-    setMiaReason(''); // Reset MIA reason
-    setMiaProofFile(null); // Reset MIA proof file
+    setIsMIA(false);
+    setMiaReason('');
+    setMiaProofFile(null);
 
     if (!selectedMenteeName) {
       setMessage('');
@@ -377,44 +280,20 @@ const initialFormState = {
       }
       const sessionData = await response.json();
 
-    // ADD THIS DEBUGGING CODE HERE:
-    console.log('🔍 DEBUG - API Response Data:', sessionData);
-    console.log('📋 Mentee Mapping from API:', sessionData.menteeMapping);
-    
-    if (sessionData.menteeMapping) {
-      console.log('✅ Mentee mapping exists');
-      console.log('🏢 NAMA_BISNES:', sessionData.menteeMapping.NAMA_BISNES);
-      console.log('📍 LOKASI_BISNES:', sessionData.menteeMapping.LOKASI_BISNES);
-      console.log('📞 NO_TELEFON:', sessionData.menteeMapping.NO_TELEFON);
-      console.log('💼 PRODUK_SERVIS:', sessionData.menteeMapping.PRODUK_SERVIS);
-      console.log('🗂️ Mentee_Folder_ID:', sessionData.menteeMapping.Mentee_Folder_ID);
-    } else {
-      console.log('❌ No mentee mapping found in API response');
-    }
       setFormData(prev => {
         const updatedFormData = { ...prev };
 
         if (sessionData.menteeMapping) {
-          console.log('📝 Setting form data from mentee mapping...');
           updatedFormData.NAMA_BISNES = sessionData.menteeMapping.NAMA_BISNES || '';
           updatedFormData.LOKASI_BISNES = sessionData.menteeMapping.LOKASI_BISNES || '';
           updatedFormData.PRODUK_SERVIS = sessionData.menteeMapping.PRODUK_SERVIS || '';
           updatedFormData.NO_TELEFON = sessionData.menteeMapping.NO_TELEFON || '';
           updatedFormData.Mentee_Folder_ID = sessionData.menteeMapping.Mentee_Folder_ID || '';
-          console.log('📄 Updated form data:', {
-          NAMA_BISNES: updatedFormData.NAMA_BISNES,
-          LOKASI_BISNES: updatedFormData.LOKASI_BISNES,
-          PRODUK_SERVIS: updatedFormData.PRODUK_SERVIS,
-          NO_TELEFON: updatedFormData.NO_TELEFON,
-          Mentee_Folder_ID: updatedFormData.Mentee_Folder_ID
-        });
-      } else {
-        console.log('⚠️ Skipping form data update - no mentee mapping');
-      }
+        }
 
         updatedFormData.SESI_NUMBER = sessionData.currentSession || 1;
         setCurrentSessionNumber(sessionData.currentSession || 1);
-        setIsMIA(sessionData.isMIA || false); // Load MIA status from backend
+        setIsMIA(sessionData.isMIA || false);
 
         if (sessionData.currentSession > 1 && sessionData.previousData) {
           setPreviousMentoringFindings(safeJSONParse(sessionData.previousData.MENTORING_FINDINGS_JSON));
@@ -452,9 +331,9 @@ const initialFormState = {
       setPreviousLatarBelakangUsahawan('');
       setHasPremisPhotosUploaded(false);
       setLawatanPremisChecked(false);
-      setIsMIA(false); // Reset MIA status on error
-      setMiaReason(''); // Reset MIA reason
-      setMiaProofFile(null); // Reset MIA proof file
+      setIsMIA(false);
+      setMiaReason('');
+      setMiaProofFile(null);
     } finally {
       setLoading(false);
     }
@@ -490,22 +369,11 @@ const initialFormState = {
     }));
   };
 
+  // UPDATED: handleFileChange to use reportType: 'sesi' for all image uploads
   const handleFileChange = async (e, fieldName) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
-  // ADD THIS DEBUG CODE HERE:
-  console.log('🔍 DEBUG - Before upload check:');
-  console.log('📁 Selected files:', files.map(f => f.name));
-  console.log('🆔 Mentee_Folder_ID from formData:', formData.Mentee_Folder_ID);
-  console.log('👤 Selected mentee:', formData.NAMA_MENTEE);
-  console.log('🗂️ Full formData object:', formData);
 
-  if (!formData.Mentee_Folder_ID) {
-    console.log('❌ No Mentee_Folder_ID found in formData');
-    setMessage('Please select a mentee first to get their folder ID before uploading images.');
-    setMessageType('error');
-    return;
-  }
     if (!formData.Mentee_Folder_ID) {
       setMessage('Please select a mentee first to get their folder ID before uploading images.');
       setMessageType('error');
@@ -517,28 +385,65 @@ const initialFormState = {
     setMessageType('');
 
     const uploadedUrls = [];
+
     for (const file of files) {
-      const fileFormData = new FormData();
-      fileFormData.append('file', file);
-      fileFormData.append('folderId', formData.Mentee_Folder_ID);
-
-    // ADD THIS DEBUG CODE HERE TOO:
-    console.log('📤 Uploading file:', file.name);
-    console.log('🆔 Using folder ID:', formData.Mentee_Folder_ID);
-
       try {
-        const response = await fetch('/api/upload-image', {
-          method: 'POST',
-          body: fileFormData,
+        const fileData = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result;
+            const base64Data = result.split(',')[1];
+            resolve(base64Data);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
         });
+
+        let imageType = '';
+        if (fieldName === 'URL_GAMBAR_GW360') {
+          imageType = 'gw';
+        } else if (fieldName === 'URL_GAMBAR_SESI_JSON') {
+          imageType = 'sesi';
+        } else if (fieldName === 'URL_GAMBAR_PREMIS_JSON') {
+          imageType = 'premis';
+        }
+
+        const uploadPayload = {
+          action: 'uploadImage',
+          fileData: fileData,
+          fileName: file.name,
+          fileType: file.type,
+          folderId: formData.Mentee_Folder_ID,
+          menteeName: formData.NAMA_MENTEE,
+          sessionNumber: currentSessionNumber,
+          reportType: 'sesi', // <--- IMPORTANT CHANGE: Route image uploads to Sesi Apps Script
+          isMIAProof: false,
+          imageType: imageType
+        };
+
+        console.log('📤 Uploading file via Apps Script proxy:', file.name);
+        console.log('🆔 Using folder ID:', formData.Mentee_Folder_ID);
+
+        const response = await fetch('/api/upload-proxy', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(uploadPayload),
+        });
+
+        console.log('📥 Upload response status:', response.status);
+
         const data = await response.json();
+        console.log('📄 Upload response data:', data);
+
         if (data.url) {
           uploadedUrls.push(data.url);
         } else {
           throw new Error('No URL returned from upload');
         }
       } catch (error) {
-        console.error(`Error uploading ${file.name}:`, error);
+        console.error(`❌ Error uploading ${file.name}:`, error);
         setMessage(`Failed to upload ${file.name}.`);
         setMessageType('error');
         setLoading(false);
@@ -555,9 +460,79 @@ const initialFormState = {
     setLoading(false);
   };
 
-  const handleMiaProofFileChange = (e) => {
-    setMiaProofFile(e.target.files[0]);
+  // NEW: handleMiaProofFileChange function for MIA proof uploads
+  const handleMiaProofFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!formData.Mentee_Folder_ID) {
+      setMessage('Please select a mentee first to get their folder ID before uploading MIA proof.');
+      setMessageType('error');
+      return;
+    }
+
+    setLoading(true);
+    setMessage(`Uploading MIA proof: ${file.name}...`);
+    setMessageType('');
+
+    try {
+      const fileData = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result;
+          const base64Data = result.split(',')[1];
+          resolve(base64Data);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const uploadPayload = {
+        action: 'uploadImage', // Action for image upload
+        fileData: fileData,
+        fileName: file.name,
+        fileType: file.type,
+        folderId: formData.Mentee_Folder_ID,
+        menteeName: formData.NAMA_MENTEE,
+        sessionNumber: currentSessionNumber,
+        reportType: 'sesi', // <--- IMPORTANT CHANGE: Route MIA proof to Sesi Apps Script
+        isMIAProof: true,
+        imageType: 'mia'
+      };
+
+      console.log('📤 Uploading MIA proof via Apps Script proxy:', file.name);
+
+      const response = await fetch('/api/upload-proxy', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(uploadPayload),
+      });
+
+      const data = await response.json();
+
+      if (data.url) {
+        setFormData(prev => ({
+          ...prev,
+          MIA_PROOF_URL: data.url
+        }));
+        setMiaProofFile(file);
+        setMessage('MIA proof uploaded successfully!');
+        setMessageType('success');
+      } else {
+        throw new Error(data.message || 'No URL returned from MIA proof upload');
+      }
+    } catch (error) {
+      console.error(`❌ Error uploading MIA proof ${file.name}:`, error);
+      setMessage(`Failed to upload MIA proof: ${error.message}`);
+      setMessageType('error');
+      setMiaProofFile(null);
+    } finally {
+      setLoading(false);
+    }
   };
+
 
   const resetForm = () => {
     setFormData({
@@ -574,270 +549,156 @@ const initialFormState = {
     setMessage('');
     setMessageType('');
     setLoading(false);
-    setIsMIA(false); // Reset MIA status
-    setMiaReason(''); // Reset MIA reason
-    setMiaProofFile(null); // Reset MIA proof file
+    setIsMIA(false);
+    setMiaReason('');
+    setMiaProofFile(null);
+
+    // Clear all file inputs in the DOM
+    const fileInputs = document.querySelectorAll('input[type="file"]');
+    fileInputs.forEach(input => {
+      input.value = '';
+    });
+
+    // Clear any "Uploaded" status messages by resetting the page display
+    console.log('✅ Form reset complete - all fields and file inputs cleared');
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setMessage('');
-    setMessageType('');
+  // UPDATED: handleSubmit to include 'action' and 'reportType: maju'
+// In your laporan-maju.js, update the handleSubmit function's response handling:
 
-    // MIA Validation & Handling START
+// In your laporan-maju.js handleSubmit function, make sure dataToSend is properly defined:
+
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setLoading(true);
+  setMessage('');
+  setMessageType('');
+
+  console.log('🚀 Starting form submission...');
+
+  try {
+    // ✅ MAKE SURE dataToSend is declared in the correct scope
+    let dataToSend = {}; // ← Declare it here at the top
+
+    // CONDITIONALLY BUILD dataToSend BASED ON MIA STATUS
     if (isMIA) {
-      if (!formData.NAMA_MENTEE) {
-        setMessage('Sila pilih mentee terlebih dahulu untuk melaporkan status MIA.');
-        setMessageType('error');
-        setLoading(false);
-        return;
-      }
-      if (!miaReason.trim()) {
-        setMessage('Sila berikan alasan/sebab usahawan MIA.');
-        setMessageType('error');
-        setLoading(false);
-        return;
-      }
-      // You can add a check here if miaProofFile is mandatory for MIA reports
-      // if (!miaProofFile) {
-      //   setMessage('Sila muat naik bukti untuk status MIA.');
-      //   setMessageType('error');
-      //   setLoading(false);
-      //   return;
-      // }
+      const miaProofUrl = formData.MIA_PROOF_URL || '';
+      console.log('📋 Building MIA data to send...');
+      
+      dataToSend = {
+        NAMA_MENTOR: formData.NAMA_MENTOR,
+        EMAIL_MENTOR: formData.EMAIL_MENTOR,
+        NAMA_MENTEE: formData.NAMA_MENTEE,
+        NAMA_BISNES: formData.NAMA_BISNES,
+        SESI_NUMBER: currentSessionNumber,
+        LOKASI_BISNES: '',
+        PRODUK_SERVIS: '',
+        NO_TELEFON: '',
+        TARIKH_SESI: '',
+        MOD_SESI: '',
+        LOKASI_F2F: '',
+        MASA_MULA: '',
+        MASA_TAMAT: '',
+        LATARBELAKANG_USAHAWAN: '',
+        DATA_KEWANGAN_BULANAN_JSON: [],
+        MENTORING_FINDINGS_JSON: [],
+        REFLEKSI_MENTOR_PERASAAN: '',
+        REFLEKSI_MENTOR_KOMITMEN: '',
+        REFLEKSI_MENTOR_LAIN: '',
+        URL_GAMBAR_PREMIS_JSON: [],
+        URL_GAMBAR_SESI_JSON: [],
+        URL_GAMBAR_GW360: '',
+        Mentee_Folder_ID: formData.Mentee_Folder_ID,
+        Laporan_Maju_Doc_ID: '',
+        STATUS_PERNIAGAAN_KESELURUHAN: '',
+        RUMUSAN_DAN_LANGKAH_KEHADAPAN: '',
+        MIA_STATUS: 'MIA',
+        MIA_REASON: miaReason,
+        MIA_PROOF_URL: miaProofUrl,
+      };
     } else {
-      // EXISTING (NON-MIA) VALIDATION START
-      if (!formData.NAMA_MENTEE || !formData.TARIKH_SESI || !formData.MOD_SESI || !formData.MASA_MULA || !formData.MASA_TAMAT) {
-        setMessage('Please fill in all required fields in Maklumat Sesi.');
-        setMessageType('error');
-        setLoading(false);
-        return;
-      }
-      if (formData.MOD_SESI === 'Face to Face' && !formData.LOKASI_F2F) {
-        setMessage('Please specify Lokasi F2F for Face to Face sessions.');
-        setMessageType('error');
-        setLoading(false);
-        return;
-      }
-      // 1) Latar Belakang (required only for Sesi 1)
-      if (currentSessionNumber === 1 && !String(formData.LATARBELAKANG_USAHAWAN || '').trim()) {
-        setMessage('Sila isi Latar Belakang Usahawan & Situasi Bisnes (Sesi 1).');
-        setMessageType('error');
-        setLoading(false);
-        return;
-      }
-
-      // 2) Dapatan Sesi Mentoring (require at least 1 finding with a topic)
-      const findings = Array.isArray(formData.MENTORING_FINDINGS_JSON)
-        ? formData.MENTORING_FINDINGS_JSON
-        : [];
-      const hasAtLeastOneFindingWithTopic = findings.some(f =>
-        String(f?.['Topik Perbincangan'] || '').trim().length > 0
-      );
-      if (!hasAtLeastOneFindingWithTopic) {
-        setMessage('Sila tambah sekurang-kurangnya satu Dapatan Sesi Mentoring (isi Topik Perbincangan).');
-        setMessageType('error');
-        setLoading(false);
-        return;
-      }
-
-      // 3) Refleksi Mentor (Perasaan & Komitmen required)
-      if (!String(formData.REFLEKSI_MENTOR_PERASAAN || '').trim() ||
-          !String(formData.REFLEKSI_MENTOR_KOMITMEN || '').trim()) {
-        setMessage('Sila isi Refleksi Mentor: Perasaan dan Komitmen adalah wajib.');
-        setMessageType('error');
-        setLoading(false);
-        return;
-      }
-      // Add existing image validation for non-MIA reports here
-      if (currentSessionNumber === 1 && !formData.URL_GAMBAR_GW360) {
-        setMessage('Gambar GW360 is required for Sesi 1.');
-        setMessageType('error');
-        setLoading(false);
-        return;
-      }
-      if (formData.URL_GAMBAR_SESI_JSON.length === 0) {
-        setMessage('Sila muat naik sekurang-kurangnya satu Gambar Sesi.');
-        setMessageType('error');
-        setLoading(false);
-        return;
-      }
-      if (lawatanPremisChecked && formData.URL_GAMBAR_PREMIS_JSON.length === 0) {
-        setMessage('Sila muat naik Gambar Premis because Lawatan Premis is checked.');
-        setMessageType('error');
-        setLoading(false);
-        return;
-      }
-      // EXISTING (NON-MIA) VALIDATION END
+      console.log('📋 Building regular report data to send...');
+      
+      dataToSend = {
+        NAMA_MENTOR: formData.NAMA_MENTOR,
+        EMAIL_MENTOR: formData.EMAIL_MENTOR,
+        NAMA_MENTEE: formData.NAMA_MENTEE,
+        NAMA_BISNES: formData.NAMA_BISNES,
+        SESI_NUMBER: currentSessionNumber,
+        LOKASI_BISNES: formData.LOKASI_BISNES,
+        PRODUK_SERVIS: formData.PRODUK_SERVIS,
+        NO_TELEFON: formData.NO_TELEFON,
+        TARIKH_SESI: formData.TARIKH_SESI,
+        MOD_SESI: formData.MOD_SESI,
+        LOKASI_F2F: formData.LOKASI_F2F,
+        MASA_MULA: formData.MASA_MULA,
+        MASA_TAMAT: formData.MASA_TAMAT,
+        LATARBELAKANG_USAHAWAN: currentSessionNumber === 1 ? formData.LATARBELAKANG_USAHAWAN : previousLatarBelakangUsahawan,
+        DATA_KEWANGAN_BULANAN_JSON: formData.DATA_KEWANGAN_BULANAN_JSON,
+        MENTORING_FINDINGS_JSON: formData.MENTORING_FINDINGS_JSON,
+        REFLEKSI_MENTOR_PERASAAN: formData.REFLEKSI_MENTOR_PERASAAN,
+        REFLEKSI_MENTOR_KOMITMEN: formData.REFLEKSI_MENTOR_KOMITMEN,
+        REFLEKSI_MENTOR_LAIN: formData.REFLEKSI_MENTOR_LAIN,
+        URL_GAMBAR_PREMIS_JSON: formData.URL_GAMBAR_PREMIS_JSON,
+        URL_GAMBAR_SESI_JSON: formData.URL_GAMBAR_SESI_JSON,
+        URL_GAMBAR_GW360: formData.URL_GAMBAR_GW360,
+        Mentee_Folder_ID: formData.Mentee_Folder_ID,
+        Laporan_Maju_Doc_ID: '',
+        STATUS_PERNIAGAAN_KESELURUHAN: formData.STATUS_PERNIAGAAN_KESELURUHAN || '',
+        RUMUSAN_DAN_LANGKAH_KEHADAPAN: formData.RUMUSAN_DAN_LANGKAH_KEHADAPAN || '',
+        MIA_STATUS: 'Tidak MIA',
+        MIA_REASON: '',
+        MIA_PROOF_URL: '',
+      };
     }
-    // MIA Validation & Handling END
 
+    // ✅ Now dataToSend is properly defined and can be used
+    console.log('📤 Data to send:', dataToSend);
+    console.log('🌐 Submitting to /api/submitMajuReport...');
+
+    const response = await fetch('/api/submitMajuReport', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(dataToSend), // ← This should work now
+    });
+
+    console.log('📥 Response status:', response.status);
+    console.log('📥 Response ok:', response.ok);
+
+    const responseText = await response.text();
+    console.log('📄 Raw response text:', responseText);
+
+    let result;
     try {
-      let dataToSend = {};
-      const appsScriptUrl = process.env.NEXT_PUBLIC_APPS_SCRIPT_LAPORAN_MAJU_URL;
+      result = JSON.parse(responseText);
+      console.log('📄 Parsed response JSON:', result);
+    } catch (parseError) {
+      console.error('❌ Failed to parse response as JSON:', parseError);
+      throw new Error(`Server returned non-JSON response: ${responseText}`);
+    }
 
-      if (!appsScriptUrl) {
-          setMessage('Google Apps Script URL is not configured in .env.local');
-          setMessageType('error');
-          setLoading(false);
-          return;
-      }
-
-      // CONDITIONALLY BUILD dataToSend BASED ON MIA STATUS
-      if (isMIA) {
-        let miaProofUrl = '';
-        if (miaProofFile) {
-          if (!formData.Mentee_Folder_ID) {
-            setMessage('Please select a mentee first to get their folder ID before uploading MIA proof.');
-            setMessageType('error');
-            setLoading(false);
-            return;
-          }
-          setMessage('Uploading MIA proof...');
-          setMessageType('');
-          const fileFormData = new FormData();
-          fileFormData.append('file', miaProofFile);
-          fileFormData.append('folderId', formData.Mentee_Folder_ID);
-
-          const uploadResponse = await fetch('/api/upload-image', {
-            method: 'POST',
-            body: fileFormData,
-          });
-          const uploadData = await uploadResponse.json();
-          if (uploadData.url) {
-            miaProofUrl = uploadData.url;
-          } else {
-            throw new Error('No URL returned from MIA proof upload');
-          }
-        }
-
-        dataToSend = {
-          Timestamp: new Date().toISOString(),
-          NAMA_MENTOR: formData.NAMA_MENTOR,
-          EMAIL_MENTOR: formData.EMAIL_MENTOR,
-          NAMA_MENTEE: formData.NAMA_MENTEE,
-          SESI_NUMBER: currentSessionNumber, // Still report session number even if MIA
-          MIA_STATUS: 'MIA', // Indicate MIA status
-          MIA_REASON: miaReason,
-          MIA_PROOF_URL: miaProofUrl,
-          Mentee_Folder_ID: formData.Mentee_Folder_ID,
-          // All other fields from the regular report are sent as empty strings or default values
-          // This is crucial to match the column order in your Google Sheet
-          NAMA_BISNES: '',
-          LOKASI_BISNES: '',
-          PRODUK_SERVIS: '',
-          NO_TELEFON: '',
-          TARIKH_SESI: '',
-          MOD_SESI: '',
-          LOKASI_F2F: '',
-          MASA_MULA: '',
-          MASA_TAMAT: '',
-          LATARBELAKANG_USAHAWAN: '',
-          DATA_KEWANGAN_BULANAN_JSON: '[]',
-          MENTORING_FINDINGS_JSON: '[]',
-          REFLEKSI_MENTOR_PERASAAN: '',
-          REFLEKSI_MENTOR_KOMITMEN: '',
-          REFLEKSI_MENTOR_LAIN: '',
-          URL_GAMBAR_PREMIS_JSON: '[]',
-          URL_GAMBAR_SESI_JSON: '[]',
-          URL_GAMBAR_GW360: '',
-          Laporan_Maju_Doc_ID: '',
-        };
-      } else {
-        // EXISTING dataToSend FOR REGULAR REPORTS
-        dataToSend = {
-          Timestamp: new Date().toISOString(),
-          NAMA_MENTOR: formData.NAMA_MENTOR,
-          EMAIL_MENTOR: formData.EMAIL_MENTOR,
-          NAMA_MENTEE: formData.NAMA_MENTEE,
-          NAMA_BISNES: formData.NAMA_BISNES,
-          LOKASI_BISNES: formData.LOKASI_BISNES,
-          PRODUK_SERVIS: formData.PRODUK_SERVIS,
-          NO_TELEFON: formData.NO_TELEFON,
-          TARIKH_SESI: formData.TARIKH_SESI,
-          SESI_NUMBER: currentSessionNumber,
-          MOD_SESI: formData.MOD_SESI,
-          LOKASI_F2F: formData.LOKASI_F2F,
-          MASA_MULA: formData.MASA_MULA,
-          MASA_TAMAT: formData.MASA_TAMAT,
-          LATARBELAKANG_USAHAWAN: currentSessionNumber === 1 ? formData.LATARBELAKANG_USAHAWAN : previousLatarBelakangUsahawan,
-          DATA_KEWANGAN_BULANAN_JSON: JSON.stringify(formData.DATA_KEWANGAN_BULANAN_JSON),
-          MENTORING_FINDINGS_JSON: JSON.stringify(formData.MENTORING_FINDINGS_JSON),
-          REFLEKSI_MENTOR_PERASAAN: formData.REFLEKSI_MENTOR_PERASAAN,
-          REFLEKSI_MENTOR_KOMITMEN: formData.REFLEKSI_MENTOR_KOMITMEN,
-          REFLEKSI_MENTOR_LAIN: formData.REFLEKSI_MENTOR_LAIN,
-          URL_GAMBAR_PREMIS_JSON: JSON.stringify(formData.URL_GAMBAR_PREMIS_JSON),
-          URL_GAMBAR_SESI_JSON: JSON.stringify(formData.URL_GAMBAR_SESI_JSON),
-          URL_GAMBAR_GW360: formData.URL_GAMBAR_GW360,
-          Mentee_Folder_ID: formData.Mentee_Folder_ID,
-          Laporan_Maju_Doc_ID: '',
-          MIA_STATUS: 'Tidak MIA', // Explicitly set if not MIA
-          MIA_REASON: '',     // Empty for non-MIA
-          MIA_PROOF_URL: ''   // Empty for non-MIA
-        };
-      }
-
-      const response = await fetch(appsScriptUrl, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(dataToSend),
-      });
-
-      setMessage('Laporan submitted successfully! (Please check Apps Script logs for confirmation)');
+    if (response.ok && result.success === true) {
+      console.log('✅ Submission successful!');
+      setMessage(result.message || 'Laporan submitted successfully!');
       setMessageType('success');
       resetForm();
-
-    } catch (error) {
-      console.error('Submission error:', error);
-      setMessage('Failed to submit Laporan. Please try again.');
-      setMessageType('error');
-    } finally {
-      setLoading(false);
+    } else {
+      console.error('❌ Submission failed:', result);
+      const errorMessage = result.error || result.message || 'Submission failed';
+      throw new Error(errorMessage);
     }
-  };
 
-    // THIS IS THE BLOCK THAT NEEDS TO BE MOVED TO THE VERY TOP OF THE COMPONENT'S RENDER FUNCTION 👇
-    // if (!session) {
-    // return <InfoCard title="Authentication Required">Please log in to access this page.</InfoCard>;
-    // }
-
-    // if (currentSessionNumber > 4 && formData.NAMA_MENTEE) {
-    // return (
-    //   <div className="bg-gray-100 min-h-screen font-sans">
-    //     <header className="text-center bg-white p-6 rounded-lg shadow-sm mb-6 max-w-4xl mx-auto">
-    //       <img src="/logo1.png" alt="Logo" className="mx-auto h-20 mb-2" />
-    //       <h1 className="text-3xl font-bold text-gray-800">Borang Laporan Maju</h1>
-    //       <p className="text-gray-500 mt-1">Sila lengkapkan borang berdasarkan sesi semasa.</p>
-    //     </header>
-
-    //     <div className="container mx-auto p-4 max-w-4xl">
-    //       <div className="bg-white p-6 rounded-lg shadow-sm">
-    //         <InfoCard title="Sesi Mentoring Lengkap" type="info">
-    //           <p className="text-lg">
-    //             Semua sesi mentoring untuk <strong>{formData.NAMA_MENTEE}</strong> telah lengkap (Sesi 1 hingga 4 telah direkodkan).
-    //             <br />
-    //             Tiada borang laporan maju baru diperlukan untuk mentee ini.
-    //           </p>
-    //           <button
-    //             onClick={resetForm}
-    //             className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-    //           >
-    //             Pilih Mentee Lain
-    //           </button>
-    //         </InfoCard>
-    //       </div>
-    //     </div>
-    //   </div>
-    // );
-    // }
-    // END OF BLOCK TO BE MOVED 👆
-
-
-  // START OF MOVED BLOCK - PLACE THESE AT THE VERY BEGINNING OF THE RENDER RETURN 👇
+  } catch (error) {
+    console.error('❌ Detailed submission error:', error);
+    setMessage(`Failed to submit Laporan: ${error.message}`);
+    setMessageType('error');
+  } finally {
+    setLoading(false);
+  }
+};
+  // Early returns for authentication and session limits
   if (!session) {
     return <InfoCard title="Authentication Required">Please log in to access this page.</InfoCard>;
   }
@@ -871,8 +732,6 @@ const initialFormState = {
       </div>
     );
   }
-  // END OF MOVED BLOCK 👆
-
 
   return (
     <div className="bg-gray-100 min-h-screen font-sans">
@@ -901,7 +760,7 @@ const initialFormState = {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* MIA Checkbox always visible at the top 👇 */}
+          {/* MIA Checkbox always visible at the top */}
           <div className="bg-white p-6 rounded-lg shadow-sm">
             {isMIA && formData.NAMA_MENTEE && (
               <InfoCard title="Usahawan ini telah ditandakan sebagai MIA." type="info">
@@ -909,23 +768,21 @@ const initialFormState = {
                 <p>Sila nyatakan alasan dan muat naik bukti.</p>
               </InfoCard>
             )}
-            <label className="flex items-center mt-4"> {/* Added mt-4 for spacing from InfoCard if present */}
+            <label className="flex items-center mt-4">
               <input
                 type="checkbox"
                 className="form-checkbox h-5 w-5 text-red-600"
                 checked={isMIA}
                 onChange={(e) => setIsMIA(e.target.checked)}
-                // If a mentee is already marked MIA, disable unchecking it if that's your policy
-                disabled={isMIA && (formData.NAMA_MENTEE && currentSessionNumber > 1)} // Example: Can't uncheck MIA if it was previously set and not Sesi 1
+                disabled={isMIA && (formData.NAMA_MENTEE && currentSessionNumber > 1)}
               />
               <span className="ml-2 text-lg font-semibold text-gray-800">Tandakan jika Usahawan Tidak Hadir / MIA</span>
             </label>
           </div>
-          {/* MIA Checkbox always visible at the top 👆 */}
 
-          {/* Conditional rendering based on isMIA status 👇 */}
+          {/* Conditional rendering based on isMIA status */}
           {isMIA ? (
-            /* MIA Form Section 👇 */
+            /* MIA Form Section */
             <div className="bg-white p-6 rounded-lg shadow-sm">
               <Section title="Laporan Status MIA">
                 <InputField
@@ -952,7 +809,7 @@ const initialFormState = {
                 <FileInput
                   label="Muat Naik Bukti (Cth: Screenshot Perbualan)"
                   name="miaProof"
-                  onFileChange={handleMiaProofFileChange}
+                  onFileChange={handleMiaProofFileChange} // <--- Ensure this uses the new handler
                   multiple={false}
                 />
                 {miaProofFile && (
@@ -962,10 +819,8 @@ const initialFormState = {
                 )}
               </Section>
             </div>
-            /* MIA Form Section 👆 */
           ) : (
             <>
-              {/* ALL YOUR EXISTING FORM SECTIONS GO HERE 👇 */}
               {/* --- Maklumat Sesi --- */}
               <div className="bg-white p-6 rounded-lg shadow-sm">
                 <Section title="Maklumat Sesi">
@@ -1044,7 +899,7 @@ const initialFormState = {
                 </Section>
               </div>
 
-              {/* --- Latar Belakang --- */}
+              {/* --- Enhanced Latar Belakang Section --- */}
               <div className="bg-white p-6 rounded-lg shadow-sm">
                 <Section title="Latar Belakang Usahawan & Situasi Bisnes">
                   {currentSessionNumber > 1 && previousLatarBelakangUsahawan && (
@@ -1052,20 +907,42 @@ const initialFormState = {
                       <p className="whitespace-pre-wrap">{previousLatarBelakangUsahawan}</p>
                     </InfoCard>
                   )}
-                  <TextArea
-                    label="Latar Belakang Usahawan"
-                    name="LATARBELAKANG_USAHAWAN"
-                    value={formData.LATARBELAKANG_USAHAWAN}
-                    onChange={handleChange}
-                    disabled={currentSessionNumber > 1}
-                    required={currentSessionNumber === 1}
-                    rows={5}
-                    placeholder={
-                      currentSessionNumber > 1
-                        ? 'Latar Belakang Usahawan can only be edited in Sesi 1. Displaying previous entry.'
-                        : ''
-                    }
-                  />
+
+                  {currentSessionNumber === 1 ? (
+                    <EnhancedTextArea
+                      label="Latar Belakang Usahawan"
+                      name="LATARBELAKANG_USAHAWAN"
+                      value={formData.LATARBELAKANG_USAHAWAN}
+                      onChange={handleChange}
+                      required={true}
+                      rows={8}
+                      placeholder={`Panduan:
+Latarbelakang usahawan.
+Penerangan produk/perkhidmatan.
+Situasi bisnes ketika ini:
+- Sistem bisnes
+- Sejauh mana usahawan jelas dengan segmen pelanggan dan nilai yang ditawarkan
+- Aktiviti pemasaran dan jualan
+- Perekodan maklumat akaun, sistem yang digunakan
+Apa yang usahawan mahu capai kedepan.
+Pemerhatian Mentor/Coach (apa yang bagus, apa yang kurang dan boleh ditambahbaik oleh usahawan)
+Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun lalui program:
+- Pendapatan
+- Keuntungan
+- Penambahan pekerja
+- Adaptasi teknologi
+- Peningkatan skil/pengetahuan`}
+                    />
+                  ) : (
+                    <TextArea
+                      label="Latar Belakang Usahawan"
+                      name="LATARBELAKANG_USAHAWAN"
+                      value={previousLatarBelakangUsahawan}
+                      disabled={true}
+                      rows={5}
+                      placeholder="Latar Belakang Usahawan can only be edited in Sesi 1. Displaying previous entry."
+                    />
+                  )}
                 </Section>
               </div>
 
@@ -1319,6 +1196,50 @@ const initialFormState = {
                 </Section>
               </div>
 
+              {/* --- NEW Rumusan & Langkah Kehadapan Section (Sesi 2+) --- */}
+              {currentSessionNumber >= 2 && (
+                <div className="bg-white p-6 rounded-lg shadow-sm">
+                  <Section title="Rumusan Keseluruhan dan Langkah Kehadapan">
+                    <EnhancedTextArea
+                      label="Status Perniagaan Keseluruhan"
+                      name="STATUS_PERNIAGAAN_KESELURUHAN"
+                      value={formData.STATUS_PERNIAGAAN_KESELURUHAN || ''}
+                      onChange={handleChange}
+                      required={false}
+                      rows={6}
+                      placeholder={`Panduan:
+- Aktiviti pemasaran dan jualan
+- Perekodan maklumat akaun, sistem yang digunakan
+Apa yang usahawan mahu capai kedepan.
+Pemerhatian Mentor/Coach (apa yang bagus, apa yang kurang dan boleh ditambahbaik oleh usahawan)
+Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun lalui program:
+- Pendapatan
+- Keuntungan
+- Penambahan pekerja
+- Adaptasi teknologi
+- Peningkatan skil/pengetahuan`}
+                    />
+
+                    <EnhancedTextArea
+                      label="Rumusan Keseluruhan dan Langkah Kehadapan"
+                      name="RUMUSAN_DAN_LANGKAH_KEHADAPAN"
+                      value={formData.RUMUSAN_DAN_LANGKAH_KEHADAPAN || ''}
+                      onChange={handleChange}
+                      required={false}
+                      rows={8}
+                      placeholder={`Nota:
+Pastikan peserta pulang dengan Keputusan dan Tindakan yang perlu diusahakan, siapa dan bila. (Kongsikan/pastika usahawan juga jelas)
+Apakah ada homework untuk peserta.
+Sebaiknya, tetapkan masa pertemuan sesi akan datang, dan mod perbincangan.
+Apakah bantuan, latihan yang mahu dicadangkan kepada HQ untuk membantu usahawan.
+Apakah mentor ada bahan tambahan yang dapat membantu usahawan.
+Apakah mentor perlukan bahan tambahan/banuan dari mentor mentor lain atau HQ.
+Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berkaitan bisnes mahupun tingkahlaku atau komitmen peserta.`}
+                    />
+                  </Section>
+                </div>
+              )}
+
               {/* --- Refleksi Mentor --- */}
               <div className="bg-white p-6 rounded-lg shadow-sm">
                 <Section title="Refleksi Mentor">
@@ -1454,7 +1375,7 @@ const initialFormState = {
                 <div className="bg-white p-6 rounded-lg shadow-sm">
                   <Section title="Bahagian Upward Mobility">
                     <InfoCard title="Peringatan Penting" type="info">
-                      <p>[SESI 2 & 4 SAHAJA] Sila lengkapkan borang Google Forms Upward Mobility di pautan berikut:</p>
+                      <p>[SESI 2 & 4 SAHAJA] Sila lengkapkan borang Forms Upward Mobility di pautan berikut:</p>
                       <a
                         href="YOUR_UPWARD_MOBILITY_GOOGLE_FORM_LINK_HERE"
                         target="_blank"
@@ -1467,7 +1388,6 @@ const initialFormState = {
                   </Section>
                 </div>
               )}
-              {/* ALL YOUR EXISTING FORM SECTIONS GO HERE 👆 */}
             </>
           )}
 
