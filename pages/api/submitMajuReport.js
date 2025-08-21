@@ -81,23 +81,23 @@ export default async function handler(req, res) {
     const updatedRange = appendRes.data?.updates?.updatedRange || '';
     const newRowNumber = updatedRange.match(/!A(\d+):/)?.[1];
 
-    // Trigger Apps Script for document generation
-    if (newRowNumber && appsScriptUrl) {
-      try {
-        await fetch(appsScriptUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            action: 'processRow', 
-            rowNumber: newRowNumber, 
-            programType: 'maju' 
-          }),
-        });
-      } catch (e) {
-        console.error('Apps Script trigger failed:', e);
-        // Don't block submission success if automation ping fails
-      }
-    }
+// Trigger Apps Script for document generation
+if (newRowNumber && appsScriptUrl) {
+  try {
+    await fetch(appsScriptUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'processRow',
+        rowNumber: newRowNumber,
+        programType: 'maju'
+      }),
+    });
+  } catch (e) {
+    console.error('Apps Script trigger failed:', e);
+    // Don't block submission success if automation ping fails
+  }
+}
 
     return res.status(200).json({ success: true, message: 'Laporan berjaya dihantar!' });
 
