@@ -216,12 +216,12 @@ export default function HomePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               <ToolCard
                 href="/laporan-sesi"
-                title="Laporan Sesi iTEKAD"
+                title="Laporan Sesi iTEKAD Bangkit"
                 description="Isi laporan berterusan untuk usahawan anda di sini."
               />
               <ToolCard
                 href="/laporan-maju"
-                title="Laporan Kemajuan"
+                title="Laporan Sesi iTEKAD Maju"
                 description="Isi laporan kemajuan untuk usahawan anda."
               />
               <ToolCard
