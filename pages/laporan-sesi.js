@@ -10,10 +10,16 @@ const smartUploadImage = async (imageData) => {
     const dataSize = new Blob([JSON.stringify(imageData)]).size;
     const sizeMB = dataSize / (1024 * 1024);
     
-    console.log(`📸 Image size: ${sizeMB.toFixed(2)}MB`);
+    // Enhanced debugging
+    console.log(`🔍 Debug Info:`, {
+        imageSizeMB: sizeMB.toFixed(2),
+        isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
+        online: navigator.onLine,
+        userAgent: navigator.userAgent.substring(0, 50),
+        appsScriptUrl: process.env.NEXT_PUBLIC_APPS_SCRIPT_URL ? 'SET' : 'MISSING'
+    });
     
     if (sizeMB < 0.9) {
-        // Small image: use proxy for better error handling
         console.log('📤 Using proxy for small image');
         try {
             const response = await fetch('/api/upload-proxy', {
@@ -21,32 +27,55 @@ const smartUploadImage = async (imageData) => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ...imageData, reportType: 'sesi' }),
             });
-            return await response.json();
+            
+            console.log('✅ Proxy response status:', response.status, response.statusText);
+            const result = await response.json();
+            console.log('✅ Proxy response data:', result);
+            return result;
+            
         } catch (error) {
-            // Fallback to direct upload
-            console.log('⚠️ Proxy failed, trying direct upload for image...');
+            console.log('⚠️ Proxy failed:', error.message);
+            console.log('🔄 Trying direct upload...');
             return await uploadImageDirect(imageData);
         }
     } else {
-        // Large image: direct upload to bypass 1MB limit
         console.log('📤 Using direct upload for large image');
         return await uploadImageDirect(imageData);
     }
 };
 
 const uploadImageDirect = async (imageData) => {
-    const response = await fetch(process.env.NEXT_PUBLIC_APPS_SCRIPT_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(imageData),
-    });
+console.log('🎯 Direct upload starting...');
+    console.log('🎯 Apps Script URL:', process.env.NEXT_PUBLIC_APPS_SCRIPT_URL);
     
-    const text = await response.text();
+    if (!process.env.NEXT_PUBLIC_APPS_SCRIPT_URL) {
+        throw new Error('NEXT_PUBLIC_APPS_SCRIPT_URL environment variable is not set');
+    }
+    
     try {
-        return JSON.parse(text);
-    } catch (parseError) {
-        console.error('Failed to parse Apps Script response:', text);
-        throw new Error('Invalid response from Google Apps Script');
+        const response = await fetch(process.env.NEXT_PUBLIC_APPS_SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(imageData),
+        });
+        
+        console.log('✅ Direct response status:', response.status, response.statusText);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const text = await response.text();
+        console.log('📋 Direct response length:', text.length);
+        console.log('📋 Direct response preview:', text.substring(0, 200));
+        
+        const result = JSON.parse(text);
+        console.log('✅ Direct upload successful');
+        return result;
+        
+    } catch (error) {
+        console.error('❌ Direct upload error:', error);
+        throw error;
     }
 };
 // --- UI Components ---
