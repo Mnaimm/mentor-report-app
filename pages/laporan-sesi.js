@@ -3,6 +3,52 @@ import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 
+
+// ADD this helper function at the top of your laporan-sesi.js file:
+const smartUploadImage = async (imageData) => {
+    // Calculate image size
+    const dataSize = new Blob([JSON.stringify(imageData)]).size;
+    const sizeMB = dataSize / (1024 * 1024);
+    
+    console.log(`📸 Image size: ${sizeMB.toFixed(2)}MB`);
+    
+    if (sizeMB < 0.9) {
+        // Small image: use proxy for better error handling
+        console.log('📤 Using proxy for small image');
+        try {
+            const response = await fetch('/api/upload-proxy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...imageData, reportType: 'sesi' }),
+            });
+            return await response.json();
+        } catch (error) {
+            // Fallback to direct upload
+            console.log('⚠️ Proxy failed, trying direct upload for image...');
+            return await uploadImageDirect(imageData);
+        }
+    } else {
+        // Large image: direct upload to bypass 1MB limit
+        console.log('📤 Using direct upload for large image');
+        return await uploadImageDirect(imageData);
+    }
+};
+
+const uploadImageDirect = async (imageData) => {
+    const response = await fetch(process.env.NEXT_PUBLIC_APPS_SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(imageData),
+    });
+    
+    const text = await response.text();
+    try {
+        return JSON.parse(text);
+    } catch (parseError) {
+        console.error('Failed to parse Apps Script response:', text);
+        throw new Error('Invalid response from Google Apps Script');
+    }
+};
 // --- UI Components ---
 const Section = ({ title, children, description }) => (
   <div className="p-6 border border-gray-200 rounded-lg bg-white shadow-sm">
@@ -298,62 +344,48 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
     const menteeData = allMentees.find((m) => m.Usahawan === menteeName);
     setSelectedMentee(menteeData);
     try {
-      const res = await fetch(`/api/menteeData?name=${encodeURIComponent(menteeName)}`);
+      const res = await fetch(`/api/menteeData?name=${encodeURIComponent(menteeName)}&programType=bangkit`);
       const data = await res.json();
 
       let fw = frameworkData;
-if (!fw || fw.length === 0) {
-  const fwRes = await fetch('/api/frameworkBank');
-  fw = await fwRes.json();
-}
+      if (!fw || fw.length === 0) {
+        const fwRes = await fetch('/api/frameworkBank');
+        fw = await fwRes.json();
+      }
 
-const prevInisiatif = normalizePrevInisiatif(data.previousInisiatif || [], fw);
+      const prevInisiatif = normalizePrevInisiatif(data.previousInisiatif || [], fw);
 
-setPreviousData({
-  sales: data.previousSales || [],
-  inisiatif: prevInisiatif,
-  premisDilawat: !!data.previousPremisDilawat,
-});
-setFormState(p => ({
-  ...p,
-  jualanTerkini: data.previousSales || Array(12).fill(''),
-  kemaskiniInisiatif: Array(prevInisiatif.length).fill(''),
-}));
+      setPreviousData({
+        sales: data.previousSales || [],
+        inisiatif: prevInisiatif,
+        premisDilawat: !!data.previousPremisDilawat,
+      });
+      setFormState(p => ({
+        ...p,
+        jualanTerkini: data.previousSales || Array(12).fill(''),
+        kemaskiniInisiatif: Array(prevInisiatif.length).fill(''),
+      }));
+      
       if (res.ok) {
         setCurrentSession(data.lastSession + 1);
         setMenteeStatus(data.status || '');
-
-        // --- normalize previous inisiatif to readable text
-        const prevInisiatifRaw = data.previousInisiatif || [];
-        const prevInisiatif = normalizePrevInisiatif(prevInisiatifRaw, frameworkData);
-
-        setPreviousData({
-          sales: data.previousSales || [],
-          inisiatif: prevInisiatif,
-          premisDilawat: !!data.previousPremisDilawat,
-        });
-        setFormState((prev) => ({
-          ...prev,
-          jualanTerkini: data.previousSales || Array(12).fill(''),
-          kemaskiniInisiatif: Array(prevInisiatif.length).fill(''),
-        }));
 
         // --- Restore draft
         try {
           const draftKey = getDraftKey(menteeName, data.lastSession + 1, session?.user?.email);
           const saved = localStorage.getItem(draftKey);
-if (saved) {
-  const parsed = JSON.parse(saved);
-  setFormState(prev => ({
-    ...prev,
-    ...parsed,
-    // keep server’s previousSales if draft has nothing/empty
-    jualanTerkini: (Array.isArray(parsed.jualanTerkini) && parsed.jualanTerkini.some(v => v))
-      ? parsed.jualanTerkini
-      : (data.previousSales || prev.jualanTerkini),
-  }));
-  setSaveStatus('Draft restored');
-}
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            setFormState(prev => ({
+              ...prev,
+              ...parsed,
+              // keep server's previousSales if draft has nothing/empty
+              jualanTerkini: (Array.isArray(parsed.jualanTerkini) && parsed.jualanTerkini.some(v => v))
+                ? parsed.jualanTerkini
+                : (data.previousSales || prev.jualanTerkini),
+            }));
+            setSaveStatus('Draft restored');
+          }
         } catch {}
         setAutosaveArmed(true);
       }
@@ -433,31 +465,30 @@ if (saved) {
       const folderId = selectedMentee.Folder_ID;
       if (!folderId) throw new Error(`Folder ID tidak ditemui untuk usahawan: ${selectedMentee.Usahawan}`);
 
-      const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onloadend = () => {
-          fetch('/api/upload-proxy', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              fileData: reader.result.split(',')[1],
-              fileName: file.name,
-              fileType: file.type,
-              folderId: fId,
-              menteeName,
-              sessionNumber
-            })
-          })
-            .then((res) => res.json())
-            .then((result) => {
-              if (result.error) reject(new Error(result.error));
-              else resolve(result.url);
+// REPLACE WITH THIS (uses smart upload for large images):
+const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onloadend = () => {
+        const imageData = {
+            fileData: reader.result.split(',')[1], 
+            fileName: file.name, 
+            fileType: file.type, 
+            folderId: fId, 
+            menteeName, 
+            sessionNumber
+        };
+        
+        // Use smart upload for images
+        smartUploadImage(imageData)
+            .then(result => {
+                if (result.error) reject(new Error(result.error)); 
+                else resolve(result.url);
             })
             .catch(reject);
-        };
-        reader.onerror = reject;
-      });
+    };
+    reader.onerror = reject;
+});
 
       const menteeNameForUpload = selectedMentee.Usahawan;
       const sessionNumberForUpload = currentSession;
@@ -497,6 +528,7 @@ if (saved) {
         mentorEmail: session.user.email,
         imageUrls,
         premisDilawatChecked: !!formState.sesi?.premisDilawat,
+        programType: 'bangkit', // Added programType
       };
 
       const response = await fetch('/api/submitReport', {
