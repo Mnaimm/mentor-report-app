@@ -12,6 +12,8 @@ function MyApp({ Component, pageProps: { session, ...pageProps } }) {
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
         <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
         <link rel="manifest" href="/site.webmanifest" />
+        {/* ADD THIS LINE - Content Security Policy to allow Google Apps Script connections */}
+        <meta httpEquiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://script.google.com https://script.googleusercontent.com; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
       </Head>
       <Component {...pageProps} />
     </SessionProvider>
