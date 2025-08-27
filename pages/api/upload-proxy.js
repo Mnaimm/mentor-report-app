@@ -1,10 +1,37 @@
 // pages/api/upload-proxy.js
-// Updated to handle both laporan-sesi and laporan-maju URLs
+// Updated to handle both laporan-sesi and laporan-maju URLs with size limits
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
+    // Check request size (approximate check using Content-Length header)
+    const contentLength = req.headers['content-length'];
+    const maxSize = 900 * 1024; // 900KB to stay under 1MB limit with some buffer
+    
+    if (contentLength && parseInt(contentLength) > maxSize) {
+      console.error('🚫 Request too large:', contentLength, 'bytes (max:', maxSize, ')');
+      return res.status(413).json({ 
+        error: 'Request too large', 
+        message: 'File size exceeds 900KB limit. Please compress images or reduce file sizes.',
+        maxSize: '900KB'
+      });
+    }
+
+    // Additional check on the actual body
+    const bodyString = JSON.stringify(req.body);
+    const bodySizeBytes = Buffer.byteLength(bodyString, 'utf8');
+    
+    if (bodySizeBytes > maxSize) {
+      console.error('🚫 Body too large:', bodySizeBytes, 'bytes (max:', maxSize, ')');
+      return res.status(413).json({ 
+        error: 'Request body too large', 
+        message: 'Data size exceeds 900KB limit. Please compress images or reduce file sizes.',
+        actualSize: `${Math.round(bodySizeBytes / 1024)}KB`,
+        maxSize: '900KB'
+      });
+    }
+
     // Determine which Apps Script URL to use based on reportType
     const reportType = req.body.reportType;
     let url;
@@ -21,11 +48,15 @@ export default async function handler(req, res) {
     }
 
     console.log('📡 Proxying to Apps Script URL:', url);
+    console.log('📊 Request body size:', Math.round(bodySizeBytes / 1024), 'KB');
 
     const upstream = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body),
+      headers: { 
+        'Content-Type': 'application/json',
+        'Content-Length': bodySizeBytes.toString()
+      },
+      body: bodyString,
     });
 
     const text = await upstream.text();
@@ -34,13 +65,32 @@ export default async function handler(req, res) {
       const json = JSON.parse(text);
       console.log('✅ Successfully parsed JSON response');
       return res.status(upstream.ok ? 200 : 500).json(json);
-    } catch {
-      console.error('❌ Failed to parse Apps Script response as JSON:', text);
+    } catch (parseError) {
+      console.error('❌ Failed to parse Apps Script response as JSON:', text.substring(0, 200), '...');
+      
+      // Check if it's a size limit error from the upstream service
+      if (text.toLowerCase().includes('body') && text.toLowerCase().includes('limit')) {
+        return res.status(413).json({ 
+          error: 'Request too large for upstream service',
+          message: 'The data is too large for the Google Apps Script endpoint. Please compress images or reduce file sizes.'
+        });
+      }
+      
       // Forward the raw body (likely HTML error or login page) to debug
       return res.status(upstream.status).send(text);
     }
   } catch (err) {
     console.error('❌ Upload proxy error:', err);
+    
+    // Check if it's a body size error
+    if (err.message && err.message.includes('body') && err.message.includes('limit')) {
+      return res.status(413).json({ 
+        error: 'Request too large', 
+        message: 'File size exceeds server limits. Please compress images or reduce file sizes.',
+        details: 'Maximum request size is 1MB'
+      });
+    }
+    
     return res.status(500).json({ error: 'Upload failed', details: String(err) });
   }
 }

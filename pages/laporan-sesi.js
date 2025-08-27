@@ -3,6 +3,52 @@ import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 
+
+// ADD this helper function at the top of your laporan-sesi.js file:
+const smartUploadImage = async (imageData) => {
+    // Calculate image size
+    const dataSize = new Blob([JSON.stringify(imageData)]).size;
+    const sizeMB = dataSize / (1024 * 1024);
+    
+    console.log(`📸 Image size: ${sizeMB.toFixed(2)}MB`);
+    
+    if (sizeMB < 0.9) {
+        // Small image: use proxy for better error handling
+        console.log('📤 Using proxy for small image');
+        try {
+            const response = await fetch('/api/upload-proxy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...imageData, reportType: 'sesi' }),
+            });
+            return await response.json();
+        } catch (error) {
+            // Fallback to direct upload
+            console.log('⚠️ Proxy failed, trying direct upload for image...');
+            return await uploadImageDirect(imageData);
+        }
+    } else {
+        // Large image: direct upload to bypass 1MB limit
+        console.log('📤 Using direct upload for large image');
+        return await uploadImageDirect(imageData);
+    }
+};
+
+const uploadImageDirect = async (imageData) => {
+    const response = await fetch(process.env.NEXT_PUBLIC_APPS_SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(imageData),
+    });
+    
+    const text = await response.text();
+    try {
+        return JSON.parse(text);
+    } catch (parseError) {
+        console.error('Failed to parse Apps Script response:', text);
+        throw new Error('Invalid response from Google Apps Script');
+    }
+};
 // --- UI Components ---
 const Section = ({ title, children, description }) => (
   <div className="p-6 border border-gray-200 rounded-lg bg-white shadow-sm">
@@ -419,31 +465,30 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
       const folderId = selectedMentee.Folder_ID;
       if (!folderId) throw new Error(`Folder ID tidak ditemui untuk usahawan: ${selectedMentee.Usahawan}`);
 
-      const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onloadend = () => {
-          fetch('/api/upload-proxy', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              fileData: reader.result.split(',')[1],
-              fileName: file.name,
-              fileType: file.type,
-              folderId: fId,
-              menteeName,
-              sessionNumber
-            })
-          })
-            .then((res) => res.json())
-            .then((result) => {
-              if (result.error) reject(new Error(result.error));
-              else resolve(result.url);
+// REPLACE WITH THIS (uses smart upload for large images):
+const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onloadend = () => {
+        const imageData = {
+            fileData: reader.result.split(',')[1], 
+            fileName: file.name, 
+            fileType: file.type, 
+            folderId: fId, 
+            menteeName, 
+            sessionNumber
+        };
+        
+        // Use smart upload for images
+        smartUploadImage(imageData)
+            .then(result => {
+                if (result.error) reject(new Error(result.error)); 
+                else resolve(result.url);
             })
             .catch(reject);
-        };
-        reader.onerror = reject;
-      });
+    };
+    reader.onerror = reject;
+});
 
       const menteeNameForUpload = selectedMentee.Usahawan;
       const sessionNumberForUpload = currentSession;
