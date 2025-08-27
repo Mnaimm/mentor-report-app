@@ -5,79 +5,9 @@ import Link from 'next/link';
 
 
 // ADD this helper function at the top of your laporan-sesi.js file:
-const smartUploadImage = async (imageData) => {
-    // Calculate image size
-    const dataSize = new Blob([JSON.stringify(imageData)]).size;
-    const sizeMB = dataSize / (1024 * 1024);
-    
-    // Enhanced debugging
-    console.log(`🔍 Debug Info:`, {
-        imageSizeMB: sizeMB.toFixed(2),
-        isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
-        online: navigator.onLine,
-        userAgent: navigator.userAgent.substring(0, 50),
-        appsScriptUrl: process.env.NEXT_PUBLIC_APPS_SCRIPT_URL ? 'SET' : 'MISSING'
-    });
-    
-    if (sizeMB < 0.9) {
-        console.log('📤 Using proxy for small image');
-        try {
-            const response = await fetch('/api/upload-proxy', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...imageData, reportType: 'sesi' }),
-            });
-            
-            console.log('✅ Proxy response status:', response.status, response.statusText);
-            const result = await response.json();
-            console.log('✅ Proxy response data:', result);
-            return result;
-            
-        } catch (error) {
-            console.log('⚠️ Proxy failed:', error.message);
-            console.log('🔄 Trying direct upload...');
-            return await uploadImageDirect(imageData);
-        }
-    } else {
-        console.log('📤 Using direct upload for large image');
-        return await uploadImageDirect(imageData);
-    }
-};
 
-const uploadImageDirect = async (imageData) => {
-console.log('🎯 Direct upload starting...');
-    console.log('🎯 Apps Script URL:', process.env.NEXT_PUBLIC_APPS_SCRIPT_URL);
-    
-    if (!process.env.NEXT_PUBLIC_APPS_SCRIPT_URL) {
-        throw new Error('NEXT_PUBLIC_APPS_SCRIPT_URL environment variable is not set');
-    }
-    
-    try {
-        const response = await fetch(process.env.NEXT_PUBLIC_APPS_SCRIPT_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(imageData),
-        });
-        
-        console.log('✅ Direct response status:', response.status, response.statusText);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const text = await response.text();
-        console.log('📋 Direct response length:', text.length);
-        console.log('📋 Direct response preview:', text.substring(0, 200));
-        
-        const result = JSON.parse(text);
-        console.log('✅ Direct upload successful');
-        return result;
-        
-    } catch (error) {
-        console.error('❌ Direct upload error:', error);
-        throw error;
-    }
-};
+
+
 // --- UI Components ---
 const Section = ({ title, children, description }) => (
   <div className="p-6 border border-gray-200 rounded-lg bg-white shadow-sm">
@@ -495,28 +425,147 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
       if (!folderId) throw new Error(`Folder ID tidak ditemui untuk usahawan: ${selectedMentee.Usahawan}`);
 
 // REPLACE WITH THIS (uses smart upload for large images):
-const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onloadend = () => {
-        const imageData = {
-            fileData: reader.result.split(',')[1], 
+// Replace the entire uploadImage function and remove smartUploadImage/uploadImageDirect
+
+const compressImageForProxy = (base64String, targetSizeKB = 650) => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      // Start with original dimensions
+      let { width, height } = img;
+      
+      // Aggressive dimension reduction
+      const maxDimension = 800;
+      if (width > height) {
+        if (width > maxDimension) {
+          height = (height * maxDimension) / width;
+          width = maxDimension;
+        }
+      } else {
+        if (height > maxDimension) {
+          width = (width * maxDimension) / height;
+          height = maxDimension;
+        }
+      }
+      
+      canvas.width = width;
+      canvas.height = height;
+      ctx.drawImage(img, 0, 0, width, height);
+      
+      // Try multiple compression levels
+      let quality = 0.7;
+      let compressedDataUrl;
+      let attempts = 0;
+      
+      do {
+        compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+        const estimatedSizeKB = (compressedDataUrl.length * 0.75) / 1024;
+        
+        console.log(`Compression attempt ${attempts + 1}: ${estimatedSizeKB.toFixed(0)}KB at ${(quality * 100).toFixed(0)}% quality`);
+        
+        if (estimatedSizeKB <= targetSizeKB) {
+          console.log(`✅ Compressed to ${estimatedSizeKB.toFixed(0)}KB`);
+          break;
+        }
+        
+        quality -= 0.1;
+        attempts++;
+        
+        // If quality gets too low, reduce dimensions further
+        if (quality <= 0.2 && attempts < 10) {
+          width = Math.floor(width * 0.8);
+          height = Math.floor(height * 0.8);
+          canvas.width = width;
+          canvas.height = height;
+          ctx.clearRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0, width, height);
+          quality = 0.6; // Reset quality when reducing dimensions
+          console.log(`Reducing dimensions to ${width}x${height}`);
+        }
+        
+      } while (attempts < 15);
+      
+      resolve(compressedDataUrl);
+    };
+    
+    img.src = base64String;
+  });
+};
+
+const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async (resolve, reject) => {
+    try {
+      const originalSizeMB = (file.size / 1024 / 1024).toFixed(2);
+      console.log(`📸 Processing ${file.name} (${originalSizeMB}MB)`);
+      
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      
+      reader.onloadend = async () => {
+        try {
+          // Always compress aggressively for proxy
+          console.log('🔄 Compressing image for proxy upload...');
+          const compressedBase64 = await compressImageForProxy(reader.result, 600); // 600KB target
+          
+          const imageData = {
+            fileData: compressedBase64.split(',')[1], 
             fileName: file.name, 
-            fileType: file.type, 
+            fileType: 'image/jpeg',
             folderId: fId, 
             menteeName, 
             sessionNumber
-        };
-        
-        // Use smart upload for images
-        smartUploadImage(imageData)
-            .then(result => {
-                if (result.error) reject(new Error(result.error)); 
-                else resolve(result.url);
-            })
-            .catch(reject);
-    };
-    reader.onerror = reject;
+          };
+          
+          // Check final size
+          const finalSizeKB = (compressedBase64.length * 0.75) / 1024;
+          console.log(`📊 Final size: ${finalSizeKB.toFixed(0)}KB (original: ${originalSizeMB}MB)`);
+          
+          if (finalSizeKB > 800) {
+            throw new Error(`Image still too large: ${finalSizeKB.toFixed(0)}KB. Please use a smaller image.`);
+          }
+          
+          // Always use proxy - no direct connection
+          console.log('📤 Uploading via proxy...');
+          const response = await fetch('/api/upload-proxy', {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify({ ...imageData, reportType: 'sesi' }),
+          });
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ Proxy error response:', errorText.substring(0, 200));
+            throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+          }
+          
+          const result = await response.json();
+          
+          if (result.error) {
+            throw new Error(`Server error: ${result.error}`);
+          }
+          
+          console.log('✅ Upload successful');
+          resolve(result.url);
+          
+        } catch (error) {
+          console.error('❌ Upload processing failed:', error);
+          reject(error);
+        }
+      };
+      
+      reader.onerror = () => {
+        reject(new Error('Failed to read image file'));
+      };
+      
+    } catch (error) {
+      console.error('❌ Upload setup failed:', error);
+      reject(error);
+    }
 });
 
       const menteeNameForUpload = selectedMentee.Usahawan;
