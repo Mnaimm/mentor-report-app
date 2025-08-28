@@ -375,7 +375,7 @@ const LaporanMajuPage = () => {
     if (!files.length) return;
 
     if (!formData.Mentee_Folder_ID) {
-      setMessage('Please select a mentee first to get their folder ID before uploading images.');
+      setMessage('Please select a mentee first to get their Folder_ID before uploading images.');
       setMessageType('error');
       return;
     }
@@ -422,7 +422,7 @@ const LaporanMajuPage = () => {
         };
 
         console.log('📤 Uploading file via Apps Script proxy:', file.name);
-        console.log('🆔 Using folder ID:', formData.Mentee_Folder_ID);
+        console.log('🆔 Using Folder_ID:', formData.Mentee_Folder_ID);
 
         const response = await fetch('/api/upload-proxy', {
           method: 'POST',
@@ -466,7 +466,7 @@ const LaporanMajuPage = () => {
     if (!file) return;
 
     if (!formData.Mentee_Folder_ID) {
-      setMessage('Please select a mentee first to get their folder ID before uploading MIA proof.');
+      setMessage('Please select a mentee first to get their Folder_ID before uploading MIA proof.');
       setMessageType('error');
       return;
     }
