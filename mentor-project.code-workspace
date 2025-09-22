@@ -1,0 +1,19 @@
+{
+  "folders": [
+    {
+      "name": "Main Project",
+      "path": "."
+    },
+    {
+      "name": "Apps Script 1", 
+      "path": "./scripts/script-1"
+    },
+    {
+      "name": "Apps Script 2",
+      "path": "./scripts/script-2"
+    }
+  ],
+  "settings": {
+    "javascript.preferences.includePackageJsonAutoImports": "on"
+  }
+}
