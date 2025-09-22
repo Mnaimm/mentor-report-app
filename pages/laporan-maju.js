@@ -127,7 +127,7 @@ const LaporanMajuPage = () => {
     URL_GAMBAR_PREMIS_JSON: [],
     URL_GAMBAR_SESI_JSON: [],
     URL_GAMBAR_GW360: '',
-    Mentee_Folder_ID: '',
+    Folder_ID: '',
     Laporan_Maju_Doc_ID: '',
     // NEW FIELDS for Sesi 2+
     STATUS_PERNIAGAAN_KESELURUHAN: '',
@@ -152,6 +152,7 @@ const LaporanMajuPage = () => {
   const [isMIA, setIsMIA] = useState(false);
   const [miaReason, setMiaReason] = useState('');
   const [miaProofFile, setMiaProofFile] = useState(null);
+  const [files, setFiles] = useState({ gw360: null, sesi: [], premis: [] });
 
   // Effect to fetch mapping data on component mount
   useEffect(() => {
@@ -248,7 +249,7 @@ const LaporanMajuPage = () => {
       URL_GAMBAR_GW360: '',
       URL_GAMBAR_SESI_JSON: [],
       URL_GAMBAR_PREMIS_JSON: [],
-      Mentee_Folder_ID: '',
+      Folder_ID: '',
       Laporan_Maju_Doc_ID: '',
       STATUS_PERNIAGAAN_KESELURUHAN: '',
       RUMUSAN_DAN_LANGKAH_KEHADAPAN: '',
@@ -284,11 +285,24 @@ const LaporanMajuPage = () => {
         const updatedFormData = { ...prev };
 
         if (sessionData.menteeMapping) {
+          console.log('🔍 Raw mentee mapping data for', selectedMenteeName, ':', sessionData.menteeMapping);
+          console.log('🔍 Available fields:', Object.keys(sessionData.menteeMapping));
+          console.log('🔍 Folder_ID value:', sessionData.menteeMapping.Folder_ID);
+          console.log('🔍 All possible folder fields:');
+          ['Folder_ID', 'FOLDER_ID', 'FolderId', 'folder_id', 'Mentee_Folder_ID'].forEach(field => {
+            console.log(`  ${field}:`, sessionData.menteeMapping[field]);
+          });
+          
           updatedFormData.NAMA_BISNES = sessionData.menteeMapping.NAMA_BISNES || '';
           updatedFormData.LOKASI_BISNES = sessionData.menteeMapping.LOKASI_BISNES || '';
           updatedFormData.PRODUK_SERVIS = sessionData.menteeMapping.PRODUK_SERVIS || '';
           updatedFormData.NO_TELEFON = sessionData.menteeMapping.NO_TELEFON || '';
-          updatedFormData.Mentee_Folder_ID = sessionData.menteeMapping.Mentee_Folder_ID || '';
+          // Use the correct field name from the mapping sheet
+          updatedFormData.Folder_ID = sessionData.menteeMapping.Folder_ID || '';
+          
+          console.log('🔍 Final Folder_ID set to:', updatedFormData.Folder_ID);
+        } else {
+          console.log('❌ No mentee mapping data received');
         }
 
         updatedFormData.SESI_NUMBER = sessionData.currentSession || 1;
@@ -369,169 +383,137 @@ const LaporanMajuPage = () => {
     }));
   };
 
-  // UPDATED: handleFileChange to use reportType: 'sesi' for all image uploads
-  const handleFileChange = async (e, fieldName) => {
-    const files = Array.from(e.target.files);
-    if (!files.length) return;
-
-    if (!formData.Mentee_Folder_ID) {
-      setMessage('Please select a mentee first to get their Folder_ID before uploading images.');
-      setMessageType('error');
-      return;
-    }
-
-    setLoading(true);
-    setMessage(`Uploading ${files.length} file(s)...`);
-    setMessageType('');
-
-    const uploadedUrls = [];
-
-    for (const file of files) {
-      try {
-        const fileData = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            const result = reader.result;
-            const base64Data = result.split(',')[1];
-            resolve(base64Data);
-          };
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
-
-        let imageType = '';
-        if (fieldName === 'URL_GAMBAR_GW360') {
-          imageType = 'gw';
-        } else if (fieldName === 'URL_GAMBAR_SESI_JSON') {
-          imageType = 'sesi';
-        } else if (fieldName === 'URL_GAMBAR_PREMIS_JSON') {
-          imageType = 'premis';
-        }
-
-        const uploadPayload = {
-          action: 'uploadImage',
-          fileData: fileData,
-          fileName: file.name,
-          fileType: file.type,
-          folderId: formData.Mentee_Folder_ID,
-          menteeName: formData.NAMA_MENTEE,
-          sessionNumber: currentSessionNumber,
-          reportType: 'sesi', // <--- IMPORTANT CHANGE: Route image uploads to Sesi Apps Script
-          isMIAProof: false,
-          imageType: imageType
-        };
-
-        console.log('📤 Uploading file via Apps Script proxy:', file.name);
-        console.log('🆔 Using Folder_ID:', formData.Mentee_Folder_ID);
-
-        const response = await fetch('/api/upload-proxy', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(uploadPayload),
-        });
-
-        console.log('📥 Upload response status:', response.status);
-
-        const data = await response.json();
-        console.log('📄 Upload response data:', data);
-
-        if (data.url) {
-          uploadedUrls.push(data.url);
-        } else {
-          throw new Error('No URL returned from upload');
-        }
-      } catch (error) {
-        console.error(`❌ Error uploading ${file.name}:`, error);
-        setMessage(`Failed to upload ${file.name}.`);
-        setMessageType('error');
-        setLoading(false);
-        return;
-      }
-    }
-
-    setFormData(prev => ({
-      ...prev,
-      [fieldName]: fieldName === 'URL_GAMBAR_GW360' ? uploadedUrls[0] : [...prev[fieldName], ...uploadedUrls]
+  // HOTFIX: Use working Bangkit Apps Script for images until Maju Apps Script gets uploadImage handler
+  // Simple file storage functions (like laporan-sesi)
+  const handleFileChange = (type, fileList, multiple = false) => {
+    setFiles((prev) => ({ 
+      ...prev, 
+      [type]: multiple ? Array.from(fileList) : fileList[0] 
     }));
-    setMessage('Files uploaded successfully!');
-    setMessageType('success');
-    setLoading(false);
   };
 
-  // NEW: handleMiaProofFileChange function for MIA proof uploads
-  const handleMiaProofFileChange = async (e) => {
+  const handleMiaProofFileChange = (e) => {
     const file = e.target.files[0];
-    if (!file) return;
-
-    if (!formData.Mentee_Folder_ID) {
-      setMessage('Please select a mentee first to get their Folder_ID before uploading MIA proof.');
-      setMessageType('error');
-      return;
-    }
-
-    setLoading(true);
-    setMessage(`Uploading MIA proof: ${file.name}...`);
-    setMessageType('');
-
-    try {
-      const fileData = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = reader.result;
-          const base64Data = result.split(',')[1];
-          resolve(base64Data);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-
-      const uploadPayload = {
-        action: 'uploadImage', // Action for image upload
-        fileData: fileData,
-        fileName: file.name,
-        fileType: file.type,
-        folderId: formData.Mentee_Folder_ID,
-        menteeName: formData.NAMA_MENTEE,
-        sessionNumber: currentSessionNumber,
-        reportType: 'sesi', // <--- IMPORTANT CHANGE: Route MIA proof to Sesi Apps Script
-        isMIAProof: true,
-        imageType: 'mia'
-      };
-
-      console.log('📤 Uploading MIA proof via Apps Script proxy:', file.name);
-
-      const response = await fetch('/api/upload-proxy', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(uploadPayload),
-      });
-
-      const data = await response.json();
-
-      if (data.url) {
-        setFormData(prev => ({
-          ...prev,
-          MIA_PROOF_URL: data.url
-        }));
-        setMiaProofFile(file);
-        setMessage('MIA proof uploaded successfully!');
-        setMessageType('success');
-      } else {
-        throw new Error(data.message || 'No URL returned from MIA proof upload');
-      }
-    } catch (error) {
-      console.error(`❌ Error uploading MIA proof ${file.name}:`, error);
-      setMessage(`Failed to upload MIA proof: ${error.message}`);
-      setMessageType('error');
-      setMiaProofFile(null);
-    } finally {
-      setLoading(false);
-    }
+    setMiaProofFile(file);
   };
+
+  // Batch upload function (like laporan-sesi)
+  const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async (resolve, reject) => {
+    try {
+      const originalSizeMB = (file.size / 1024 / 1024).toFixed(2);
+      console.log(`📸 Processing ${file.name} (${originalSizeMB}MB)`);
+      
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      
+      reader.onloadend = async () => {
+        try {
+          const imageData = {
+            action: 'uploadImage',
+            fileData: reader.result.split(',')[1], 
+            fileName: file.name, 
+            fileType: file.type,
+            folderId: fId, 
+            menteeName, 
+            sessionNumber,
+            isMIAProof: false
+          };
+          
+          console.log('📤 Uploading via proxy...');
+          const response = await fetch('/api/upload-proxy', {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify({ ...imageData, reportType: 'maju' }),
+          });
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ Proxy error response:', errorText.substring(0, 200));
+            throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+          }
+          
+          const result = await response.json();
+          
+          console.log('📦 Apps Script response:', result);
+          
+          if (result.error) {
+            throw new Error(result.message || result.error);
+          }
+          
+          if (!result.success || !result.url) {
+            console.error('❌ Apps Script returned:', result);
+            throw new Error(result.message || 'Apps Script upload failed - check MajuExecutionLogs');
+          }
+          
+          console.log('✅ Upload successful:', result.url);
+          resolve(result.url);
+          
+        } catch (uploadError) {
+          console.error('❌ Upload error:', uploadError);
+          reject(uploadError);
+        }
+      };
+      
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      
+    } catch (error) {
+      console.error('❌ File processing error:', error);
+      reject(error);
+    }
+  });
+
+  // MIA proof upload function
+  const uploadMiaProof = (file, fId, menteeName, sessionNumber) => new Promise(async (resolve, reject) => {
+    try {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      
+      reader.onloadend = async () => {
+        try {
+          const imageData = {
+            action: 'uploadImage',
+            fileData: reader.result.split(',')[1], 
+            fileName: file.name, 
+            fileType: file.type,
+            folderId: fId, 
+            menteeName, 
+            sessionNumber,
+            isMIAProof: true
+          };
+          
+          const response = await fetch('/api/upload-proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...imageData, reportType: 'maju' }),
+          });
+          
+          if (!response.ok) {
+            throw new Error(`MIA upload failed: ${response.status}`);
+          }
+          
+          const result = await response.json();
+          
+          console.log('📦 MIA Apps Script response:', result);
+          
+          if (result.error || !result.success || !result.url) {
+            console.error('❌ MIA Apps Script returned:', result);
+            throw new Error(result.message || 'MIA Apps Script upload failed - check MajuExecutionLogs');
+          }
+          
+          resolve(result.url);
+        } catch (error) {
+          reject(error);
+        }
+      };
+      
+      reader.onerror = () => reject(new Error('Failed to read MIA file'));
+    } catch (error) {
+      reject(error);
+    }
+  });
 
 
   const resetForm = () => {
@@ -552,6 +534,7 @@ const LaporanMajuPage = () => {
     setIsMIA(false);
     setMiaReason('');
     setMiaProofFile(null);
+    setFiles({ gw360: null, sesi: [], premis: [] });
 
     // Clear all file inputs in the DOM
     const fileInputs = document.querySelectorAll('input[type="file"]');
@@ -568,8 +551,75 @@ const LaporanMajuPage = () => {
 
 // In your laporan-maju.js handleSubmit function, make sure dataToSend is properly defined:
 
+// Form validation function
+const validateForm = () => {
+  const errors = [];
+  
+  // For non-MIA submissions, check required fields
+  if (!isMIA) {
+    // 1. Latar Belakang Usahawan is required
+    if (!formData.LATARBELAKANG_USAHAWAN || formData.LATARBELAKANG_USAHAWAN.trim() === '') {
+      errors.push('Latar Belakang Usahawan & Situasi Bisnes adalah wajib diisi');
+    }
+    
+    // 2. Minimum 1 Dapatan Sesi Mentoring with required fields
+    if (!formData.MENTORING_FINDINGS_JSON || formData.MENTORING_FINDINGS_JSON.length === 0) {
+      errors.push('Sekurang-kurangnya 1 Dapatan Sesi Mentoring diperlukan');
+    } else {
+      // Check each mentoring finding for required fields
+      formData.MENTORING_FINDINGS_JSON.forEach((finding, index) => {
+        if (!finding['Topik Perbincangan'] || finding['Topik Perbincangan'].trim() === '') {
+          errors.push(`Dapatan Mentoring #${index + 1}: Topik Perbincangan adalah wajib`);
+        }
+        if (!finding['Hasil yang Diharapkan'] || finding['Hasil yang Diharapkan'].trim() === '') {
+          errors.push(`Dapatan Mentoring #${index + 1}: Hasil yang Diharapkan adalah wajib`);
+        }
+        // Check minimum 1 action plan
+        if (!finding['Pelan Tindakan'] || finding['Pelan Tindakan'].length === 0) {
+          errors.push(`Dapatan Mentoring #${index + 1}: Sekurang-kurangnya 1 Pelan Tindakan diperlukan`);
+        } else {
+          // Check that at least one action plan has required fields
+          const validActionPlans = finding['Pelan Tindakan'].filter(plan => 
+            plan.Tindakan && plan.Tindakan.trim() !== ''
+          );
+          if (validActionPlans.length === 0) {
+            errors.push(`Dapatan Mentoring #${index + 1}: Pelan Tindakan mesti mempunyai sekurang-kurangnya 1 tindakan yang diisi`);
+          }
+        }
+      });
+    }
+    
+    // 3. Refleksi Mentor fields are required
+    if (!formData.REFLEKSI_MENTOR_PERASAAN || formData.REFLEKSI_MENTOR_PERASAAN.trim() === '') {
+      errors.push('Refleksi Mentor - Perasaan Mentor adalah wajib diisi');
+    }
+    if (!formData.REFLEKSI_MENTOR_KOMITMEN || formData.REFLEKSI_MENTOR_KOMITMEN.trim() === '') {
+      errors.push('Refleksi Mentor - Komitmen Mentor adalah wajib diisi');
+    }
+  } else {
+    // For MIA submissions, check MIA-specific requirements
+    if (!miaReason || miaReason.trim() === '') {
+      errors.push('Alasan/Sebab Usahawan MIA adalah wajib diisi');
+    }
+    if (!miaProofFile) {
+      errors.push('Bukti MIA (screenshot/dokumen) adalah wajib dimuat naik');
+    }
+  }
+  
+  return errors;
+};
+
 const handleSubmit = async (e) => {
   e.preventDefault();
+  
+  // Validate form first
+  const validationErrors = validateForm();
+  if (validationErrors.length > 0) {
+    setMessage(`Sila lengkapkan medan yang diperlukan:\n• ${validationErrors.join('\n• ')}`);
+    setMessageType('error');
+    return; // Stop submission if validation fails
+  }
+  
   setLoading(true);
   setMessage('');
   setMessageType('');
@@ -577,12 +627,71 @@ const handleSubmit = async (e) => {
   console.log('🚀 Starting form submission...');
 
   try {
+    // Image upload phase - process all images first
+    console.log('📸 Starting batch image upload...');
+    const imageUrls = { gw360: '', sesi: [], premis: [], mia: '' };
+    const uploadPromises = [];
+
+    // Count total files for logging
+    const gw360Count = files.gw360 ? 1 : 0;
+    const sesiCount = files.sesi ? files.sesi.length : 0;  
+    const premisCount = files.premis ? files.premis.length : 0;
+    const miaCount = miaProofFile ? 1 : 0;
+
+    console.log(`📊 Image URLs in submission:`);
+    console.log(`  - Sesi Images: ${sesiCount}`);
+    console.log(`  - Premis Images: ${premisCount}`);
+    console.log(`  - GW360 Image: ${gw360Count ? 'Present' : 'Missing'}`);
+
+    const folderId = formData.Folder_ID;
+    const menteeNameForUpload = formData.NAMA_MENTEE;
+    const sessionNumberForUpload = currentSessionNumber;
+
+    // Check if we have images to upload
+    const hasImagesToUpload = files.gw360 || (files.sesi && files.sesi.length > 0) || (files.premis && files.premis.length > 0) || miaProofFile;
+    
+    if (!hasImagesToUpload) {
+      console.log('ℹ️ No images to upload, skipping upload phase');
+    } else {
+      console.log('📋 Folder ID:', folderId);
+      console.log('📋 Mentee Name:', menteeNameForUpload);
+    }
+
+    // Upload images if we have any
+    if (hasImagesToUpload) {
+      // Upload GW360 image (single file)
+      if (files.gw360) {
+        uploadPromises.push(uploadImage(files.gw360, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => (imageUrls.gw360 = url)));
+      }
+
+      // Upload Sesi images (multiple files)
+      if (files.sesi && files.sesi.length > 0) {
+        files.sesi.forEach((file) => uploadPromises.push(uploadImage(file, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => imageUrls.sesi.push(url))));
+      }
+
+      // Upload Premis images (multiple files)
+      if (files.premis && files.premis.length > 0) {
+        files.premis.forEach((file) => uploadPromises.push(uploadImage(file, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => imageUrls.premis.push(url))));
+      }
+
+      // Upload MIA proof if present
+      if (miaProofFile) {
+        uploadPromises.push(uploadMiaProof(miaProofFile, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => (imageUrls.mia = url)));
+      }
+
+      // Wait for all uploads to complete
+      if (uploadPromises.length > 0) {
+        console.log(`⏳ Waiting for ${uploadPromises.length} image uploads to complete...`);
+        await Promise.all(uploadPromises);
+        console.log('✅ All images uploaded successfully');
+      }
+    }
+
     // ✅ MAKE SURE dataToSend is declared in the correct scope
     let dataToSend = {}; // ← Declare it here at the top
 
     // CONDITIONALLY BUILD dataToSend BASED ON MIA STATUS
     if (isMIA) {
-      const miaProofUrl = formData.MIA_PROOF_URL || '';
       console.log('📋 Building MIA data to send...');
       
       dataToSend = {
@@ -608,13 +717,13 @@ const handleSubmit = async (e) => {
         URL_GAMBAR_PREMIS_JSON: [],
         URL_GAMBAR_SESI_JSON: [],
         URL_GAMBAR_GW360: '',
-        Mentee_Folder_ID: formData.Mentee_Folder_ID,
+        Folder_ID: formData.Folder_ID,
         Laporan_Maju_Doc_ID: '',
         STATUS_PERNIAGAAN_KESELURUHAN: '',
         RUMUSAN_DAN_LANGKAH_KEHADAPAN: '',
         MIA_STATUS: 'MIA',
         MIA_REASON: miaReason,
-        MIA_PROOF_URL: miaProofUrl,
+        MIA_PROOF_URL: imageUrls.mia,
       };
     } else {
       console.log('📋 Building regular report data to send...');
@@ -639,21 +748,28 @@ const handleSubmit = async (e) => {
         REFLEKSI_MENTOR_PERASAAN: formData.REFLEKSI_MENTOR_PERASAAN,
         REFLEKSI_MENTOR_KOMITMEN: formData.REFLEKSI_MENTOR_KOMITMEN,
         REFLEKSI_MENTOR_LAIN: formData.REFLEKSI_MENTOR_LAIN,
-        URL_GAMBAR_PREMIS_JSON: formData.URL_GAMBAR_PREMIS_JSON,
-        URL_GAMBAR_SESI_JSON: formData.URL_GAMBAR_SESI_JSON,
-        URL_GAMBAR_GW360: formData.URL_GAMBAR_GW360,
-        Mentee_Folder_ID: formData.Mentee_Folder_ID,
+        URL_GAMBAR_PREMIS_JSON: imageUrls.premis,
+        URL_GAMBAR_SESI_JSON: imageUrls.sesi,
+        URL_GAMBAR_GW360: imageUrls.gw360,
+        Folder_ID: formData.Folder_ID,
         Laporan_Maju_Doc_ID: '',
         STATUS_PERNIAGAAN_KESELURUHAN: formData.STATUS_PERNIAGAAN_KESELURUHAN || '',
         RUMUSAN_DAN_LANGKAH_KEHADAPAN: formData.RUMUSAN_DAN_LANGKAH_KEHADAPAN || '',
         MIA_STATUS: 'Tidak MIA',
         MIA_REASON: '',
-        MIA_PROOF_URL: '',
+        MIA_PROOF_URL: imageUrls.mia,
       };
     }
 
     // ✅ Now dataToSend is properly defined and can be used
     console.log('📤 Data to send:', dataToSend);
+    
+    // DEBUG: Check if images are present
+    console.log('🖼️ Image URLs in submission:');
+    console.log('  - Sesi Images:', dataToSend.URL_GAMBAR_SESI_JSON?.length || 0);
+    console.log('  - Premis Images:', dataToSend.URL_GAMBAR_PREMIS_JSON?.length || 0);
+    console.log('  - GW360 Image:', dataToSend.URL_GAMBAR_GW360 ? 'Present' : 'Missing');
+    
     console.log('🌐 Submitting to /api/submitMajuReport...');
 
     const response = await fetch('/api/submitMajuReport', {
@@ -901,7 +1017,7 @@ const handleSubmit = async (e) => {
 
               {/* --- Enhanced Latar Belakang Section --- */}
               <div className="bg-white p-6 rounded-lg shadow-sm">
-                <Section title="Latar Belakang Usahawan & Situasi Bisnes">
+                <Section title="Latar Belakang Usahawan & Situasi Bisnes *">
                   {currentSessionNumber > 1 && previousLatarBelakangUsahawan && (
                     <InfoCard title="Ringkasan Latar Belakang Usahawan (Sesi 1)" type="info">
                       <p className="whitespace-pre-wrap">{previousLatarBelakangUsahawan}</p>
@@ -1276,7 +1392,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                     <FileInput
                       label="Gambar GW360 (Sesi 1 Sahaja)"
                       name="URL_GAMBAR_GW360"
-                      onFileChange={(e) => handleFileChange(e, 'URL_GAMBAR_GW360')}
+                      onFileChange={(e) => handleFileChange('gw360', e.target.files)}
                       multiple={false}
                       required={currentSessionNumber === 1}
                     />
@@ -1300,7 +1416,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                   <FileInput
                     label="Gambar Sesi (Pelbagai Gambar)"
                     name="URL_GAMBAR_SESI_JSON"
-                    onFileChange={(e) => handleFileChange(e, 'URL_GAMBAR_SESI_JSON')}
+                    onFileChange={(e) => handleFileChange('sesi', e.target.files, true)}
                     multiple={true}
                     required
                   />
@@ -1338,7 +1454,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                         <FileInput
                           label="Gambar Premis (Pelbagai Gambar)"
                           name="URL_GAMBAR_PREMIS_JSON"
-                          onFileChange={(e) => handleFileChange(e, 'URL_GAMBAR_PREMIS_JSON')}
+                          onFileChange={(e) => handleFileChange('premis', e.target.files, true)}
                           multiple={true}
                           required={lawatanPremisChecked}
                         />

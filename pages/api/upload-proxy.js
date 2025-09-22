@@ -50,13 +50,24 @@ export default async function handler(req, res) {
     console.log('📡 Proxying to Apps Script URL:', url);
     console.log('📊 Request body size:', Math.round(bodySizeBytes / 1024), 'KB');
 
+    // Clean the request body - remove proxy-specific fields before forwarding
+    const cleanBody = { ...req.body };
+    delete cleanBody.reportType; // This is only for routing, not for Apps Script
+    delete cleanBody.imageType;  // This is only for logging, not for Apps Script
+    // Keep 'action' field - Apps Script needs this to route to handleImageUpload
+    
+    const cleanBodyString = JSON.stringify(cleanBody);
+    const cleanBodySize = Buffer.byteLength(cleanBodyString, 'utf8');
+    
+    console.log('🧹 Cleaned body size:', Math.round(cleanBodySize / 1024), 'KB');
+
     const upstream = await fetch(url, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
-        'Content-Length': bodySizeBytes.toString()
+        'Content-Length': cleanBodySize.toString()
       },
-      body: bodyString,
+      body: cleanBodyString,
     });
 
     const text = await upstream.text();
