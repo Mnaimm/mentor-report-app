@@ -591,17 +591,18 @@ const validateForm = () => {
       });
     }
     
-    // 3. ✅ NEW: Previous action updates required for Sesi 2+
+    // 3. ✅ NEW: Previous action updates required for Sesi 2+ (Either Kemajuan OR Cabaran, not both)
     if (currentSessionNumber >= 2 && previousMentoringFindings.length > 0) {
       let missingUpdates = [];
       previousMentoringFindings.forEach((finding, findingIndex) => {
         if (finding['Pelan Tindakan'] && Array.isArray(finding['Pelan Tindakan'])) {
           finding['Pelan Tindakan'].forEach((plan, planIndex) => {
-            if (!plan.Kemajuan || plan.Kemajuan.trim() === '') {
-              missingUpdates.push(`Kemajuan untuk "${plan.Tindakan || 'Tindakan ' + (planIndex + 1)}"`);
-            }
-            if (!plan.Cabaran || plan.Cabaran.trim() === '') {
-              missingUpdates.push(`Cabaran untuk "${plan.Tindakan || 'Tindakan ' + (planIndex + 1)}"`);
+            const hasKemajuan = plan.Kemajuan && plan.Kemajuan.trim() !== '';
+            const hasCabaran = plan.Cabaran && plan.Cabaran.trim() !== '';
+            
+            // Require at least ONE update (either Kemajuan OR Cabaran)
+            if (!hasKemajuan && !hasCabaran) {
+              missingUpdates.push(`Kemaskini samada Kemajuan atau Cabaran untuk "${plan.Tindakan || 'Tindakan ' + (planIndex + 1)}"`);
             }
           });
         }
@@ -1228,7 +1229,7 @@ Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun la
                         📋 Kemaskini Tindakan dari Sesi Sebelumnya (Sesi #{currentSessionNumber - 1})
                       </h3>
                       <p className="text-sm text-blue-700 mb-4">
-                        Sila kemaskini status kemajuan dan cabaran bagi setiap tindakan yang telah ditetapkan dalam sesi sebelumnya.
+                        <strong>Sila pilih untuk kemaskini:</strong> Samada <em>Kemajuan</em> (jika ada progress) atau <em>Cabaran</em> (jika ada halangan) untuk setiap tindakan. Tidak perlu isi kedua-duanya.
                       </p>
                       
                       {previousMentoringFindings.map((finding, findingIndex) => (
@@ -1253,7 +1254,7 @@ Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun la
                                 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
                                   <TextArea
-                                    label="✅ Kemajuan (Progress)"
+                                    label="✅ Kemajuan (Progress) - Pilihan 1"
                                     name={`kemajuan_${findingIndex}_${planIndex}`}
                                     value={plan.Kemajuan || ''}
                                     onChange={(e) => {
@@ -1265,11 +1266,11 @@ Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun la
                                       setPreviousMentoringFindings(updatedFindings);
                                     }}
                                     rows={3}
-                                    placeholder="Nyatakan kemajuan yang telah dicapai untuk tindakan ini..."
+                                    placeholder="Pilih ini jika ada kemajuan untuk tindakan ini..."
                                   />
                                   
                                   <TextArea
-                                    label="⚠️ Cabaran (Challenges)"
+                                    label="⚠️ Cabaran (Challenges) - Pilihan 2"
                                     name={`cabaran_${findingIndex}_${planIndex}`}
                                     value={plan.Cabaran || ''}
                                     onChange={(e) => {
@@ -1281,7 +1282,7 @@ Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun la
                                       setPreviousMentoringFindings(updatedFindings);
                                     }}
                                     rows={3}
-                                    placeholder="Nyatakan cabaran atau halangan yang dihadapi..."
+                                    placeholder="Pilih ini jika ada cabaran atau halangan yang dihadapi..."
                                   />
                                 </div>
                               </div>
