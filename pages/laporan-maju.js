@@ -557,9 +557,11 @@ const validateForm = () => {
   
   // For non-MIA submissions, check required fields
   if (!isMIA) {
-    // 1. Latar Belakang Usahawan is required
-    if (!formData.LATARBELAKANG_USAHAWAN || formData.LATARBELAKANG_USAHAWAN.trim() === '') {
-      errors.push('Latar Belakang Usahawan & Situasi Bisnes adalah wajib diisi');
+    // 1. ✅ FIXED: Latar Belakang Usahawan is required ONLY for Sesi 1
+    if (currentSessionNumber === 1) {
+      if (!formData.LATARBELAKANG_USAHAWAN || formData.LATARBELAKANG_USAHAWAN.trim() === '') {
+        errors.push('Latar Belakang Usahawan & Situasi Bisnes adalah wajib diisi');
+      }
     }
     
     // 2. Minimum 1 Dapatan Sesi Mentoring with required fields
@@ -589,7 +591,27 @@ const validateForm = () => {
       });
     }
     
-    // 3. ✅ NEW: Rumusan required for Sesi 2+
+    // 3. ✅ NEW: Previous action updates required for Sesi 2+
+    if (currentSessionNumber >= 2 && previousMentoringFindings.length > 0) {
+      let missingUpdates = [];
+      previousMentoringFindings.forEach((finding, findingIndex) => {
+        if (finding['Pelan Tindakan'] && Array.isArray(finding['Pelan Tindakan'])) {
+          finding['Pelan Tindakan'].forEach((plan, planIndex) => {
+            if (!plan.Kemajuan || plan.Kemajuan.trim() === '') {
+              missingUpdates.push(`Kemajuan untuk "${plan.Tindakan || 'Tindakan ' + (planIndex + 1)}"`);
+            }
+            if (!plan.Cabaran || plan.Cabaran.trim() === '') {
+              missingUpdates.push(`Cabaran untuk "${plan.Tindakan || 'Tindakan ' + (planIndex + 1)}"`);
+            }
+          });
+        }
+      });
+      if (missingUpdates.length > 0) {
+        errors.push(`Sila kemaskini tindakan dari sesi sebelumnya: ${missingUpdates.join(', ')}`);
+      }
+    }
+    
+    // 4. ✅ NEW: Rumusan required for Sesi 2+
     if (currentSessionNumber >= 2) {
       if (!formData.RUMUSAN_DAN_LANGKAH_KEHADAPAN || formData.RUMUSAN_DAN_LANGKAH_KEHADAPAN.trim() === '') {
         errors.push('Rumusan Keseluruhan dan Langkah Kehadapan adalah wajib diisi untuk Sesi 2 ke atas');
@@ -1291,22 +1313,13 @@ Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun la
                         value={finding['Hasil yang Diharapkan'] || ''}
                         onChange={(e) => handleDynamicChange('MENTORING_FINDINGS_JSON', index, 'Hasil yang Diharapkan', e.target.value)}
                       />
-                      <TextArea
-                        label="Kemajuan Mentee"
-                        name="Kemajuan Mentee"
-                        value={finding['Kemajuan Mentee'] || ''}
-                        onChange={(e) => handleDynamicChange('MENTORING_FINDINGS_JSON', index, 'Kemajuan Mentee', e.target.value)}
-                        rows={3}
-                      />
-                      <TextArea
-                        label="Cabaran dan Halangan Mentee"
-                        name="Cabaran dan Halangan Mentee"
-                        value={finding['Cabaran dan Halangan Mentee'] || ''}
-                        onChange={(e) => handleDynamicChange('MENTORING_FINDINGS_JSON', index, 'Cabaran dan Halangan Mentee', e.target.value)}
-                        rows={3}
-                      />
 
                       <h5 className="font-semibold mt-4 mb-2">Pelan Tindakan</h5>
+                      <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded">
+                        <p className="text-sm text-blue-800">
+                          <strong>Nota:</strong> Kemajuan dan Cabaran untuk tindakan ini akan dikemaskini dalam sesi akan datang.
+                        </p>
+                      </div>
                       {(finding['Pelan Tindakan'] || []).map((plan, pIndex) => (
                         <div key={pIndex} className="border p-3 mb-2 rounded-md bg-gray-100">
                           <InputField
@@ -1402,8 +1415,6 @@ Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun la
                       addRow('MENTORING_FINDINGS_JSON', {
                         'Topik Perbincangan': '',
                         'Hasil yang Diharapkan': '',
-                        'Kemajuan Mentee': '',
-                        'Cabaran dan Halangan Mentee': '',
                         'Pelan Tindakan': [],
                       })
                     }
