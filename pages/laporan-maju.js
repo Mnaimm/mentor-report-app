@@ -609,6 +609,44 @@ const validateForm = () => {
   return errors;
 };
 
+// ✅ NEW: Build cumulative mentoring findings that include previous sessions with updates
+const buildCumulativeMentoringFindings = () => {
+  let cumulativeFindings = [];
+  
+  // For Sesi 1, just return current findings
+  if (currentSessionNumber === 1) {
+    return formData.MENTORING_FINDINGS_JSON;
+  }
+  
+  // For Sesi 2+, combine previous findings (with updates) + current findings
+  if (previousMentoringFindings.length > 0) {
+    // Add updated previous findings first
+    const updatedPreviousFindings = previousMentoringFindings.map(finding => ({
+      ...finding,
+      // Mark these as being from previous session for document generation
+      SessionOrigin: currentSessionNumber - 1,
+      UpdatedInSession: currentSessionNumber
+    }));
+    cumulativeFindings = [...updatedPreviousFindings];
+  }
+  
+  // Add current session's new findings
+  const currentFindings = formData.MENTORING_FINDINGS_JSON.map(finding => ({
+    ...finding,
+    SessionOrigin: currentSessionNumber
+  }));
+  
+  cumulativeFindings = [...cumulativeFindings, ...currentFindings];
+  
+  console.log(`📊 Built cumulative findings for Sesi ${currentSessionNumber}:`, {
+    previousCount: previousMentoringFindings.length,
+    currentCount: formData.MENTORING_FINDINGS_JSON.length,
+    totalCount: cumulativeFindings.length
+  });
+  
+  return cumulativeFindings;
+};
+
 const handleSubmit = async (e) => {
   e.preventDefault();
   
@@ -744,7 +782,7 @@ const handleSubmit = async (e) => {
         MASA_TAMAT: formData.MASA_TAMAT,
         LATARBELAKANG_USAHAWAN: currentSessionNumber === 1 ? formData.LATARBELAKANG_USAHAWAN : previousLatarBelakangUsahawan,
         DATA_KEWANGAN_BULANAN_JSON: formData.DATA_KEWANGAN_BULANAN_JSON,
-        MENTORING_FINDINGS_JSON: formData.MENTORING_FINDINGS_JSON,
+        MENTORING_FINDINGS_JSON: buildCumulativeMentoringFindings(),
         REFLEKSI_MENTOR_PERASAAN: formData.REFLEKSI_MENTOR_PERASAAN,
         REFLEKSI_MENTOR_KOMITMEN: formData.REFLEKSI_MENTOR_KOMITMEN,
         REFLEKSI_MENTOR_LAIN: formData.REFLEKSI_MENTOR_LAIN,
@@ -1051,7 +1089,7 @@ Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun la
                     />
                   ) : (
                     <TextArea
-                      label="Latar Belakang Usahawan"
+                      label="Latar Belakang Usahawan (Dari Sesi 1)"
                       name="LATARBELAKANG_USAHAWAN"
                       value={previousLatarBelakangUsahawan}
                       disabled={true}
@@ -1149,29 +1187,86 @@ Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun la
 
               {/* --- Dapatan Sesi Mentoring --- */}
               <div className="bg-white p-6 rounded-lg shadow-sm">
-                <Section title="Dapatan Sesi Mentoring">
+                <Section title="Dapatan Sesi Mentoring *">
+                  <div className="mb-4 p-3 bg-blue-50 border-l-4 border-blue-400 rounded-r">
+                    <p className="text-sm text-blue-800">
+                      <strong>Required:</strong> Minimum 1 Topik Perbincangan dengan sekurang-kurangnya 1 Pelan Tindakan yang lengkap.
+                    </p>
+                  </div>
                   {currentSessionNumber > 1 && previousMentoringFindings.length > 0 && (
-                    <InfoCard title={`Ringkasan Inisiatif Sesi Lalu (Sesi #${currentSessionNumber - 1})`} type="info">
-                      <ul className="list-disc pl-5">
-                        {previousMentoringFindings.map((finding, index) => (
-                          <li key={index} className="mb-2">
-                            <p className="font-semibold">{finding['Topik Perbincangan']}</p>
-                            <p>Hasil Diharapkan: {finding['Hasil yang Diharapkan']}</p>
-                            <p>Kemajuan: {finding['Kemajuan Mentee']}</p>
-                            <p>Cabaran: {finding['Cabaran dan Halangan Mentee']}</p>
-                            {finding['Pelan Tindakan'] && Array.isArray(finding['Pelan Tindakan']) && finding['Pelan Tindakan'].length > 0 && (
-                              <ul className="list-disc list-inside pl-5 mt-1 text-sm text-gray-600">
-                                {finding['Pelan Tindakan'].map((plan, pIndex) => (
-                                  <li key={pIndex}>
-                                    {plan.Tindakan} (Jangkaan Siap: {plan['Jangkaan tarikh siap'] || 'N/A'}) - {plan.Catatan}
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    </InfoCard>
+                    <div className="mb-6 p-4 bg-blue-50 border-l-4 border-blue-400 rounded-r-lg">
+                      <h3 className="text-lg font-semibold text-blue-800 mb-4">
+                        📋 Kemaskini Tindakan dari Sesi Sebelumnya (Sesi #{currentSessionNumber - 1})
+                      </h3>
+                      <p className="text-sm text-blue-700 mb-4">
+                        Sila kemaskini status kemajuan dan cabaran bagi setiap tindakan yang telah ditetapkan dalam sesi sebelumnya.
+                      </p>
+                      
+                      {previousMentoringFindings.map((finding, findingIndex) => (
+                        finding['Pelan Tindakan'] && Array.isArray(finding['Pelan Tindakan']) && finding['Pelan Tindakan'].length > 0 && (
+                          <div key={findingIndex} className="bg-white p-4 mb-4 rounded-lg border">
+                            <h4 className="font-semibold text-gray-800 mb-3">
+                              Topik: {finding['Topik Perbincangan']}
+                            </h4>
+                            <p className="text-sm text-gray-600 mb-4">
+                              Hasil Diharapkan: {finding['Hasil yang Diharapkan']}
+                            </p>
+                            
+                            {finding['Pelan Tindakan'].map((plan, planIndex) => (
+                              <div key={planIndex} className="bg-gray-50 p-3 mb-3 rounded border-l-4 border-orange-400">
+                                <div className="mb-2">
+                                  <span className="font-medium text-gray-700">Tindakan:</span>
+                                  <p className="text-gray-800">{plan.Tindakan}</p>
+                                  <p className="text-sm text-gray-600">
+                                    Jangkaan Siap: {plan['Jangkaan tarikh siap'] || 'N/A'}
+                                  </p>
+                                </div>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+                                  <TextArea
+                                    label="✅ Kemajuan (Progress)"
+                                    name={`kemajuan_${findingIndex}_${planIndex}`}
+                                    value={plan.Kemajuan || ''}
+                                    onChange={(e) => {
+                                      const updatedFindings = [...previousMentoringFindings];
+                                      if (!updatedFindings[findingIndex]['Pelan Tindakan'][planIndex].Kemajuan) {
+                                        updatedFindings[findingIndex]['Pelan Tindakan'][planIndex].Kemajuan = '';
+                                      }
+                                      updatedFindings[findingIndex]['Pelan Tindakan'][planIndex].Kemajuan = e.target.value;
+                                      setPreviousMentoringFindings(updatedFindings);
+                                    }}
+                                    rows={3}
+                                    placeholder="Nyatakan kemajuan yang telah dicapai untuk tindakan ini..."
+                                  />
+                                  
+                                  <TextArea
+                                    label="⚠️ Cabaran (Challenges)"
+                                    name={`cabaran_${findingIndex}_${planIndex}`}
+                                    value={plan.Cabaran || ''}
+                                    onChange={(e) => {
+                                      const updatedFindings = [...previousMentoringFindings];
+                                      if (!updatedFindings[findingIndex]['Pelan Tindakan'][planIndex].Cabaran) {
+                                        updatedFindings[findingIndex]['Pelan Tindakan'][planIndex].Cabaran = '';
+                                      }
+                                      updatedFindings[findingIndex]['Pelan Tindakan'][planIndex].Cabaran = e.target.value;
+                                      setPreviousMentoringFindings(updatedFindings);
+                                    }}
+                                    rows={3}
+                                    placeholder="Nyatakan cabaran atau halangan yang dihadapi..."
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )
+                      ))}
+                      
+                      <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
+                        <p className="text-sm text-yellow-800">
+                          💡 <strong>Tip:</strong> Kemaskini progress dan cabaran ini akan dimasukkan ke dalam dokumen laporan untuk menunjukkan perkembangan dari sesi ke sesi.
+                        </p>
+                      </div>
+                    </div>
                   )}
 
                   {formData.MENTORING_FINDINGS_JSON.map((finding, index) => (
@@ -1360,20 +1455,22 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
               <div className="bg-white p-6 rounded-lg shadow-sm">
                 <Section title="Refleksi Mentor">
                   <TextArea
-                    label="Perasaan Mentor Setelah Sesi Ini"
+                    label="Perasaan Mentor Setelah Sesi Ini *"
                     name="REFLEKSI_MENTOR_PERASAAN"
                     value={formData.REFLEKSI_MENTOR_PERASAAN}
                     onChange={handleChange}
                     required
                     rows={4}
+                    placeholder="Bagaimana perasaan saya tentang sesi ini? Apa yang boleh saya lakukan untuk menjadi mentor yang lebih baik?"
                   />
                   <TextArea
-                    label="Komitmen Mentor Untuk Menolong Mentee"
+                    label="Komitmen Mentor Untuk Menolong Mentee *"
                     name="REFLEKSI_MENTOR_KOMITMEN"
                     value={formData.REFLEKSI_MENTOR_KOMITMEN}
                     onChange={handleChange}
                     required
                     rows={4}
+                    placeholder="Bagaimana komitmen yang ditunjukkan oleh mentee?"
                   />
                   <TextArea
                     label="Lain-lain Catatan Refleksi Mentor"
