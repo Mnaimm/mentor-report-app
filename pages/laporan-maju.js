@@ -589,7 +589,14 @@ const validateForm = () => {
       });
     }
     
-    // 3. Refleksi Mentor fields are required
+    // 3. ✅ NEW: Rumusan required for Sesi 2+
+    if (currentSessionNumber >= 2) {
+      if (!formData.RUMUSAN_DAN_LANGKAH_KEHADAPAN || formData.RUMUSAN_DAN_LANGKAH_KEHADAPAN.trim() === '') {
+        errors.push('Rumusan Keseluruhan dan Langkah Kehadapan adalah wajib diisi untuk Sesi 2 ke atas');
+      }
+    }
+    
+    // 4. Refleksi Mentor fields are required
     if (!formData.REFLEKSI_MENTOR_PERASAAN || formData.REFLEKSI_MENTOR_PERASAAN.trim() === '') {
       errors.push('Refleksi Mentor - Perasaan Mentor adalah wajib diisi');
     }
@@ -653,8 +660,14 @@ const handleSubmit = async (e) => {
   // Validate form first
   const validationErrors = validateForm();
   if (validationErrors.length > 0) {
-    setMessage(`Sila lengkapkan medan yang diperlukan:\n• ${validationErrors.join('\n• ')}`);
+    // Create a more user-friendly error message
+    const errorMessage = `❌ Sila lengkapkan medan yang diperlukan (${validationErrors.length} isu):\n\n• ${validationErrors.join('\n• ')}`;
+    setMessage(errorMessage);
     setMessageType('error');
+    
+    // Scroll to the top to show error message
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
     return; // Stop submission if validation fails
   }
   
@@ -1056,12 +1069,6 @@ const handleSubmit = async (e) => {
               {/* --- Enhanced Latar Belakang Section --- */}
               <div className="bg-white p-6 rounded-lg shadow-sm">
                 <Section title="Latar Belakang Usahawan & Situasi Bisnes *">
-                  {currentSessionNumber > 1 && previousLatarBelakangUsahawan && (
-                    <InfoCard title="Ringkasan Latar Belakang Usahawan (Sesi 1)" type="info">
-                      <p className="whitespace-pre-wrap">{previousLatarBelakangUsahawan}</p>
-                    </InfoCard>
-                  )}
-
                   {currentSessionNumber === 1 ? (
                     <EnhancedTextArea
                       label="Latar Belakang Usahawan"
@@ -1432,11 +1439,11 @@ Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun la
                     />
 
                     <EnhancedTextArea
-                      label="Rumusan Keseluruhan dan Langkah Kehadapan"
+                      label={`Rumusan Keseluruhan dan Langkah Kehadapan ${currentSessionNumber >= 2 ? '*' : ''}`}
                       name="RUMUSAN_DAN_LANGKAH_KEHADAPAN"
                       value={formData.RUMUSAN_DAN_LANGKAH_KEHADAPAN || ''}
                       onChange={handleChange}
-                      required={false}
+                      required={currentSessionNumber >= 2}
                       rows={8}
                       placeholder={`Nota:
 Pastikan peserta pulang dengan Keputusan dan Tindakan yang perlu diusahakan, siapa dan bila. (Kongsikan/pastika usahawan juga jelas)
@@ -1590,7 +1597,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                     <InfoCard title="Peringatan Penting" type="info">
                       <p>[SESI 2 & 4 SAHAJA] Sila lengkapkan borang Google Forms Upward Mobility di pautan berikut:</p>
                       <a
-                        href="YOUR_UPWARD_MOBILITY_GOOGLE_FORM_LINK_HERE"
+                        href="/upward-mobility"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-blue-600 hover:underline font-medium"
