@@ -162,7 +162,7 @@ const mapNoTelefonIdx = mappingHeaders.indexOf(normHeader('no Telefon')); // Not
 const mapJenisBisnesIdx = mappingHeaders.indexOf(normHeader('JENIS BISNES')); // Note the space
 const mapMentorEmailIdx = mappingHeaders.indexOf(normHeader('Mentor_Email'));
 const mapMentorNameIdx = mappingHeaders.indexOf(normHeader('Mentor'));
-const mapFolderIdIdx = mappingHeaders.indexOf(normHeader('fOLDER id')); // Note the space and mixed case
+const mapFolderIdIdx = mappingHeaders.indexOf(normHeader('Folder_ID')); // Match the actual header name
 const mapEmailIdx = mappingHeaders.indexOf(normHeader('EMAIL'));
 
 // DEBUG: Let's also add a debug log to see what the normHeader function produces
@@ -170,7 +170,7 @@ console.log('🔍 DEBUG - Normalized header examples:');
 console.log('  "Nama Syarikat" becomes:', normHeader('Nama Syarikat'));
 console.log('  "no Telefon" becomes:', normHeader('no Telefon'));
 console.log('  "JENIS BISNES" becomes:', normHeader('JENIS BISNES'));
-console.log('  "fOLDER id" becomes:', normHeader('fOLDER id'));
+console.log('  "Folder_ID" becomes:', normHeader('Folder_ID'));
 
     // DEBUG: Log the mapping indices
     console.log('📊 DEBUG - Mapping indices:', {
@@ -204,7 +204,7 @@ console.log('  "fOLDER id" becomes:', normHeader('fOLDER id'));
                 PRODUK_SERVIS: mapJenisBisnesIdx !== -1 ? menteeMapRow[mapJenisBisnesIdx] : '',
                 MENTOR_EMAIL: mapMentorEmailIdx !== -1 ? menteeMapRow[mapMentorEmailIdx] : '',
                 NAMA_MENTOR_FROM_MAPPING: mapMentorNameIdx !== -1 ? menteeMapRow[mapMentorNameIdx] : '',
-                Mentee_Folder_ID: mapFolderIdIdx !== -1 ? menteeMapRow[mapFolderIdIdx] : '', // Pass this through
+                Folder_ID: mapFolderIdIdx !== -1 ? menteeMapRow[mapFolderIdIdx] : '', // Pass this through
                 MENTEE_EMAIL_FROM_MAPPING: mapEmailIdx !== -1 ? menteeMapRow[mapEmailIdx] : '', // Pass mentee email
             };
             
