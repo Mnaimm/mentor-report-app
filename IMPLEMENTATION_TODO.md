@@ -89,35 +89,97 @@
 
 ---
 
-## 📋 **CURRENT STATUS**
+## 📋 **CURRENT STATUS - SEPTEMBER 24, 2025**
 
-### ✅ **COMPLETED:**
-- Enhanced Apps Script with comprehensive debugging
-- MAKLUMAT SESI placeholder fixes (`{{MOD_SESI}}` etc.)
-- Bulk regeneration backend functions added
-- Environment variables updated with latest deployment
-- Progressive logic strategy defined
+### ✅ **COMPLETED TODAY:**
+- Fixed SpreadsheetApp permission issue (corrected SPREADSHEET_ID typo)
+- Document generation now working (confirmed document creation successful)
+- Enhanced permission testing infrastructure (`testPermissions`, `testSimpleDocCreation`)
+- Simplified placeholder logic (exact matches instead of multiple variations)
+- Fixed variable reference errors (`financialPlaceholders` → `financialPlaceholder`)
+- Updated environment with latest deployment URL
+
+### 🚨 **CURRENT ISSUES IDENTIFIED:**
+1. **Table Placement**: Tables still appearing at document END instead of replacing placeholders
+2. **Sesi 2+ Logic**: Overwrites Sesi 1 document instead of creating new document
 
 ### 🔄 **IN PROGRESS:**
-- **Phase 1.1**: Enhanced table insertion debugging deployed
-- **Next**: Test and analyze table placement issues
+- **Phase 1**: Table placement debugging and fixes
+- **Current Focus**: Why `{{DATA_KEWANGAN_BULANAN_TABLE}}` and `{{MENTORING_FINDINGS_TABLE}}` aren't being replaced
 
 ### ⏳ **PENDING:**
-- All Phase 1 table placement fixes
-- Complete Sesi 2+ logic restructure
-- Progressive data integration
+- Fix placeholder replacement logic in `insertTableFromJson` function
+- Implement proper Sesi 2+ NEW document creation strategy
+- Progressive data accumulation
 - End-to-end testing
 
 ---
 
-## 🎯 **IMMEDIATE NEXT STEPS:**
-1. **Deploy latest Apps Script** with enhanced debugging
-2. **Test Sesi 1 form** and share execution logs
-3. **Analyze table placement results** from MajuTemplateAnalysis sheet
-4. **Fix table insertion logic** based on findings
-5. **Move to Phase 2** once Sesi 1 works perfectly
+## 🎯 **DETAILED ACTION PLAN FOR TOMORROW**
+
+### **PRIORITY 1: Fix Table Placement (Issue 1)**
+
+#### **Task 1.1: Debug Placeholder Replacement**
+- [ ] Add console logging to `insertTableFromJson` function
+- [ ] Check if `findText({{DATA_KEWANGAN_BULANAN_TABLE}})` returns valid range
+- [ ] Verify placeholder exists exactly as expected in template
+- [ ] Test direct text replacement without table insertion
+
+#### **Task 1.2: Test Placeholder Search Logic**
+- [ ] Create simple test function: `testFindPlaceholder()`
+- [ ] Test with exact string: `{{DATA_KEWANGAN_BULANAN_TABLE}}`
+- [ ] Verify `body.getText().includes()` vs `body.findText()` results
+- [ ] Check for hidden characters or formatting issues
+
+#### **Task 1.3: Fix Table Insertion Logic**
+- [ ] Review `insertTableFromJson` element-by-element search
+- [ ] Fix direct paragraph replacement approach
+- [ ] Ensure table gets inserted at correct index position
+- [ ] Test with simplified table insertion (no complex search)
+
+### **PRIORITY 2: Fix Sesi 2+ Document Strategy (Issue 2)**
+
+#### **Task 2.1: Analyze Current Logic**
+- [ ] Review `processMajuRow` function decision tree
+- [ ] Check why Sesi 2+ calls `appendToExistingDocument` instead of new creation
+- [ ] Identify where existing document ID is being reused
+
+#### **Task 2.2: Implement New Document Strategy**
+- [ ] Modify logic: ALL sessions create NEW documents
+- [ ] Create `createProgressiveDocument()` function
+- [ ] Collect data from ALL previous sessions for current document
+- [ ] Test Sesi 1 → Sesi 2 creates 2 separate documents
+
+### **QUICK WINS TO TRY FIRST:**
+1. **Simple Placeholder Test**: Create test function that only does placeholder replacement
+2. **Check Template**: Verify exact placeholder text in Google Docs template
+3. **Disable Fallback**: Comment out fallback table insertion to force placeholder replacement
+4. **Test in Isolation**: Create minimal document with just placeholders for testing
 
 ---
 
-**Last Updated:** September 24, 2025  
-**Current Focus:** Phase 1 - Sesi 1 Table Placement Fix
+## 🔧 **TECHNICAL CONTEXT FOR TOMORROW**
+
+### **Current System State:**
+- ✅ **Apps Script URL**: `AKfycbwexs7_5wKfJyFFwp1oYBY0hOKbAOqd227T2Vg1Ee6_a7ourbCR7ehZtDgJJr7CUJ5fMA`
+- ✅ **Permissions**: All working (Sheets, Docs, Drive access confirmed)
+- ✅ **Document Creation**: Working (documents are being created)
+- ❌ **Table Placement**: Tables at end instead of replacing placeholders
+- ❌ **Sesi 2+ Logic**: Overwrites instead of creating new documents
+
+### **Files to Focus On:**
+- `appsscript-2/Code.js` - Main logic file
+- `insertTableFromJson` function - Table placement logic
+- `processMajuRow` function - Session decision logic
+- Google Docs template - Verify exact placeholder format
+
+### **Success Metrics for Tomorrow:**
+- [ ] Tables appear in template middle sections (not at end)
+- [ ] Sesi 2 creates NEW document (doesn't modify Sesi 1 document)
+- [ ] Both financial and mentoring tables placed correctly
+
+---
+
+**Last Updated:** September 24, 2025 8:30 PM  
+**Current Focus:** Fix table placement issue, then tackle Sesi 2+ new document strategy  
+**Next Session Goal:** Get tables in correct positions within 1 hour of debugging
