@@ -1,0 +1,14 @@
+{
+  "mcps": [
+    {
+      "name": "filesystem",
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-filesystem", "."]
+    },
+    {
+      "name": "git",
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-git", "."]
+    }
+  ]
+}
