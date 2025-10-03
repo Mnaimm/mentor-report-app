@@ -1,5 +1,6 @@
 // pages/api/submitReport.js
 import { google } from 'googleapis';
+import cache from '../../lib/simple-cache';
 
 /** Extract the row number from "SheetName!A37:T37" */
 function getRowNumberFromUpdatedRange(updatedRange) {
@@ -213,14 +214,21 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid programType specified.' });
     }
 
-    // Append data to the determined Google Sheet and tab
-    const appendRes = await sheets.spreadsheets.values.append({
-      spreadsheetId: spreadsheetId,
-      range: range,
-      valueInputOption: 'USER_ENTERED',
-      insertDataOption: 'INSERT_ROWS',
-      requestBody: { values: [rowData] },
-    });
+    // Append data to the determined Google Sheet and tab with 8s timeout
+    console.log(`📊 Attempting to append data to ${programType} sheet...`);
+    const appendRes = await Promise.race([
+      sheets.spreadsheets.values.append({
+        spreadsheetId: spreadsheetId,
+        range: range,
+        valueInputOption: 'USER_ENTERED',
+        insertDataOption: 'INSERT_ROWS',
+        requestBody: { values: [rowData] },
+      }),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Google Sheets API timeout after 8 seconds')), 8000)
+      )
+    ]);
+    console.log(`✅ Sheet append successful for ${programType}`);
 
     // Get the row number where data was appended
     const updatedRange = appendRes.data?.updates?.updatedRange || '';
@@ -229,25 +237,58 @@ export default async function handler(req, res) {
     // If successful, trigger the corresponding Apps Script automation
     if (newRowNumber) {
       try {
+        console.log(`🤖 Triggering ${programType} Apps Script automation for row ${newRowNumber}...`);
         await fetch(appsScriptUrl, { // Use the correct Apps Script URL
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'processRow', rowNumber: newRowNumber, programType: programType }), // Pass programType to Apps Script
         });
+        console.log(`✅ Apps Script automation completed for ${programType} row ${newRowNumber}`);
       } catch (e) {
-        console.error(`Automation ping for ${programType} failed:`, e);
+        console.error(`⚠️ Automation ping for ${programType} failed:`, e.message);
         // Do not block submission success if automation ping fails
+        // Data is already in sheet - document can be generated manually
       }
+    }
+
+    // Invalidate relevant cache entries on successful submission
+    const mentorEmail = reportData?.mentorEmail;
+    if (mentorEmail) {
+      const cacheKeysToInvalidate = [
+        `mentor-stats:${mentorEmail.toLowerCase().trim()}`,
+        'mapping:bangkit',
+        'mapping:maju'
+      ];
+
+      for (const key of cacheKeysToInvalidate) {
+        cache.delete(key);
+      }
+
+      console.log(`🗑️ Cache invalidated for mentor: ${mentorEmail}`);
     }
 
     return res.status(200).json({ success: true, message: 'Laporan berjaya dihantar!' });
 
   } catch (error) {
     console.error('❌ Error in /api/submitReport:', error);
+
+    // Specific timeout error handling
+    if (error.message.includes('timeout')) {
+      return res.status(408).json({
+        success: false,
+        error: 'Timeout - sila cuba lagi dalam beberapa saat',
+        details: error.message,
+        phase: error.message.includes('Sheets') ? 'sheet_write_timeout' : 'unknown_timeout',
+        retryable: true
+      });
+    }
+
+    // Generic error
     return res.status(500).json({
       success: false,
-      error: `Gagal menghantar laporan ke Google Sheets: ${error.message}`,
+      error: `Gagal menghantar laporan: ${error.message}`,
       details: error.message,
+      retryable: false
     });
   }
 }

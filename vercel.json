@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "pages/api/submitReport.js": {
+      "maxDuration": 10
+    },
+    "pages/api/submitMajuReport.js": {
+      "maxDuration": 10
+    }
+  }
+}
