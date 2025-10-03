@@ -1,8 +1,19 @@
 import { google } from 'googleapis';
+import cache from '../../lib/simple-cache';
 
 export default async function handler(req, res) {
   try {
     const { programType } = req.query;
+    const cacheKey = `mapping:${programType || 'all'}`;
+
+    // Try cache first
+    const cachedData = cache.get(cacheKey);
+    if (cachedData) {
+      console.log(`⚡ Cache HIT for mapping:${programType}`);
+      return res.json(cachedData);
+    }
+
+    console.log(`🔄 Cache MISS for mapping:${programType}, fetching from Google Sheets...`);
 
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma', 'no-cache');
@@ -85,6 +96,10 @@ export default async function handler(req, res) {
     } else {
       filteredMentees = [];
     }
+
+    // Cache the result for 15 minutes
+    cache.set(cacheKey, filteredMentees, 15 * 60 * 1000);
+    console.log(`💾 Cached mapping data for ${programType} (${filteredMentees.length} mentees)`);
 
     res.status(200).json(filteredMentees);
 

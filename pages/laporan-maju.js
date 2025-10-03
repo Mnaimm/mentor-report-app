@@ -846,13 +846,29 @@ const handleSubmit = async (e) => {
     
     console.log('🌐 Submitting to /api/submitMajuReport...');
 
-    const response = await fetch('/api/submitMajuReport', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(dataToSend), // ← This should work now
-    });
+    // Add frontend timeout protection (25 seconds)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 25000);
+
+    let response;
+    try {
+      response = await fetch('/api/submitMajuReport', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(dataToSend),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+
+      if (fetchError.name === 'AbortError') {
+        throw new Error('⏱️ Request timeout - sila cuba lagi. Jika masalah berterusan, hubungi admin.');
+      }
+      throw fetchError;
+    }
 
     console.log('📥 Response status:', response.status);
     console.log('📥 Response ok:', response.ok);
@@ -867,6 +883,11 @@ const handleSubmit = async (e) => {
     } catch (parseError) {
       console.error('❌ Failed to parse response as JSON:', parseError);
       throw new Error(`Server returned non-JSON response: ${responseText}`);
+    }
+
+    // Check for retryable errors before success check
+    if (!response.ok && result.retryable) {
+      throw new Error(`${result.error || result.message} (Boleh cuba semula)`);
     }
 
     if (response.ok && result.success === true) {

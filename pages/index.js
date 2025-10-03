@@ -2,6 +2,9 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSession, signIn, signOut } from "next-auth/react";
+import DebugPanel from '../components/DebugPanel';
+import UserSwitcher from '../components/UserSwitcher';
+import { ImpersonationManager } from '../lib/impersonation';
 
 const ToolCard = ({ href, title, description }) => (
   <Link
@@ -65,26 +68,61 @@ export default function HomePage() {
 
   useEffect(() => {
     if (status !== "authenticated") {
+      console.log('❌ Dashboard: User not authenticated, clearing stats');
       setStats(null);
       return;
     }
+
+    console.log('🔄 Dashboard: User authenticated, fetching stats...');
     let cancelled = false;
     const load = async () => {
       try {
         setStatsLoading(true);
         setStatsError(null);
-        const res = await fetch("/api/mentor-stats");
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const startTime = Date.now();
+        console.log('🚀 Dashboard: Starting API call to /api/mentor-stats');
+
+        // Include impersonation headers if active
+        const headers = ImpersonationManager.getHeaders();
+        const res = await fetch("/api/mentor-stats", { headers });
+        const fetchTime = Date.now() - startTime;
+
+        console.log(`⏱️ Dashboard: API call completed in ${fetchTime}ms, status: ${res.status}`);
+
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error(`❌ Dashboard: API error ${res.status}:`, errorText);
+          throw new Error(`HTTP ${res.status}: ${errorText}`);
+        }
+
         const json = await res.json();
-        if (!cancelled) setStats(json);
+        const totalTime = Date.now() - startTime;
+
+        console.log(`✅ Dashboard: Data received in ${totalTime}ms:`, {
+          requestId: json.debug?.requestId,
+          totalMentees: json.totalMentees,
+          allTimeReports: json.allTime?.totalReports,
+          currentRoundReported: json.currentRoundStats?.reportedThisRound,
+          apiProcessingTime: json.debug?.totalTimeMs + 'ms'
+        });
+
+        if (!cancelled) {
+          setStats(json);
+          console.log('📊 Dashboard: Stats state updated successfully');
+        }
       } catch (e) {
+        console.error('❌ Dashboard: Error loading stats:', e);
         if (!cancelled) setStatsError(String(e?.message || e));
       } finally {
         if (!cancelled) setStatsLoading(false);
       }
     };
     load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      console.log('🚫 Dashboard: Stats loading cancelled (component unmounted)');
+    };
   }, [status]);
 
   if (status === "loading") {
@@ -140,6 +178,29 @@ export default function HomePage() {
                 Log Keluar
               </button>
             </div>
+
+            {/* User Switcher - Only for Super Admin */}
+            <UserSwitcher
+              onImpersonationChange={(email) => {
+                console.log('Impersonation changed:', email);
+                // Stats will reload on page refresh triggered by component
+              }}
+            />
+
+            {/* Debug Info Panel */}
+            {stats?.debug && (
+              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-xs text-gray-600">
+                <strong>Debug Info:</strong> Request ID: {stats.debug.requestId} |
+                Data fetched at: {new Date(stats.debug.timestamp).toLocaleTimeString()} |
+                API processing: {stats.debug.totalTimeMs}ms |
+                <button
+                  onClick={() => window.location.reload()}
+                  className="ml-2 text-blue-600 hover:text-blue-800 underline"
+                >
+                  Refresh Data
+                </button>
+              </div>
+            )}
 
             {/* Current Round Stats - Most Important */}
             {stats?.currentRoundStats && (
@@ -289,6 +350,9 @@ export default function HomePage() {
             )}
           </div>
         )}
+
+        {/* Debug Panel - Only show for authenticated users */}
+        {session && <DebugPanel />}
       </div>
     </div>
   );

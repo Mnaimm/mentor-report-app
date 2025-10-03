@@ -169,6 +169,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [compressionProgress, setCompressionProgress] = useState({ show: false, current: 0, total: 0, message: '', fileName: '' });
 
   // --- Non-blocking toast (yellow notice) ---
   const [toast, setToast] = useState({ show: false, message: '' });
@@ -427,70 +428,108 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
 // REPLACE WITH THIS (uses smart upload for large images):
 // Replace the entire uploadImage function and remove smartUploadImage/uploadImageDirect
 
-const compressImageForProxy = (base64String, targetSizeKB = 650) => {
+// Smart compression with upfront calculations and progress callbacks
+const compressImageForProxy = (base64String, targetSizeKB = 800, onProgress = null) => {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      
-      // Start with original dimensions
-      let { width, height } = img;
-      
-      // Aggressive dimension reduction
-      const maxDimension = 800;
-      if (width > height) {
-        if (width > maxDimension) {
+      // Phase 1: Calculate optimal settings upfront
+      const calculateOptimalSettings = () => {
+        if (onProgress) onProgress(1, 4, 'Calculating optimal settings...');
+
+        const { width: origWidth, height: origHeight } = img;
+        const originalSizeEstimateKB = (base64String.length * 0.75) / 1024;
+
+        // Smart dimension calculation - single upfront calculation
+        const maxDimension = 900; // Slightly larger starting point
+        let width = origWidth;
+        let height = origHeight;
+
+        if (width > height && width > maxDimension) {
           height = (height * maxDimension) / width;
           width = maxDimension;
-        }
-      } else {
-        if (height > maxDimension) {
+        } else if (height > maxDimension) {
           width = (width * maxDimension) / height;
           height = maxDimension;
         }
-      }
-      
-      canvas.width = width;
-      canvas.height = height;
-      ctx.drawImage(img, 0, 0, width, height);
-      
-      // Try multiple compression levels
-      let quality = 0.7;
-      let compressedDataUrl;
-      let attempts = 0;
-      
-      do {
-        compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
-        const estimatedSizeKB = (compressedDataUrl.length * 0.75) / 1024;
-        
-        console.log(`Compression attempt ${attempts + 1}: ${estimatedSizeKB.toFixed(0)}KB at ${(quality * 100).toFixed(0)}% quality`);
-        
-        if (estimatedSizeKB <= targetSizeKB) {
-          console.log(`✅ Compressed to ${estimatedSizeKB.toFixed(0)}KB`);
-          break;
-        }
-        
-        quality -= 0.1;
-        attempts++;
-        
-        // If quality gets too low, reduce dimensions further
-        if (quality <= 0.2 && attempts < 10) {
-          width = Math.floor(width * 0.8);
-          height = Math.floor(height * 0.8);
-          canvas.width = width;
-          canvas.height = height;
-          ctx.clearRect(0, 0, width, height);
-          ctx.drawImage(img, 0, 0, width, height);
-          quality = 0.6; // Reset quality when reducing dimensions
-          console.log(`Reducing dimensions to ${width}x${height}`);
-        }
-        
-      } while (attempts < 15);
-      
-      resolve(compressedDataUrl);
+
+        // Smart quality estimation based on compression ratio needed
+        const compressionRatioNeeded = targetSizeKB / originalSizeEstimateKB;
+        let startingQuality = Math.max(0.3, Math.min(0.8, compressionRatioNeeded * 1.2));
+
+        console.log(`📊 Original: ${origWidth}x${origHeight} (~${originalSizeEstimateKB.toFixed(0)}KB)`);
+        console.log(`📐 Target dimensions: ${Math.floor(width)}x${Math.floor(height)}`);
+        console.log(`🎯 Target size: ${targetSizeKB}KB, starting quality: ${(startingQuality * 100).toFixed(0)}%`);
+
+        return { width: Math.floor(width), height: Math.floor(height), startingQuality };
+      };
+
+      // Phase 2: Setup canvas once
+      const settings = calculateOptimalSettings();
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      canvas.width = settings.width;
+      canvas.height = settings.height;
+      ctx.drawImage(img, 0, 0, settings.width, settings.height);
+
+      if (onProgress) onProgress(2, 4, `Resized to ${settings.width}x${settings.height}`);
+
+      // Phase 3: Smart compression with non-blocking attempts
+      const performSmartCompression = () => {
+        let quality = settings.startingQuality;
+        let attempts = 0;
+        const maxAttempts = 5; // Reduced from 15 to 5
+
+        const tryCompression = () => {
+          if (attempts >= maxAttempts) {
+            console.log('⚠️ Max attempts reached, using last result');
+            const finalResult = canvas.toDataURL('image/jpeg', quality);
+            if (onProgress) onProgress(4, 4, '✅ Compression completed');
+            resolve(finalResult);
+            return;
+          }
+
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+          const estimatedSizeKB = (compressedDataUrl.length * 0.75) / 1024;
+
+          attempts++;
+          const progressMsg = `Attempt ${attempts}: ${estimatedSizeKB.toFixed(0)}KB @ ${(quality * 100).toFixed(0)}%`;
+          console.log(`🔄 ${progressMsg}`);
+
+          if (onProgress) onProgress(3, 4, progressMsg);
+
+          if (estimatedSizeKB <= targetSizeKB) {
+            console.log(`✅ Compressed to ${estimatedSizeKB.toFixed(0)}KB in ${attempts} attempts`);
+            if (onProgress) onProgress(4, 4, `✅ Compressed to ${estimatedSizeKB.toFixed(0)}KB`);
+            resolve(compressedDataUrl);
+            return;
+          }
+
+          // Intelligent quality stepping - larger reductions initially
+          if (attempts <= 2) {
+            quality -= 0.15; // Aggressive initial reduction
+          } else {
+            quality -= 0.08; // Smaller fine-tuning
+          }
+
+          // Ensure minimum quality
+          if (quality < 0.2) {
+            quality = 0.2;
+          }
+
+          // Use requestAnimationFrame for non-blocking execution
+          requestAnimationFrame(tryCompression);
+        };
+
+        // Start compression on next frame
+        requestAnimationFrame(tryCompression);
+      };
+
+      // Phase 4: Start compression
+      requestAnimationFrame(performSmartCompression);
     };
-    
+
     img.src = base64String;
   });
 };
@@ -499,15 +538,26 @@ const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async 
     try {
       const originalSizeMB = (file.size / 1024 / 1024).toFixed(2);
       console.log(`📸 Processing ${file.name} (${originalSizeMB}MB)`);
-      
+
       const reader = new FileReader();
       reader.readAsDataURL(file);
-      
+
       reader.onloadend = async () => {
         try {
-          // Always compress aggressively for proxy
+          // Progress callback for React state updates
+          const onCompressionProgress = (current, total, message) => {
+            setCompressionProgress({
+              show: true,
+              current,
+              total,
+              message,
+              fileName: file.name
+            });
+          };
+
+          // Always compress aggressively for proxy with progress
           console.log('🔄 Compressing image for proxy upload...');
-          const compressedBase64 = await compressImageForProxy(reader.result, 600); // 600KB target
+          const compressedBase64 = await compressImageForProxy(reader.result, 800, onCompressionProgress); // Increased to 800KB target
           
           const imageData = {
             fileData: compressedBase64.split(',')[1], 
@@ -550,10 +600,14 @@ const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async 
           }
           
           console.log('✅ Upload successful');
+          // Clear compression progress
+          setCompressionProgress({ show: false, current: 0, total: 0, message: '', fileName: '' });
           resolve(result.url);
           
         } catch (error) {
           console.error('❌ Upload processing failed:', error);
+          // Clear compression progress on error
+          setCompressionProgress({ show: false, current: 0, total: 0, message: '', fileName: '' });
           reject(error);
         }
       };
@@ -590,6 +644,9 @@ const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async 
 
       await Promise.all(uploadPromises);
 
+      // Clear compression progress immediately when uploads complete
+      setCompressionProgress({ show: false, current: 0, total: 0, message: '', fileName: '' });
+
       // Clear saved draft BEFORE resetting
       try {
         const k = getDraftKey(selectedMentee?.Usahawan, currentSession, session?.user?.email);
@@ -609,20 +666,46 @@ const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async 
         programType: 'bangkit', // Added programType
       };
 
-      const response = await fetch('/api/submitReport', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(reportData),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Gagal menghantar laporan.');
+      // Add frontend timeout protection (25 seconds)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
 
-      setSuccess('Laporan berjaya dihantar! Borang akan direset.');
+      try {
+        const response = await fetch('/api/submitReport', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(reportData),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          // Check if retryable
+          if (result.retryable) {
+            throw new Error(`${result.error} (Boleh cuba semula)`);
+          }
+          throw new Error(result.error || 'Gagal menghantar laporan.');
+        }
+
+        // Success path continues below...
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+
+        if (fetchError.name === 'AbortError') {
+          throw new Error('⏱️ Request timeout - sila cuba lagi. Jika masalah berterusan, hubungi admin.');
+        }
+        throw fetchError;
+      }
+
+      setSuccess('✅ Laporan berjaya dihantar! Borang sedang direset...');
       window.scrollTo(0, 0);
+      // Reduced timeout and immediate feedback
       setTimeout(() => {
         resetForm();
         setSuccess('');
-      }, 3000);
+      }, 1500); // Reduced from 3000ms to 1500ms
     } catch (err) {
       setError(err.message);
       window.scrollTo(0, 0);
@@ -918,6 +1001,7 @@ const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async 
           </div>
         )}
 
+
         <form onSubmit={handleSubmit}>
           <Section title="1. Pemilihan Usahawan">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -970,11 +1054,46 @@ const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async 
           )}
 
           {selectedMentee && menteeStatus !== 'MIA' && (
-            <div className="mt-6 pt-6 border-t text-center">
-              <button type="submit" disabled={isSubmitting} className="w-full md:w-auto bg-green-600 text-white font-bold py-3 px-12 rounded-lg hover:bg-green-700 disabled:bg-gray-400">
-                {isSubmitting ? 'Menghantar...' : 'Hantar Laporan Sesi ' + currentSession}
-              </button>
-              {saveStatus && <div className="mt-2 text-xs text-gray-500">{saveStatus}</div>}
+            <div className="mt-6 pt-6 border-t">
+              {/* Compression Progress Indicator - Near Submit Button */}
+              {compressionProgress.show && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-blue-900">
+                        📸 Compressing: {compressionProgress.fileName}
+                      </p>
+                      <p className="text-xs text-blue-700">
+                        Step {compressionProgress.current}/{compressionProgress.total}: {compressionProgress.message}
+                      </p>
+                      <div className="w-full bg-blue-200 rounded-full h-2 mt-2">
+                        <div
+                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${(compressionProgress.current / compressionProgress.total) * 100}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Upload Progress when submitting */}
+              {isSubmitting && !compressionProgress.show && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4 text-center">
+                  <div className="flex items-center justify-center space-x-3">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-600"></div>
+                    <span className="text-green-800 font-medium">📤 Uploading to server...</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="text-center">
+                <button type="submit" disabled={isSubmitting || compressionProgress.show} className="w-full md:w-auto bg-green-600 text-white font-bold py-3 px-12 rounded-lg hover:bg-green-700 disabled:bg-gray-400">
+                  {compressionProgress.show ? '🔄 Compressing Images...' : isSubmitting ? '📤 Menghantar...' : 'Hantar Laporan Sesi ' + currentSession}
+                </button>
+                {saveStatus && <div className="mt-2 text-xs text-gray-500">{saveStatus}</div>}
+              </div>
             </div>
           )}
         </form>

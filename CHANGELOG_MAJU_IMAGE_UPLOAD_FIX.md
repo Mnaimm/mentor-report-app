@@ -154,6 +154,84 @@
 
 ---
 
-**Resolution Status**: ✅ **COMPLETED**  
-**Impact**: Critical functionality restored for iTEKAD Maju program  
-**Risk Level**: Low (using proven patterns from working implementations)
+## Template Review & Enhancement - September 23, 2025
+
+### 5. Document Template Alignment ✅
+- **Issue**: Template placeholders needed alignment with Apps Script and frontend form
+- **Action**: Comprehensive page-by-page review of Google Docs template
+- **Files**: `appsscript-2/Code.js` (enhanced), user's Google Docs template (pages 2 & 5 edited)
+
+#### 5.1 Template Structure Analysis
+**Pages Reviewed**:
+- **Page 1**: Title page - No placeholders (✅ Perfect)
+- **Page 2**: MAKLUMAT SESI table - User edited to remove Sesi 2-4 static placeholders (✅ Perfect)
+- **Page 3**: Data tables - No changes needed (✅ Perfect)
+- **Page 4**: Refleksi Mentor - No changes needed (✅ Perfect)
+- **Page 5**: Image sections - User edited to use progressive text instead of placeholders (✅ Perfect)
+- **Page 6**: GW360 section - No changes needed (✅ Perfect)
+- **Page 7**: Footer - No changes needed (✅ Perfect)
+
+#### 5.2 Apps Script Enhancements
+**Enhanced Features**:
+1. **Improved Table Generation**: Better handling of nested `Pelan Tindakan` arrays
+2. **Session-Specific Image Handling**: Support for `{{URL_GAMBAR_SESI_1_JSON}}` through `{{URL_GAMBAR_SESI_4_JSON}}`
+3. **Flexible Premis Image Updates**: Premis photos can now be updated from any session (user requirement)
+4. **Progressive Text Replacement**: Replaces `[Will be added when Sesi X is completed]` with actual images
+5. **Enhanced Error Handling**: Better logging and debugging capabilities
+
+#### 5.3 Key Template Changes Made by User
+**Page 2 - MAKLUMAT SESI Table**:
+- **Before**: Static placeholders for all sessions (`{{TARIKH_SESI_2}}`, etc.)
+- **After**: Only Sesi 1 placeholders, empty cells for Sesi 2-4
+- **Benefit**: Apps Script can dynamically update table cells instead of replacing placeholders
+
+**Page 5 - LAMPIRAN GAMBAR**:
+- **Before**: Separate placeholders for each session (`{{URL_GAMBAR_SESI_2_JSON}}`, etc.)
+- **After**: Text `[Will be added when Sesi X is completed]` for Sesi 2-4
+- **Benefit**: Clean initial document appearance, professional progressive updates
+
+#### 5.4 Apps Script Code Updates
+**Enhanced Functions**:
+- `insertTableFromJson()`: Better object/array handling
+- `appendToExistingDocument()`: Session-specific image placeholder updates
+- `populateSesi1Data()`: Simplified placeholder handling
+- Progressive text replacement for image sections
+
+### 6. Environment Configuration ✅
+- **New Apps Script URL**: `AKfycbyWTnWh-WFZrszzoRwxgmxjtHuRJas_cJGZx3C6jkaL-Ij0vzHG89no0Un3eHRtagm2ag`
+- **Updated**: `NEXT_PUBLIC_APPS_SCRIPT_LAPORAN_MAJU_URL` in `.env.local`
+
+---
+
+**Resolution Status**: ✅ **COMPLETED - READY FOR TESTING**  
+**Impact**: Complete document generation system with perfect template alignment  
+**Risk Level**: Low (systematic review and proven enhancement patterns)  
+
+## Table Placement Fix - September 24, 2025
+
+### 7. Document Table Positioning ✅
+- **Issue**: Tables (DATA_KEWANGAN_BULANAN and DAPATAN_SESI_MENTORING) were being appended to end of document instead of replacing placeholders
+- **Root Cause**: Complex placeholder replacement logic in `insertTableFromJson()` function was failing
+- **Fix**: Simplified table insertion approach with better error handling
+
+#### 7.1 Apps Script Enhancement
+**File**: `appsscript-2/Code.js`
+**Function**: `insertTableFromJson()`
+**Changes**:
+- Simplified placeholder replacement logic
+- Better error handling and logging
+- Direct heading replacement instead of complex element manipulation
+- More reliable table insertion after heading paragraphs
+
+**Before**: Complex element removal and index-based insertion
+**After**: Direct text replacement with simplified table insertion
+
+#### 7.2 Enhanced Logging
+- Added detailed logging for placeholder detection
+- Better error tracking for table insertion failures
+- Step-by-step debugging information
+
+## Next Steps
+1. **User Testing**: Re-test form submission with fixed table placement
+2. **Document Verification**: Confirm tables now appear in correct locations (replacing placeholders)
+3. **Session Flow Testing**: Test Sesi 1-4 progressive document building

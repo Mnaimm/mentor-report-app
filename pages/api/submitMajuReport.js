@@ -1,5 +1,6 @@
 // pages/api/submitMajuReport.js
 import { google } from 'googleapis';
+import cache from '../../lib/simple-cache';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -39,15 +40,21 @@ export default async function handler(req, res) {
     const rowData = mapMajuDataToSheetRow(reportData);
     console.log('📊 Prepared row data:', rowData.slice(0, 5)); // Log first 5 values
 
-    // Append data to Google Sheet
+    // Append data to Google Sheet with 8s timeout
     console.log('📊 Appending data to Google Sheets...');
-    const appendRes = await sheets.spreadsheets.values.append({
-      spreadsheetId: spreadsheetId,
-      range: range,
-      valueInputOption: 'USER_ENTERED',
-      insertDataOption: 'INSERT_ROWS',
-      requestBody: { values: [rowData] },
-    });
+    const appendRes = await Promise.race([
+      sheets.spreadsheets.values.append({
+        spreadsheetId: spreadsheetId,
+        range: range,
+        valueInputOption: 'USER_ENTERED',
+        insertDataOption: 'INSERT_ROWS',
+        requestBody: { values: [rowData] },
+      }),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Google Sheets API timeout after 8 seconds')), 8000)
+      )
+    ]);
+    console.log('✅ Sheet append successful');
 
     // Extract the row number where data was appended
     const updatedRange = appendRes.data?.updates?.updatedRange || '';
@@ -87,8 +94,25 @@ export default async function handler(req, res) {
         const appsScriptResult = JSON.parse(appsScriptText);
         if (appsScriptResult.success) {
           console.log('✅ Document created successfully:', appsScriptResult.docId);
-          return res.status(200).json({ 
-            success: true, 
+
+          // Invalidate cache on successful submission
+          const mentorEmail = reportData?.mentorEmail;
+          if (mentorEmail) {
+            const cacheKeysToInvalidate = [
+              `mentor-stats:${mentorEmail.toLowerCase().trim()}`,
+              'mapping:bangkit',
+              'mapping:maju'
+            ];
+
+            for (const key of cacheKeysToInvalidate) {
+              cache.delete(key);
+            }
+
+            console.log(`🗑️ Cache invalidated for mentor: ${mentorEmail}`);
+          }
+
+          return res.status(200).json({
+            success: true,
             message: 'Laporan berjaya dihantar dan dokumen telah dicipta!',
             rowNumber: newRowNumber,
             docId: appsScriptResult.docId
@@ -123,9 +147,24 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('❌ Error in /api/submitMajuReport:', error);
+
+    // Specific timeout error handling
+    if (error.message.includes('timeout')) {
+      return res.status(408).json({
+        success: false,
+        error: 'Timeout - sila cuba lagi dalam beberapa saat',
+        details: error.message,
+        phase: error.message.includes('Sheets') ? 'sheet_write_timeout' : 'unknown_timeout',
+        retryable: true
+      });
+    }
+
+    // Generic error
     return res.status(500).json({
       success: false,
       error: `Gagal menghantar laporan: ${error.message}`,
+      details: error.message,
+      retryable: false
     });
   }
 }
