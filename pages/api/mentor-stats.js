@@ -2,18 +2,75 @@
 import { getSheetsClient } from '../../lib/sheets';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "./auth/[...nextauth]";
+import cache from '../../lib/simple-cache';
+import { getEffectiveUserEmail, canImpersonate } from '../../lib/impersonation';
 
 export default async function handler(req, res) {
+  const debugInfo = {
+    timestamp: new Date().toISOString(),
+    requestId: Math.random().toString(36).substr(2, 9)
+  };
+
+  console.log(`🔄 [${debugInfo.requestId}] mentor-stats API called at ${debugInfo.timestamp}`);
+
   try {
     // 1) require login
     const session = await getServerSession(req, res, authOptions);
-    if (!session?.user?.email) return res.status(401).json({ error: "Unauthorized" });
-    const loginEmail = session.user.email.toLowerCase().trim();
+    if (!session?.user?.email) {
+      console.log(`❌ [${debugInfo.requestId}] Unauthorized access attempt`);
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const realUserEmail = session.user.email.toLowerCase().trim();
+    const effectiveUserEmail = getEffectiveUserEmail(req, session);
+    const isImpersonating = realUserEmail !== effectiveUserEmail;
+
+    console.log(`👤 [${debugInfo.requestId}] Processing request:`);
+    console.log(`  Real user: ${realUserEmail}`);
+    console.log(`  Effective user: ${effectiveUserEmail}`);
+    console.log(`  Impersonating: ${isImpersonating ? 'Yes' : 'No'}`);
+
+    // Security check: only allow impersonation for super admin
+    if (isImpersonating && !canImpersonate(realUserEmail)) {
+      console.log(`❌ [${debugInfo.requestId}] Unauthorized impersonation attempt by: ${realUserEmail}`);
+      return res.status(403).json({ error: "Unauthorized impersonation attempt" });
+    }
+
+    const loginEmail = effectiveUserEmail;
+
+    // Cache key for this mentor's stats (include impersonation context)
+    const cacheKey = `mentor-stats:${loginEmail}${isImpersonating ? ':impersonated' : ''}`;
+
+    // Try to get from cache first
+    const cachedData = cache.get(cacheKey);
+    if (cachedData) {
+      console.log(`⚡ [${debugInfo.requestId}] Returning cached data for ${loginEmail}`);
+      return res.json({
+        ...cachedData,
+        debug: {
+          ...debugInfo,
+          fromCache: true,
+          originalTimestamp: cachedData.debug?.timestamp,
+          cacheAge: Date.now() - new Date(cachedData.debug?.timestamp || 0).getTime(),
+          impersonation: {
+            isImpersonating,
+            realUser: realUserEmail,
+            effectiveUser: effectiveUserEmail
+          }
+        }
+      });
+    }
+
+    console.log(`📊 [${debugInfo.requestId}] Fetching data from Google Sheets...`);
+    const sheetsStartTime = Date.now();
 
     const client = await getSheetsClient();
     const mappingSheet = await client.getRows('mapping');
-    const sessionSheet = await client.getRows('V8'); 
+    const sessionSheet = await client.getRows('V8');
     const batchSheet = await client.getRows('batch');
+
+    const sheetsEndTime = Date.now();
+    console.log(`⏱️ [${debugInfo.requestId}] Google Sheets data fetched in ${sheetsEndTime - sheetsStartTime}ms`);
+    console.log(`📋 [${debugInfo.requestId}] Data counts: mapping=${mappingSheet.length}, sessions=${sessionSheet.length}, batches=${batchSheet.length}`);
 
     // 2) Find mentor's batch and current round info
     const mentorMappings = mappingSheet.filter(row => {
@@ -178,11 +235,11 @@ export default async function handler(req, res) {
     const currentRoundPending = totalMentees - currentRoundReportedMentees.size;
 
     // 6) Response
-    return res.json({
+    const responseData = {
       mentorEmail: loginEmail,
       currentRound,
       totalMentees,
-      
+
       // All-time stats
       allTime: {
         totalReports: allTimeTotalReports,
@@ -190,7 +247,7 @@ export default async function handler(req, res) {
         miaCount: allTimeMiaCount,
         perMenteeSessions: allTimePerMenteeSessions,
       },
-      
+
       // Current round stats
       currentRoundStats: {
         reportedThisRound: currentRoundReportedMentees.size,
@@ -198,21 +255,48 @@ export default async function handler(req, res) {
         miaThisRound: currentRoundMiaCount,
         perMenteeSessions: currentRoundPerMenteeSessions,
       },
-      
+
       // Batch-grouped data
       menteesByBatch,
       sessionsByBatch: sessionsByBatchCount,
       miaByBatch,
-      
+
       source: {
         batchInfo: batchInfo || null,
         mentorBatch,
         totalMenteeRecords: mentorMappings.length,
       },
+
+      // Debug info
+      debug: {
+        ...debugInfo,
+        processingTimeMs: Date.now() - sheetsEndTime,
+        totalTimeMs: Date.now() - new Date(debugInfo.timestamp).getTime(),
+        impersonation: {
+          isImpersonating,
+          realUser: realUserEmail,
+          effectiveUser: effectiveUserEmail
+        }
+      }
+    };
+
+    console.log(`✅ [${debugInfo.requestId}] Response ready:`, {
+      totalMentees,
+      allTimeReports: allTimeTotalReports,
+      currentRoundReported: currentRoundReportedMentees.size,
+      processingTime: responseData.debug.totalTimeMs + 'ms'
     });
 
+    // Cache the response for 10 minutes
+    cache.set(cacheKey, responseData, 10 * 60 * 1000); // 10 minutes
+
+    return res.json(responseData);
+
   } catch (e) {
-    console.error('Error in mentor-stats:', e);
-    res.status(500).json({ error: String(e?.message || e) });
+    console.error(`❌ [${debugInfo.requestId}] Error in mentor-stats:`, e);
+    res.status(500).json({
+      error: String(e?.message || e),
+      debug: debugInfo
+    });
   }
 }
