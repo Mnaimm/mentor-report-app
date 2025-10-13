@@ -890,15 +890,62 @@ const handleSubmit = async (e) => {
       throw new Error(`${result.error || result.message} (Boleh cuba semula)`);
     }
 
+    // Handle success
     if (response.ok && result.success === true) {
-      console.log('✅ Submission successful!');
-      setMessage(result.message || 'Laporan submitted successfully!');
+      console.log('✅ [PHASE 5] Submission successful!');
+      console.log('📋 [PHASE 5] Success message:', result.message);
+
+      if (result.docUrl) {
+        console.log('📄 [PHASE 5] Document URL:', result.docUrl);
+      }
+
+      // Show success with row number for verification
+      const successMessage = `${result.message || '✅ Laporan berjaya dihantar!'}\n\n📊 Row Number: ${result.rowNumber || 'N/A'}\n\nSila semak Google Sheet untuk pengesahan.`;
+
+      setMessage(successMessage);
       setMessageType('success');
+
+      console.log('🔄 [PHASE 5] Resetting form...');
       resetForm();
+
+      console.log('✅ [COMPLETE] Submission process completed successfully');
+      return;
+
+    } else if (result.partialSuccess) {
+      // Handle partial success (sheet saved but document failed)
+      console.warn('⚠️ [PHASE 5] Partial success - sheet saved but document failed');
+
+      const partialMessage = `⚠️ ${result.error || 'Laporan separa berjaya'}\n\n` +
+        `✅ Data telah disimpan di Google Sheet\n` +
+        `❌ Dokumen gagal dicipta\n\n` +
+        `📊 Row Number: ${result.rowNumber}\n` +
+        `📝 Details: ${result.warning || result.message}\n\n` +
+        `💡 Sila hubungi admin dengan nombor row di atas untuk mencipta dokumen.`;
+
+      setMessage(partialMessage);
+      setMessageType('warning');
+
+      // Don't reset form completely - user might need to see data
+      console.log('⚠️ [PHASE 5] Partial success - form not reset');
+      return;
+
     } else {
-      console.error('❌ Submission failed:', result);
-      const errorMessage = result.error || result.message || 'Submission failed';
-      throw new Error(errorMessage);
+      // Failure case
+      console.error('❌ [PHASE 5] Submission failed');
+      console.error('📊 [PHASE 5] Response status:', response.status);
+      console.error('📊 [PHASE 5] Result object:', result);
+
+      const errorMessage = result.error || result.message || 'Unknown error occurred';
+      const errorDetails = result.details || '';
+      const warningInfo = result.warning ? `\n⚠️ Warning: ${result.warning}` : '';
+      const rowInfo = result.rowNumber ? `\n📊 Row Number: ${result.rowNumber}` : '';
+
+      console.error('❌ [PHASE 5] Error message:', errorMessage);
+      if (errorDetails) {
+        console.error('❌ [PHASE 5] Error details:', errorDetails);
+      }
+
+      throw new Error(`${errorMessage}${warningInfo}${errorDetails ? '\n\nDetails: ' + errorDetails : ''}${rowInfo}`);
     }
 
   } catch (error) {
@@ -958,8 +1005,15 @@ const handleSubmit = async (e) => {
         {/* Message / Loading (as cards for consistency) */}
         {message && (
           <div className="bg-white p-6 rounded-lg shadow-sm">
-            <InfoCard title={messageType === 'success' ? 'Success' : 'Error'} type={messageType}>
-              {message}
+            <InfoCard
+              title={
+                messageType === 'success' ? 'Success' :
+                messageType === 'warning' ? 'Partial Success' :
+                'Error'
+              }
+              type={messageType}
+            >
+              <div style={{ whiteSpace: 'pre-line' }}>{message}</div>
             </InfoCard>
           </div>
         )}

@@ -9,7 +9,11 @@ export default async function handler(req, res) {
 
   try {
     const reportData = req.body;
-    console.log('📋 Received report data for MAJU submission');
+    console.log('📋 [SUBMIT API] Request received for MAJU submission');
+    console.log('📊 [SUBMIT API] Mentee:', reportData.NAMA_MENTEE);
+    console.log('📊 [SUBMIT API] Session:', reportData.SESI_NUMBER);
+    console.log('📊 [SUBMIT API] Folder_ID:', reportData.Folder_ID);
+    console.log('📊 [SUBMIT API] MIA Status:', reportData.MIA_STATUS);
 
     // Auth setup
     const credentialsJson = Buffer.from(process.env.GOOGLE_CREDENTIALS_BASE64, 'base64').toString('ascii');
@@ -36,9 +40,24 @@ export default async function handler(req, res) {
       throw new Error('Missing NEXT_PUBLIC_APPS_SCRIPT_LAPORAN_MAJU_URL environment variable.');
     }
 
+    // DEBUG: Verify all critical fields are populated
+    console.log('🔍 [DEBUG] Field verification before sheet write:');
+    console.log('  - Folder_ID from request:', reportData.Folder_ID);
+    console.log('  - NAMA_MENTEE:', reportData.NAMA_MENTEE);
+    console.log('  - SESI_NUMBER:', reportData.SESI_NUMBER);
+    console.log('  - NAMA_MENTOR:', reportData.NAMA_MENTOR);
+    console.log('  - EMAIL_MENTOR:', reportData.EMAIL_MENTOR);
+
+    // Alert if Folder_ID is missing
+    if (!reportData.Folder_ID || reportData.Folder_ID === '') {
+      console.error('⚠️ [CRITICAL] Folder_ID is empty! Document generation will fail.');
+      console.error('⚠️ Request body Folder_ID:', reportData.Folder_ID);
+    }
+
     // Prepare row data
     const rowData = mapMajuDataToSheetRow(reportData);
-    console.log('📊 Prepared row data:', rowData.slice(0, 5)); // Log first 5 values
+    console.log('📊 Prepared row data (first 5 values):', rowData.slice(0, 5));
+    console.log('📊 Folder_ID in row data (index 25):', rowData[25]);
 
     // Append data to Google Sheet with 8s timeout
     console.log('📊 Appending data to Google Sheets...');
@@ -86,14 +105,21 @@ export default async function handler(req, res) {
     });
 
     const appsScriptText = await appsScriptResponse.text();
-    console.log('📥 Apps Script response status:', appsScriptResponse.status);
-    console.log('📥 Apps Script response text:', appsScriptText);
+    console.log('📥 [SUBMIT API] Apps Script response status:', appsScriptResponse.status);
+    console.log('📥 [SUBMIT API] Apps Script response text:', appsScriptText.substring(0, 500));
 
     if (appsScriptResponse.ok) {
       try {
         const appsScriptResult = JSON.parse(appsScriptText);
+        console.log('📦 [SUBMIT API] Apps Script parsed response:', {
+          success: appsScriptResult.success,
+          message: appsScriptResult.message,
+          docId: appsScriptResult.docId,
+          docUrl: appsScriptResult.docUrl
+        });
+
         if (appsScriptResult.success) {
-          console.log('✅ Document created successfully:', appsScriptResult.docId);
+          console.log('✅ [SUBMIT API] Document created successfully:', appsScriptResult.docId);
 
           // Invalidate cache on successful submission
           const mentorEmail = reportData?.mentorEmail;
@@ -118,30 +144,51 @@ export default async function handler(req, res) {
             docId: appsScriptResult.docId
           });
         } else {
-          console.error('❌ Apps Script returned error:', appsScriptResult.message);
-          return res.status(200).json({ 
-            success: true, 
-            message: `Laporan berjaya dihantar, tetapi ada masalah dengan dokumen: ${appsScriptResult.message}`,
+          console.error('❌ [SUBMIT API] Apps Script returned error:', appsScriptResult.message);
+          console.error('❌ [SUBMIT API] Error details:', appsScriptResult);
+
+          // Partial success: Sheet saved but document failed
+          return res.status(200).json({
+            success: false,
+            partialSuccess: true,
+            sheetSaved: true,
+            documentCreated: false,
+            error: 'Data disimpan tetapi dokumen gagal dicipta',
+            message: 'Laporan telah disimpan di Google Sheet tetapi dokumen tidak dapat dijana. Sila hubungi admin dengan nombor row di bawah.',
+            warning: appsScriptResult.message,
             rowNumber: newRowNumber,
-            warning: appsScriptResult.message
+            phase: 'document_generation',
+            retryable: true
           });
         }
       } catch (parseError) {
-        console.error('❌ Failed to parse Apps Script response:', parseError);
-        return res.status(200).json({ 
-          success: true, 
-          message: 'Laporan berjaya dihantar, tetapi respons dokumen tidak dapat diproses.',
+        console.error('❌ [SUBMIT API] Failed to parse Apps Script response:', parseError);
+        return res.status(200).json({
+          success: false,
+          partialSuccess: true,
+          sheetSaved: true,
+          documentCreated: false,
+          error: 'Data disimpan tetapi respons dokumen tidak dapat diproses',
+          message: 'Laporan telah disimpan di Google Sheet tetapi respons dokumen tidak sah. Sila hubungi admin dengan nombor row di bawah.',
+          warning: 'Document processing response invalid',
           rowNumber: newRowNumber,
-          warning: 'Document processing response invalid'
+          phase: 'document_generation',
+          retryable: true
         });
       }
     } else {
-      console.error('❌ Apps Script call failed with status:', appsScriptResponse.status);
-      return res.status(200).json({ 
-        success: true, 
-        message: 'Laporan berjaya dihantar, tetapi dokumen tidak dapat dicipta.',
+      console.error('❌ [SUBMIT API] Apps Script call failed with status:', appsScriptResponse.status);
+      return res.status(200).json({
+        success: false,
+        partialSuccess: true,
+        sheetSaved: true,
+        documentCreated: false,
+        error: 'Data disimpan tetapi Apps Script gagal',
+        message: 'Laporan telah disimpan di Google Sheet tetapi Apps Script gagal dipanggil. Sila hubungi admin dengan nombor row di bawah.',
+        warning: `Apps Script HTTP ${appsScriptResponse.status}`,
         rowNumber: newRowNumber,
-        warning: `Document creation failed (HTTP ${appsScriptResponse.status})`
+        phase: 'document_generation',
+        retryable: true
       });
     }
 
@@ -200,7 +247,7 @@ function mapMajuDataToSheetRow(data) {
     JSON.stringify(data.URL_GAMBAR_PREMIS_JSON || []),         // URL_GAMBAR_PREMIS_JSON
     JSON.stringify(data.URL_GAMBAR_SESI_JSON || []),           // URL_GAMBAR_SESI_JSON
     data.URL_GAMBAR_GW360 || '',                 // URL_GAMBAR_GW360
-    data.Mentee_Folder_ID || '',                 // Mentee_Folder_ID
+    data.Folder_ID || '',                        // Folder_ID (FIXED: was Mentee_Folder_ID)
     '',                                          // Laporan_Maju_Doc_ID (empty, will be filled by Apps Script)
     data.MIA_STATUS || 'Tidak MIA',              // MIA_STATUS
     data.MIA_REASON || '',                       // MIA_REASON
