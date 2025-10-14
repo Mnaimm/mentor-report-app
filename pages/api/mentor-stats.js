@@ -65,12 +65,20 @@ export default async function handler(req, res) {
 
     const client = await getSheetsClient();
     const mappingSheet = await client.getRows('mapping');
-    const sessionSheet = await client.getRows('V8');
+    const bangkitSheet = await client.getRows('V8');
     const batchSheet = await client.getRows('batch');
+
+    // Read Maju reports sheet
+    let majuSheet = [];
+    try {
+      majuSheet = await client.getRows('LaporanMaju');
+    } catch (e) {
+      console.warn(`⚠️ [${debugInfo.requestId}] LaporanMaju sheet not found, skipping Maju reports`);
+    }
 
     const sheetsEndTime = Date.now();
     console.log(`⏱️ [${debugInfo.requestId}] Google Sheets data fetched in ${sheetsEndTime - sheetsStartTime}ms`);
-    console.log(`📋 [${debugInfo.requestId}] Data counts: mapping=${mappingSheet.length}, sessions=${sessionSheet.length}, batches=${batchSheet.length}`);
+    console.log(`📋 [${debugInfo.requestId}] Data counts: mapping=${mappingSheet.length}, bangkit=${bangkitSheet.length}, maju=${majuSheet.length}, batches=${batchSheet.length}`);
 
     // 2) Find mentor's batch and current round info
     const mentorMappings = mappingSheet.filter(row => {
@@ -130,15 +138,37 @@ export default async function handler(req, res) {
 
     const totalMentees = menteeSet.size;
 
-    // 4) Process session data
+    // Detect program type from batch name
+    const menteeToProgram = {};
+    for (const mentee of menteeSet) {
+      const batch = menteeToBatch[mentee] || '';
+      if (batch.toLowerCase().includes('maju')) {
+        menteeToProgram[mentee] = 'maju';
+      } else if (batch.toLowerCase().includes('bangkit')) {
+        menteeToProgram[mentee] = 'bangkit';
+      } else {
+        menteeToProgram[mentee] = 'unknown';
+        console.warn(`⚠️ [${debugInfo.requestId}] Cannot determine program for mentee: ${mentee}, batch: ${batch}`);
+      }
+    }
+
+    console.log(`🔍 [${debugInfo.requestId}] Program distribution:`, {
+      maju: Object.values(menteeToProgram).filter(p => p === 'maju').length,
+      bangkit: Object.values(menteeToProgram).filter(p => p === 'bangkit').length,
+      unknown: Object.values(menteeToProgram).filter(p => p === 'unknown').length
+    });
+
+    // 4) Process session data from both sheets
+    console.log(`📊 [${debugInfo.requestId}] Processing Bangkit sessions...`);
     const sessionsByMentee = new Map();
-    for (const session of sessionSheet) {
+    for (const session of bangkitSheet) {
       const menteeName = session['Nama Usahawan'];
       if (!menteeName || !menteeSet.has(menteeName)) continue;
 
       const sessionData = {
         reportLabel: session['Sesi Laporan'] || '',
         status: session['Status Sesi'] || '',
+        programType: 'bangkit',
         // Sales data columns
         Jan: session.Jan, Feb: session.Feb, Mar: session.Mar,
         Apr: session.Apr, Mei: session.Mei, Jun: session.Jun,
@@ -151,6 +181,45 @@ export default async function handler(req, res) {
       }
       sessionsByMentee.get(menteeName).push(sessionData);
     }
+
+    console.log(`✅ [${debugInfo.requestId}] Processed ${bangkitSheet.length} Bangkit sessions`);
+
+    // 4b) Process Maju session data (LaporanMaju sheet)
+    console.log(`📊 [${debugInfo.requestId}] Processing Maju sessions...`);
+
+    for (const session of majuSheet) {
+      const menteeName = (session['NAMA_MENTEE'] || '').toString().trim();
+      if (!menteeName || !menteeSet.has(menteeName)) continue;
+
+      const sesiNumber = session['SESI_NUMBER'];
+      const miaStatus = (session['MIA_STATUS'] || 'Tidak MIA').toString().trim();
+
+      // Get batch info to extract round number
+      const batch = menteeToBatch[menteeName];
+      const batchInfo = batchSheet.find(b => b['Batch'] === batch);
+      const roundLabel = batchInfo?.['Mentoring Round'] || 'Round 1';
+      const roundMatch = roundLabel.match(/\d+$/);
+      const roundNumber = roundMatch ? roundMatch[0] : '1';
+
+      // Construct report label similar to Bangkit format
+      const reportLabel = `Sesi #${sesiNumber} (Round ${roundNumber})`;
+
+      const sessionData = {
+        reportLabel,
+        status: miaStatus.toLowerCase() === 'mia' ? 'MIA' : 'Selesai',
+        programType: 'maju',
+        sesiNumber,
+        miaStatus
+      };
+
+      if (!sessionsByMentee.has(menteeName)) {
+        sessionsByMentee.set(menteeName, []);
+      }
+      sessionsByMentee.get(menteeName).push(sessionData);
+    }
+
+    console.log(`✅ [${debugInfo.requestId}] Processed ${majuSheet.length} Maju sessions`);
+    console.log(`📊 [${debugInfo.requestId}] Total sessions combined: ${sessionsByMentee.size} mentees tracked`);
 
     // 5) Calculate statistics
     let allTimeTotalReports = 0;
@@ -280,10 +349,14 @@ export default async function handler(req, res) {
       }
     };
 
-    console.log(`✅ [${debugInfo.requestId}] Response ready:`, {
+    console.log(`✅ [${debugInfo.requestId}] Statistics calculated:`, {
       totalMentees,
+      bangkitMentees: Object.values(menteeToProgram).filter(p => p === 'bangkit').length,
+      majuMentees: Object.values(menteeToProgram).filter(p => p === 'maju').length,
       allTimeReports: allTimeTotalReports,
       currentRoundReported: currentRoundReportedMentees.size,
+      allTimeMIA: allTimeMiaCount,
+      currentRoundMIA: currentRoundMiaCount,
       processingTime: responseData.debug.totalTimeMs + 'ms'
     });
 
