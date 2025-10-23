@@ -155,6 +155,12 @@ const LaporanMajuPage = () => {
   const [files, setFiles] = useState({ gw360: null, sesi: [], premis: [] });
   const [compressionProgress, setCompressionProgress] = useState({ show: false, current: 0, total: 0, message: '', fileName: '' });
 
+  // --- Draft/Autosave functionality ---
+  const getDraftKey = (menteeName, sessionNo, mentorEmail) =>
+    `laporanMaju:draft:v1:${mentorEmail || 'unknown'}:${menteeName || 'none'}:s${sessionNo}`;
+  const [saveStatus, setSaveStatus] = useState('');
+  const [autosaveArmed, setAutosaveArmed] = useState(false);
+
   // Effect to fetch mapping data on component mount
   useEffect(() => {
     const fetchMappingData = async () => {
@@ -225,6 +231,36 @@ const LaporanMajuPage = () => {
     }
     setFilteredMenteesForDropdown(menteesToDisplay);
   }, [allMenteesMapping, selectedMentorEmail, isAdmin, session]);
+
+  // --- Autosave effect: save to localStorage on changes ---
+  useEffect(() => {
+    if (!autosaveArmed) return;
+    if (!formData.NAMA_MENTEE || !currentSessionNumber) return;
+
+    const draftKey = getDraftKey(
+      formData.NAMA_MENTEE,
+      currentSessionNumber,
+      session?.user?.email
+    );
+
+    const payload = { ...formData };
+
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(draftKey, JSON.stringify(payload));
+        const timeStr = new Date().toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+        setSaveStatus(`Saved • ${timeStr}`);
+      } catch {
+        setSaveStatus('Unable to save draft');
+      }
+    }, 700);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData, autosaveArmed]);
 
   // Handle Mentee Selection & Load Session Data
   const handleMenteeSelect = useCallback(async (e) => {
@@ -329,6 +365,31 @@ const LaporanMajuPage = () => {
 
         return updatedFormData;
       });
+
+      // --- Restore draft if exists ---
+      try {
+        const draftKey = getDraftKey(
+          selectedMenteeName,
+          sessionData.currentSession,
+          session?.user?.email
+        );
+        const saved = localStorage.getItem(draftKey);
+
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          setFormData(prev => ({
+            ...prev,
+            ...parsed,
+          }));
+          setSaveStatus('Draft restored');
+          console.log('📄 Draft restored for:', selectedMenteeName, 'Sesi', sessionData.currentSession);
+        }
+      } catch (draftError) {
+        console.error('Failed to restore draft:', draftError);
+      }
+
+      // Enable autosave after data is loaded
+      setAutosaveArmed(true);
 
     } catch (error) {
       console.error('Error fetching mentee session data:', error);
@@ -678,6 +739,19 @@ const LaporanMajuPage = () => {
 
 
   const resetForm = () => {
+    // Clear draft from localStorage
+    try {
+      const draftKey = getDraftKey(
+        formData.NAMA_MENTEE,
+        currentSessionNumber,
+        session?.user?.email
+      );
+      localStorage.removeItem(draftKey);
+      console.log('🗑️ Draft cleared from localStorage');
+    } catch (error) {
+      console.error('Failed to clear draft:', error);
+    }
+
     setFormData({
       ...initialFormState,
       NAMA_MENTOR: isAdmin ? (mentorsInMapping.find(m => m.value === selectedMentorEmail)?.label || '') : (session?.user?.name || ''),
@@ -696,6 +770,8 @@ const LaporanMajuPage = () => {
     setMiaReason('');
     setMiaProofFile(null);
     setFiles({ gw360: null, sesi: [], premis: [] });
+    setSaveStatus('');
+    setAutosaveArmed(false);
 
     // Clear all file inputs in the DOM
     const fileInputs = document.querySelectorAll('input[type="file"]');
@@ -1068,6 +1144,19 @@ const handleSubmit = async (e) => {
 
       setMessage(successMessage);
       setMessageType('success');
+
+      // Clear saved draft before resetting
+      try {
+        const draftKey = getDraftKey(
+          formData.NAMA_MENTEE,
+          currentSessionNumber,
+          session?.user?.email
+        );
+        localStorage.removeItem(draftKey);
+        console.log('🗑️ [PHASE 5] Draft cleared after successful submission');
+      } catch (error) {
+        console.error('Failed to clear draft:', error);
+      }
 
       console.log('🔄 [PHASE 5] Resetting form...');
       resetForm();
@@ -1914,6 +2003,11 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                 {compressionProgress.show ? '🔄 Compressing Images...' : loading ? '📤 Submitting...' : 'Submit Laporan Maju'}
               </button>
             </div>
+            {saveStatus && (
+              <div className="mt-2 text-xs text-gray-500 text-center">
+                {saveStatus}
+              </div>
+            )}
           </div>
         </form>
       </div>
