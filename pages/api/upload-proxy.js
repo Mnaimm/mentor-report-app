@@ -54,8 +54,12 @@ export default async function handler(req, res) {
     const cleanBody = { ...req.body };
     delete cleanBody.reportType; // This is only for routing, not for Apps Script
     delete cleanBody.imageType;  // This is only for logging, not for Apps Script
-    // Keep 'action' field - Apps Script needs this to route to handleImageUpload
-    
+
+    // IMPORTANT: Add 'action: uploadImage' for Apps Script routing
+    cleanBody.action = 'uploadImage';
+
+    console.log('📤 Sending to Apps Script with action:', cleanBody.action);
+
     const cleanBodyString = JSON.stringify(cleanBody);
     const cleanBodySize = Buffer.byteLength(cleanBodyString, 'utf8');
     
