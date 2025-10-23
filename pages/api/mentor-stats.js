@@ -261,8 +261,20 @@ export default async function handler(req, res) {
         allTimeTotalReports++;
 
         // Extract round number from report label
-        const reportMatch = reportLabel.match(/\d+$/);
-        const reportRoundNumber = reportMatch ? reportMatch[0] : null;
+        // For Maju: "Sesi #1 (Round 1)" -> extract "1" from "(Round 1)"
+        // For Bangkit: "Sesi 1 Round 1" -> extract "1" from end
+        let reportRoundNumber = null;
+
+        // Try to match "Round X)" pattern first (for Maju)
+        const majuMatch = reportLabel.match(/Round (\d+)\)/);
+        if (majuMatch) {
+          reportRoundNumber = majuMatch[1];
+        } else {
+          // Fallback to original pattern for Bangkit reports
+          const bangkitMatch = reportLabel.match(/\d+$/);
+          reportRoundNumber = bangkitMatch ? bangkitMatch[0] : null;
+        }
+
         const isCurrentRound = currentRound && reportRoundNumber === currentRound.round.toString();
 
         // Debug logging for first few Maju reports
