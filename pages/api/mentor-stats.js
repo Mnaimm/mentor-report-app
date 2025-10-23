@@ -221,6 +221,19 @@ export default async function handler(req, res) {
     console.log(`✅ [${debugInfo.requestId}] Processed ${majuSheet.length} Maju sessions`);
     console.log(`📊 [${debugInfo.requestId}] Total sessions combined: ${sessionsByMentee.size} mentees tracked`);
 
+    // Debug: Log some Maju report labels
+    const majuSamples = Array.from(sessionsByMentee.entries())
+      .filter(([_, sessions]) => sessions.some(s => s.programType === 'maju'))
+      .slice(0, 3);
+    if (majuSamples.length > 0) {
+      console.log(`🔍 [${debugInfo.requestId}] Maju report label samples:`,
+        majuSamples.map(([mentee, sessions]) => ({
+          mentee,
+          labels: sessions.filter(s => s.programType === 'maju').map(s => s.reportLabel)
+        }))
+      );
+    }
+
     // 5) Calculate statistics
     let allTimeTotalReports = 0;
     let allTimeMiaCount = 0;
@@ -243,14 +256,26 @@ export default async function handler(req, res) {
       miaByBatch[batch][menteeName] = 0;
 
       for (const session of sessions) {
-        const { reportLabel, status } = session;
-        
+        const { reportLabel, status, programType } = session;
+
         allTimeTotalReports++;
-        
+
         // Extract round number from report label
         const reportMatch = reportLabel.match(/\d+$/);
         const reportRoundNumber = reportMatch ? reportMatch[0] : null;
         const isCurrentRound = currentRound && reportRoundNumber === currentRound.round.toString();
+
+        // Debug logging for first few Maju reports
+        if (programType === 'maju' && allTimeTotalReports <= 5) {
+          console.log(`🔍 [${debugInfo.requestId}] Maju report debug:`, {
+            mentee: menteeName,
+            reportLabel,
+            reportRoundNumber,
+            currentRoundNumber: currentRound?.round,
+            isCurrentRound,
+            status
+          });
+        }
 
         if (status.toLowerCase() === 'mia') {
           allTimeMiaCount++;
