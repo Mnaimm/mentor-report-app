@@ -52,10 +52,8 @@ const mapBangkitDataToSheetRow = (data) => {
     if (i < 12) row[24 + i] = v ?? '0';
   });
 
-  // AK: Link Gambar (session; array ok)
-  row[36] = Array.isArray(data?.imageUrls?.sesi)
-    ? data.imageUrls.sesi.join(', ')
-    : (data?.imageUrls?.sesi || '');
+  // AK: Link Gambar (session; JSON array format like Laporan Maju)
+  row[36] = JSON.stringify(data?.imageUrls?.sesi || []);
 
   // AL–AM
   row[37] = data?.tambahan?.produkServis || '';         // 37 Produk/Servis
@@ -79,9 +77,7 @@ const mapBangkitDataToSheetRow = (data) => {
 
   // AX–AY: Profile & Premis photos
   row[49] = data?.imageUrls?.profil || '';              // 49 Link_Gambar_Profil
-  row[50] = Array.isArray(data?.imageUrls?.premis)
-    ? data.imageUrls.premis.join(', ')
-    : (data?.imageUrls?.premis || '');                  // 50 Link_Gambar_Premis
+  row[50] = JSON.stringify(data?.imageUrls?.premis || []); // 50 Link_Gambar_Premis (JSON array format like Laporan Maju)
 
   // AZ: Premis checkbox
   row[51] = !!data?.premisDilawatChecked;               // 51 Premis_Dilawat_Checked
