@@ -1227,6 +1227,13 @@ const handleSubmit = async (e) => {
       // Handle partial success (sheet saved but document failed)
       console.warn('⚠️ [PHASE 5] Partial success - sheet saved but document failed');
 
+      // Update stage: show warning
+      setSubmissionStage({
+        stage: 'warning',
+        message: 'Data saved but document generation timed out',
+        detail: 'Check the warning message below'
+      });
+
       const partialMessage = `⚠️ ${result.error || 'Laporan separa berjaya'}\n\n` +
         `✅ Data telah disimpan di Google Sheet\n` +
         `❌ Dokumen gagal dicipta\n\n` +
@@ -1239,7 +1246,7 @@ const handleSubmit = async (e) => {
 
       // Don't reset form completely - user might need to see data
       console.log('⚠️ [PHASE 5] Partial success - form not reset');
-      return;
+      // Don't return early - let finally block clear loading state
 
     } else {
       // Failure case
@@ -2059,24 +2066,37 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
               <div className={`border rounded-lg p-4 mb-4 ${
                 submissionStage.stage === 'error'
                   ? 'bg-red-50 border-red-200'
+                  : submissionStage.stage === 'warning'
+                  ? 'bg-yellow-50 border-yellow-200'
                   : 'bg-blue-50 border-blue-200'
               }`}>
                 <div className="flex items-center space-x-3">
-                  {submissionStage.stage !== 'error' && (
+                  {submissionStage.stage !== 'error' && submissionStage.stage !== 'warning' && (
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
                   )}
                   {submissionStage.stage === 'error' && (
                     <div className="text-red-600 text-2xl">⚠️</div>
                   )}
+                  {submissionStage.stage === 'warning' && (
+                    <div className="text-yellow-600 text-2xl">⚠️</div>
+                  )}
                   <div className="flex-1">
                     <p className={`text-sm font-medium ${
-                      submissionStage.stage === 'error' ? 'text-red-900' : 'text-blue-900'
+                      submissionStage.stage === 'error'
+                        ? 'text-red-900'
+                        : submissionStage.stage === 'warning'
+                        ? 'text-yellow-900'
+                        : 'text-blue-900'
                     }`}>
                       {submissionStage.message}
                     </p>
                     {submissionStage.detail && (
                       <p className={`text-xs mt-1 ${
-                        submissionStage.stage === 'error' ? 'text-red-700' : 'text-blue-700'
+                        submissionStage.stage === 'error'
+                          ? 'text-red-700'
+                          : submissionStage.stage === 'warning'
+                          ? 'text-yellow-700'
+                          : 'text-blue-700'
                       }`}>
                         {submissionStage.detail}
                       </p>
