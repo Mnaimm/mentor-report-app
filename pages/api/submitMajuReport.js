@@ -89,20 +89,45 @@ export default async function handler(req, res) {
 
     // Trigger Apps Script for document generation
     console.log('🚀 Triggering Apps Script for document generation...');
-    
+
     const appsScriptPayload = {
       action: 'processRow',
       rowNumber: parseInt(newRowNumber, 10),
       programType: 'maju'
     };
-    
+
     console.log('📤 Apps Script payload:', appsScriptPayload);
-    
-    const appsScriptResponse = await fetch(appsScriptUrl, {
+
+    // Add 5-second timeout for Apps Script (Google Sheets API already took ~2s, need to stay under 10s total)
+    const appsScriptTimeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Apps Script timeout after 5 seconds')), 5000)
+    );
+
+    const appsScriptCall = fetch(appsScriptUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(appsScriptPayload),
     });
+
+    let appsScriptResponse;
+    try {
+      appsScriptResponse = await Promise.race([appsScriptCall, appsScriptTimeout]);
+    } catch (timeoutError) {
+      console.error('⚠️ Apps Script timed out after 5 seconds');
+      // Return partial success - sheet data is saved, document generation can be done manually
+      return res.status(200).json({
+        success: false,
+        partialSuccess: true,
+        sheetSaved: true,
+        documentCreated: false,
+        error: 'Data disimpan tetapi dokumen gagal dicipta (timeout)',
+        message: 'Laporan telah disimpan di Google Sheet tetapi dokumen tidak dapat dijana kerana timeout. Sila hubungi admin dengan nombor row di bawah.',
+        warning: 'Apps Script timeout after 5 seconds',
+        rowNumber: newRowNumber,
+        phase: 'document_generation',
+        retryable: true
+      });
+    }
 
     const appsScriptText = await appsScriptResponse.text();
     console.log('📥 [SUBMIT API] Apps Script response status:', appsScriptResponse.status);

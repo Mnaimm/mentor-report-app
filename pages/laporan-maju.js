@@ -154,6 +154,7 @@ const LaporanMajuPage = () => {
   const [miaProofFile, setMiaProofFile] = useState(null);
   const [files, setFiles] = useState({ gw360: null, sesi: [], premis: [] });
   const [compressionProgress, setCompressionProgress] = useState({ show: false, current: 0, total: 0, message: '', fileName: '' });
+  const [submissionStage, setSubmissionStage] = useState({ stage: '', message: '', detail: '' });
 
   // --- Draft/Autosave functionality ---
   const getDraftKey = (menteeName, sessionNo, mentorEmail) =>
@@ -916,7 +917,14 @@ const buildCumulativeMentoringFindings = () => {
 
 const handleSubmit = async (e) => {
   e.preventDefault();
-  
+
+  // IMMEDIATELY disable button to prevent double-click
+  if (loading) {
+    console.warn('⚠️ Submission already in progress, ignoring duplicate click');
+    return;
+  }
+  setLoading(true);
+
   // Validate form first
   const validationErrors = validateForm();
   if (validationErrors.length > 0) {
@@ -924,16 +932,17 @@ const handleSubmit = async (e) => {
     const errorMessage = `❌ Sila lengkapkan medan yang diperlukan (${validationErrors.length} isu):\n\n• ${validationErrors.join('\n• ')}`;
     setMessage(errorMessage);
     setMessageType('error');
-    
+
     // Scroll to the top to show error message
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    
+
+    setLoading(false); // Re-enable button if validation fails
     return; // Stop submission if validation fails
   }
-  
-  setLoading(true);
+
   setMessage('');
   setMessageType('');
+  setSubmissionStage({ stage: 'preparing', message: 'Preparing submission...', detail: '' });
 
   console.log('🚀 Starting form submission...');
 
@@ -992,6 +1001,13 @@ const handleSubmit = async (e) => {
 
       // Wait for all uploads to complete
       if (uploadPromises.length > 0) {
+        // Update stage: uploading images
+        setSubmissionStage({
+          stage: 'uploading',
+          message: 'Uploading images to Google Drive...',
+          detail: `Uploading ${uploadPromises.length} image${uploadPromises.length > 1 ? 's' : ''}`
+        });
+
         console.log(`⏳ Waiting for ${uploadPromises.length} image uploads to complete...`);
         await Promise.all(uploadPromises);
         console.log('✅ All images uploaded successfully');
@@ -1086,6 +1102,13 @@ const handleSubmit = async (e) => {
     
     console.log('🌐 Submitting to /api/submitMajuReport...');
 
+    // Update stage: saving to database
+    setSubmissionStage({
+      stage: 'saving',
+      message: 'Saving report to Google Sheets...',
+      detail: 'This may take up to 30 seconds'
+    });
+
     // Add frontend timeout protection (25 seconds)
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 25000);
@@ -1113,21 +1136,49 @@ const handleSubmit = async (e) => {
     console.log('📥 Response status:', response.status);
     console.log('📥 Response ok:', response.ok);
 
-    const responseText = await response.text();
-    console.log('📄 Raw response text:', responseText);
-
+    // Safe JSON parsing with fallback
     let result;
+    const contentType = response.headers.get('content-type');
+
     try {
-      result = JSON.parse(responseText);
-      console.log('📄 Parsed response JSON:', result);
+      if (contentType && contentType.includes('application/json')) {
+        result = await response.json();
+        console.log('📄 Parsed response JSON:', result);
+      } else {
+        // Response is not JSON (likely HTML error page)
+        const text = await response.text();
+        console.error('❌ Non-JSON response:', text.substring(0, 200));
+        result = {
+          error: 'Server returned unexpected response. Please check Google Sheet to verify if report was saved.',
+          retryable: false,
+          serverResponse: text.substring(0, 200)
+        };
+      }
     } catch (parseError) {
-      console.error('❌ Failed to parse response as JSON:', parseError);
-      throw new Error(`Server returned non-JSON response: ${responseText}`);
+      console.error('❌ Failed to parse response:', parseError);
+      result = {
+        error: 'Unable to read server response. Please check Google Sheet to verify if report was saved.',
+        retryable: false
+      };
     }
 
-    // Check for retryable errors before success check
-    if (!response.ok && result.retryable) {
-      throw new Error(`${result.error || result.message} (Boleh cuba semula)`);
+    // Enhanced error message based on status code
+    if (!response.ok) {
+      let userMessage = result.error || result.message;
+
+      if (response.status === 504) {
+        userMessage = `⏱️ Server timeout - your images were uploaded, but we couldn't confirm if data was saved.\n\n` +
+                      `✓ Check Google Sheet to see if your report appears\n` +
+                      `✗ DO NOT submit again without checking\n` +
+                      `📞 Contact admin if report is missing`;
+      } else if (response.status === 408) {
+        userMessage = `${result.error || 'Request timeout'}\n\nYou can try submitting again.`;
+      }
+
+      if (result.retryable) {
+        throw new Error(`${userMessage} (Boleh cuba semula)`);
+      }
+      throw new Error(userMessage);
     }
 
     // Handle success
@@ -1138,6 +1189,13 @@ const handleSubmit = async (e) => {
       if (result.docUrl) {
         console.log('📄 [PHASE 5] Document URL:', result.docUrl);
       }
+
+      // Update stage: complete
+      setSubmissionStage({
+        stage: 'complete',
+        message: 'Report submitted successfully!',
+        detail: ''
+      });
 
       // Show success with row number for verification
       const successMessage = `${result.message || '✅ Laporan berjaya dihantar!'}\n\n📊 Row Number: ${result.rowNumber || 'N/A'}\n\nSila semak Google Sheet untuk pengesahan.`;
@@ -1160,6 +1218,7 @@ const handleSubmit = async (e) => {
 
       console.log('🔄 [PHASE 5] Resetting form...');
       resetForm();
+      setSubmissionStage({ stage: '', message: '', detail: '' }); // Clear stage after reset
 
       console.log('✅ [COMPLETE] Submission process completed successfully');
       return;
@@ -1203,6 +1262,25 @@ const handleSubmit = async (e) => {
 
   } catch (error) {
     console.error('❌ Detailed submission error:', error);
+
+    // Determine stage-specific error message
+    let errorMessage = error.message;
+    let errorDetail = '';
+
+    if (submissionStage.stage === 'uploading') {
+      errorMessage = `❌ Image upload failed: ${error.message}`;
+      errorDetail = 'Check your internet connection and try again.';
+    } else if (submissionStage.stage === 'saving') {
+      errorMessage = `⚠️ ${error.message}`;
+      errorDetail = '';
+    }
+
+    setSubmissionStage({
+      stage: 'error',
+      message: errorMessage,
+      detail: errorDetail
+    });
+
     setMessage(`Failed to submit Laporan: ${error.message}`);
     setMessageType('error');
   } finally {
@@ -1976,12 +2054,34 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
               </div>
             )}
 
-            {/* Upload Progress when submitting */}
-            {loading && !compressionProgress.show && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4 text-center">
-                <div className="flex items-center justify-center space-x-3">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-600"></div>
-                  <span className="text-green-800 font-medium">📤 Uploading to server...</span>
+            {/* Submission Stage Progress Indicator */}
+            {submissionStage.stage && submissionStage.stage !== 'complete' && !compressionProgress.show && (
+              <div className={`border rounded-lg p-4 mb-4 ${
+                submissionStage.stage === 'error'
+                  ? 'bg-red-50 border-red-200'
+                  : 'bg-blue-50 border-blue-200'
+              }`}>
+                <div className="flex items-center space-x-3">
+                  {submissionStage.stage !== 'error' && (
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  )}
+                  {submissionStage.stage === 'error' && (
+                    <div className="text-red-600 text-2xl">⚠️</div>
+                  )}
+                  <div className="flex-1">
+                    <p className={`text-sm font-medium ${
+                      submissionStage.stage === 'error' ? 'text-red-900' : 'text-blue-900'
+                    }`}>
+                      {submissionStage.message}
+                    </p>
+                    {submissionStage.detail && (
+                      <p className={`text-xs mt-1 ${
+                        submissionStage.stage === 'error' ? 'text-red-700' : 'text-blue-700'
+                      }`}>
+                        {submissionStage.detail}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
             )}

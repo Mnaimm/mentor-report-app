@@ -170,6 +170,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [compressionProgress, setCompressionProgress] = useState({ show: false, current: 0, total: 0, message: '', fileName: '' });
+  const [submissionStage, setSubmissionStage] = useState({ stage: '', message: '', detail: '' });
 
   // --- Non-blocking toast (yellow notice) ---
   const [toast, setToast] = useState({ show: false, message: '' });
@@ -391,21 +392,58 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // IMMEDIATELY disable button to prevent double-click
+    if (isSubmitting) {
+      console.warn('⚠️ Submission already in progress, ignoring duplicate click');
+      return;
+    }
+    setIsSubmitting(true);
+
     if (!selectedMentee) {
       setError('Sila pilih usahawan terlebih dahulu.');
+      setIsSubmitting(false);
       return;
     }
 
     if (!isMIA) {
       if (currentSession === 1) {
-        if (!files.gw) { setError('Sila muat naik Gambar Carta GrowthWheel.'); return; }
-        if (!files.profil) { setError('Sila muat naik Gambar Individu Usahawan.'); return; }
-        if (files.sesi.length === 0) { setError('Sila muat naik sekurang-kurangnya satu Gambar Sesi Mentoring.'); return; }
-        if (formState.sesi.platform === 'Face to Face' && !formState.sesi.lokasiF2F) { setError('Sila masukkan lokasi untuk sesi Face to Face.'); return; }
-        if (formState.sesi.premisDilawat && (files.premis?.length || 0) < 1) { setError("Sila muat naik Gambar Premis kerana 'Premis dilawat' ditandakan."); return; }
+        if (!files.gw) {
+          setError('Sila muat naik Gambar Carta GrowthWheel.');
+          setIsSubmitting(false);
+          return;
+        }
+        if (!files.profil) {
+          setError('Sila muat naik Gambar Individu Usahawan.');
+          setIsSubmitting(false);
+          return;
+        }
+        if (files.sesi.length === 0) {
+          setError('Sila muat naik sekurang-kurangnya satu Gambar Sesi Mentoring.');
+          setIsSubmitting(false);
+          return;
+        }
+        if (formState.sesi.platform === 'Face to Face' && !formState.sesi.lokasiF2F) {
+          setError('Sila masukkan lokasi untuk sesi Face to Face.');
+          setIsSubmitting(false);
+          return;
+        }
+        if (formState.sesi.premisDilawat && (files.premis?.length || 0) < 1) {
+          setError("Sila muat naik Gambar Premis kerana 'Premis dilawat' ditandakan.");
+          setIsSubmitting(false);
+          return;
+        }
       } else {
-        if (files.sesi.length === 0) { setError('Sila muat naik sekurang-kurangnya satu Gambar Sesi Mentoring.'); return; }
-        if (formState.sesi.platform === 'Face to Face' && !formState.sesi.lokasiF2F) { setError('Sila masukkan lokasi untuk sesi Face to Face.'); return; }
+        if (files.sesi.length === 0) {
+          setError('Sila muat naik sekurang-kurangnya satu Gambar Sesi Mentoring.');
+          setIsSubmitting(false);
+          return;
+        }
+        if (formState.sesi.platform === 'Face to Face' && !formState.sesi.lokasiF2F) {
+          setError('Sila masukkan lokasi untuk sesi Face to Face.');
+          setIsSubmitting(false);
+          return;
+        }
         // --- Non-blocking reminder instead of blocking requirement for premis
         if (!previousData.premisDilawat && (files.premis?.length || 0) < 1) {
           showToast('Peringatan: Premis belum pernah dilawat. Pertimbangkan muat naik gambar premis pada sesi ini.');
@@ -413,11 +451,15 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
       }
     }
 
-    if (isMIA && !formState.mia.alasan) { setError('Sila berikan alasan untuk status MIA.'); return; }
+    if (isMIA && !formState.mia.alasan) {
+      setError('Sila berikan alasan untuk status MIA.');
+      setIsSubmitting(false);
+      return;
+    }
 
-    setIsSubmitting(true);
     setError('');
     setSuccess('');
+    setSubmissionStage({ stage: 'preparing', message: 'Preparing submission...', detail: '' });
 
     try {
       const imageUrls = { growthwheel: '', profil: '', sesi: [], premis: [], mia: '' };
@@ -642,6 +684,13 @@ const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async 
         }
       }
 
+      // Update stage: uploading images
+      setSubmissionStage({
+        stage: 'uploading',
+        message: 'Uploading images to Google Drive...',
+        detail: `Uploading ${uploadPromises.length} image${uploadPromises.length > 1 ? 's' : ''}`
+      });
+
       await Promise.all(uploadPromises);
 
       // Clear compression progress immediately when uploads complete
@@ -666,6 +715,13 @@ const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async 
         programType: 'bangkit', // Added programType
       };
 
+      // Update stage: saving to database
+      setSubmissionStage({
+        stage: 'saving',
+        message: 'Saving report to Google Sheets...',
+        detail: 'This may take up to 30 seconds'
+      });
+
       // Add frontend timeout protection (25 seconds)
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 25000);
@@ -679,14 +735,48 @@ const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async 
         });
         clearTimeout(timeoutId);
 
-        const result = await response.json();
+        // Safe JSON parsing with fallback
+        let result;
+        const contentType = response.headers.get('content-type');
+
+        try {
+          if (contentType && contentType.includes('application/json')) {
+            result = await response.json();
+          } else {
+            // Response is not JSON (likely HTML error page)
+            const text = await response.text();
+            console.error('❌ Non-JSON response:', text.substring(0, 200));
+            result = {
+              error: 'Server returned unexpected response. Please check Google Sheet to verify if report was saved.',
+              retryable: false,
+              serverResponse: text.substring(0, 200)
+            };
+          }
+        } catch (parseError) {
+          console.error('❌ Failed to parse response:', parseError);
+          result = {
+            error: 'Unable to read server response. Please check Google Sheet to verify if report was saved.',
+            retryable: false
+          };
+        }
 
         if (!response.ok) {
-          // Check if retryable
-          if (result.retryable) {
-            throw new Error(`${result.error} (Boleh cuba semula)`);
+          // Enhanced error message based on status code
+          let userMessage = result.error;
+
+          if (response.status === 504) {
+            userMessage = `⏱️ Server timeout - your images were uploaded, but we couldn't confirm if data was saved.\n\n` +
+                          `✓ Check Google Sheet to see if your report appears\n` +
+                          `✗ DO NOT submit again without checking\n` +
+                          `📞 Contact admin if report is missing`;
+          } else if (response.status === 408) {
+            userMessage = `${result.error || 'Request timeout'}\n\nYou can try submitting again.`;
           }
-          throw new Error(result.error || 'Gagal menghantar laporan.');
+
+          if (result.retryable) {
+            throw new Error(`${userMessage} (Boleh cuba semula)`);
+          }
+          throw new Error(userMessage);
         }
 
         // Success path continues below...
@@ -699,15 +789,41 @@ const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async 
         throw fetchError;
       }
 
+      // Update stage: complete
+      setSubmissionStage({
+        stage: 'complete',
+        message: 'Report submitted successfully!',
+        detail: ''
+      });
+
       setSuccess('✅ Laporan berjaya dihantar! Borang sedang direset...');
       window.scrollTo(0, 0);
       // Reduced timeout and immediate feedback
       setTimeout(() => {
         resetForm();
         setSuccess('');
+        setSubmissionStage({ stage: '', message: '', detail: '' });
       }, 1500); // Reduced from 3000ms to 1500ms
     } catch (err) {
-      setError(err.message);
+      // Determine stage-specific error message
+      let errorMessage = err.message;
+      let errorDetail = '';
+
+      if (submissionStage.stage === 'uploading') {
+        errorMessage = `❌ Image upload failed: ${err.message}`;
+        errorDetail = 'Check your internet connection and try again.';
+      } else if (submissionStage.stage === 'saving') {
+        errorMessage = `⚠️ ${err.message}`;
+        errorDetail = '';
+      }
+
+      setSubmissionStage({
+        stage: 'error',
+        message: errorMessage,
+        detail: errorDetail
+      });
+
+      setError(errorMessage);
       window.scrollTo(0, 0);
     } finally {
       setIsSubmitting(false);
@@ -1078,12 +1194,34 @@ const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async 
                 </div>
               )}
 
-              {/* Upload Progress when submitting */}
-              {isSubmitting && !compressionProgress.show && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4 text-center">
-                  <div className="flex items-center justify-center space-x-3">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-600"></div>
-                    <span className="text-green-800 font-medium">📤 Uploading to server...</span>
+              {/* Submission Stage Progress Indicator */}
+              {submissionStage.stage && submissionStage.stage !== 'complete' && !compressionProgress.show && (
+                <div className={`border rounded-lg p-4 mb-4 ${
+                  submissionStage.stage === 'error'
+                    ? 'bg-red-50 border-red-200'
+                    : 'bg-blue-50 border-blue-200'
+                }`}>
+                  <div className="flex items-center space-x-3">
+                    {submissionStage.stage !== 'error' && (
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                    )}
+                    {submissionStage.stage === 'error' && (
+                      <div className="text-red-600 text-2xl">⚠️</div>
+                    )}
+                    <div className="flex-1">
+                      <p className={`text-sm font-medium ${
+                        submissionStage.stage === 'error' ? 'text-red-900' : 'text-blue-900'
+                      }`}>
+                        {submissionStage.message}
+                      </p>
+                      {submissionStage.detail && (
+                        <p className={`text-xs mt-1 ${
+                          submissionStage.stage === 'error' ? 'text-red-700' : 'text-blue-700'
+                        }`}>
+                          {submissionStage.detail}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}

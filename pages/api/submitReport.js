@@ -172,11 +172,19 @@ export default async function handler(req, res) {
     if (newRowNumber) {
       try {
         console.log(`🤖 Triggering ${programType} Apps Script automation for row ${newRowNumber}...`);
-        await fetch(appsScriptUrl, { // Use the correct Apps Script URL
+
+        // Add 5-second timeout for Apps Script (Google Sheets API already took ~2s, need to stay under 10s total)
+        const appsScriptTimeout = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Apps Script timeout after 5 seconds')), 5000)
+        );
+
+        const appsScriptCall = fetch(appsScriptUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'processRow', rowNumber: newRowNumber, programType: programType }), // Pass programType to Apps Script
+          body: JSON.stringify({ action: 'processRow', rowNumber: newRowNumber, programType: programType }),
         });
+
+        await Promise.race([appsScriptCall, appsScriptTimeout]);
         console.log(`✅ Apps Script automation completed for ${programType} row ${newRowNumber}`);
       } catch (e) {
         console.error(`⚠️ Automation ping for ${programType} failed:`, e.message);
