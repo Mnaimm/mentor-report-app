@@ -13,7 +13,10 @@ export default async function handler(req, res) {
 
     const client = await getSheetsClient();
     const mappingSheet = await client.getRows('mapping');
-    const sessionSheet = await client.getRows('V8'); 
+    const sessionSheet = await client.getRows('V8');
+
+    console.log(`📊 Loaded ${mappingSheet.length} rows from mapping sheet`);
+    console.log(`📊 Loaded ${sessionSheet.length} rows from V8 sheet`); 
     
     // Try to get batch sheet, if it doesn't exist, extract batches from mapping
     let batchSheet;
@@ -56,22 +59,32 @@ export default async function handler(req, res) {
     for (const batch of batchSheet) {
       const { 'Batch': batchName, 'Mentoring Round': roundLabel, 'Period': period } = batch;
       if (!batchName) continue;
-      
+
+      console.log(`🔍 Processing batch: "${batchName}" (Round: ${roundLabel})`);
       const filteredMap = mappingSheet.filter(row => row.Batch === batchName);
 
       if (filteredMap.length === 0) {
-        console.log(`No mapping data found for batch: ${batchName}`);
+        console.log(`⚠️ No mapping data found for batch: "${batchName}"`);
+        console.log(`   Available batches in mapping:`, [...new Set(mappingSheet.map(r => r.Batch).filter(Boolean))].slice(0, 5));
         continue;
       }
+      console.log(`✅ Found ${filteredMap.length} mapping rows for batch: "${batchName}"`);
 
       const mentorMap = {};
+      let skippedRows = 0;
       for (const row of filteredMap) {
         const { Mentor: mentor, Mentee: mentee, Zon: zone } = row;
-        if (!mentor || !mentee) continue;
+        if (!mentor || !mentee) {
+          skippedRows++;
+          continue;
+        }
         if (!mentorMap[mentor]) {
             mentorMap[mentor] = { mentees: [], zone: zone || 'N/A' };
         }
         mentorMap[mentor].mentees.push(mentee);
+      }
+      if (skippedRows > 0) {
+        console.log(`⚠️ Skipped ${skippedRows} rows with missing Mentor or Mentee data`);
       }
 
       const mentors = Object.entries(mentorMap).map(([mentor, data]) => {
