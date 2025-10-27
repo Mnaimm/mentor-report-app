@@ -250,7 +250,7 @@ export default function HomePage() {
                 <h3 className="text-lg font-semibold text-gray-700 mb-4">
                   Ringkasan Keseluruhan
                 </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                   <StatCard
                     label="Jumlah Laporan Dihantar"
                     value={stats.allTime.totalReports ?? 0}
@@ -262,6 +262,12 @@ export default function HomePage() {
                     value={stats.allTime.uniqueMenteesReported ?? 0}
                     sublabel="sekurang-kurangnya 1 laporan"
                     color="green"
+                  />
+                  <StatCard
+                    label="Lawatan Premis Done"
+                    value={stats.allTime.premisVisitCount ?? 0}
+                    sublabel="usahawan dengan premis dilawat"
+                    color="blue"
                   />
                   <StatCard
                     label="Jumlah MIA"

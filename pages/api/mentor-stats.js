@@ -189,6 +189,7 @@ export default async function handler(req, res) {
         reportLabel: session['Sesi Laporan'] || '',
         status: session['Status Sesi'] || '',
         programType: 'bangkit',
+        premisDilawat: session['Premis Dilawat'] || false, // Track premises visit
         // Sales data columns
         Jan: session.Jan, Feb: session.Feb, Mar: session.Mar,
         Apr: session.Apr, Mei: session.Mei, Jun: session.Jun,
@@ -229,7 +230,8 @@ export default async function handler(req, res) {
         status: miaStatus.toLowerCase() === 'mia' ? 'MIA' : 'Selesai',
         programType: 'maju',
         sesiNumber,
-        miaStatus
+        miaStatus,
+        premisDilawat: session['LAWATAN_PREMIS'] || false // Track premises visit for Maju
       };
 
       if (!sessionsByMentee.has(menteeName)) {
@@ -264,6 +266,7 @@ export default async function handler(req, res) {
     const currentRoundSessionsByMentee = {};
     const sessionsByBatch = {};
     const miaByBatch = {};
+    const menteesWithPremisVisit = new Set(); // Track mentees with premises visit
 
     for (const [menteeName, sessions] of sessionsByMentee) {
       const batch = menteeToBatch[menteeName] || 'Unknown';
@@ -276,9 +279,14 @@ export default async function handler(req, res) {
       miaByBatch[batch][menteeName] = 0;
 
       for (const session of sessions) {
-        const { reportLabel, status, programType } = session;
+        const { reportLabel, status, programType, premisDilawat } = session;
 
         allTimeTotalReports++;
+
+        // Track if mentee has had premises visit
+        if (premisDilawat === true || premisDilawat === 'TRUE' || premisDilawat === 'true') {
+          menteesWithPremisVisit.add(menteeName);
+        }
 
         // Extract round number from report label
         // For Maju: "Sesi #1 (Round 1)" -> extract "1" from "(Round 1)"
@@ -371,6 +379,7 @@ export default async function handler(req, res) {
         totalReports: allTimeTotalReports,
         uniqueMenteesReported: allTimeReportedMentees.size,
         miaCount: allTimeMiaCount,
+        premisVisitCount: menteesWithPremisVisit.size, // Number of mentees with premises visit
         perMenteeSessions: allTimePerMenteeSessions,
       },
 
