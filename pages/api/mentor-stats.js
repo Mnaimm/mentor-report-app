@@ -86,7 +86,17 @@ export default async function handler(req, res) {
       return email === loginEmail;
     });
 
+    console.log(`🔍 [${debugInfo.requestId}] Found ${mentorMappings.length} mapping rows for ${loginEmail}`);
+    if (mentorMappings.length > 0) {
+      const batches = [...new Set(mentorMappings.map(r => r['Batch']).filter(Boolean))];
+      console.log(`📦 [${debugInfo.requestId}] Mentor's batches:`, batches);
+    }
+
     if (mentorMappings.length === 0) {
+      console.log(`⚠️ [${debugInfo.requestId}] No mentees found for ${loginEmail}`);
+      console.log(`   Available emails in mapping (first 5):`,
+        [...new Set(mappingSheet.map(r => (r['Mentor_Email'] || r['Email'] || '').toLowerCase().trim()).filter(Boolean))].slice(0, 5)
+      );
       return res.json({
         mentorEmail: loginEmail,
         error: "No mentees found for this mentor",
@@ -122,21 +132,31 @@ export default async function handler(req, res) {
     const menteeSet = new Set();
     const menteeToBatch = {};
     const menteesByBatch = {};
+    let skippedRows = 0;
 
     for (const row of mentorMappings) {
       const mentee = (row['Mentee'] || row['Nama Usahawan'] || '').toString().trim();
       const batch = (row['Batch'] || '').toString().trim() || 'Unknown';
-      
+
       if (mentee) {
         menteeSet.add(mentee);
         menteeToBatch[mentee] = batch;
-        
+
         if (!menteesByBatch[batch]) menteesByBatch[batch] = [];
         menteesByBatch[batch].push(mentee);
+      } else {
+        skippedRows++;
       }
     }
 
     const totalMentees = menteeSet.size;
+    console.log(`👥 [${debugInfo.requestId}] Extracted ${totalMentees} unique mentees from ${mentorMappings.length} rows`);
+    if (skippedRows > 0) {
+      console.log(`⚠️ [${debugInfo.requestId}] Skipped ${skippedRows} rows with missing Mentee/Nama Usahawan`);
+    }
+    console.log(`📊 [${debugInfo.requestId}] Mentees by batch:`,
+      Object.entries(menteesByBatch).map(([batch, mentees]) => `${batch}=${mentees.length}`).join(', ')
+    );
 
     // Detect program type from batch name
     const menteeToProgram = {};
