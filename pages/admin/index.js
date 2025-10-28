@@ -15,22 +15,31 @@ export default function AdminDashboard() {
   const [error, setError] = useState(null);
   const [openBatches, setOpenBatches] = useState({});
 
+  const fetchData = () => {
+    setLoading(true);
+    setError(null);
+    // Add timestamp to prevent browser caching
+    fetch(`/api/admin/sales-status?t=${Date.now()}`, {
+      cache: 'no-store'
+    })
+      .then(res => {
+        if (!res.ok) throw new Error(`API responded with status: ${res.status}`);
+        return res.json();
+      })
+      .then(data => {
+        if (data.error) throw new Error(data.error);
+        setBatches(data);
+        if (data.length > 0) {
+          setOpenBatches({ 0: true });
+        }
+      })
+      .catch(err => setError(err.message))
+      .finally(() => setLoading(false));
+  };
+
   useEffect(() => {
     if (status === 'authenticated') {
-      fetch('/api/admin/sales-status')
-        .then(res => {
-          if (!res.ok) throw new Error(`API responded with status: ${res.status}`);
-          return res.json();
-        })
-        .then(data => {
-          if (data.error) throw new Error(data.error);
-          setBatches(data);
-          if (data.length > 0) {
-            setOpenBatches({ 0: true });
-          }
-        })
-        .catch(err => setError(err.message))
-        .finally(() => setLoading(false));
+      fetchData();
     }
   }, [status]);
   
@@ -45,9 +54,18 @@ export default function AdminDashboard() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 bg-gray-50 min-h-screen">
-      <h1 className="text-3xl font-bold text-center text-gray-800 mb-8">
-        Admin Dashboard - Status Laporan Jualan
-      </h1>
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold text-gray-800">
+          Admin Dashboard - Status Laporan Jualan
+        </h1>
+        <button
+          onClick={fetchData}
+          disabled={loading}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+        >
+          {loading ? 'Loading...' : '🔄 Refresh Data'}
+        </button>
+      </div>
       {Array.isArray(batches) && batches.length > 0 ? (
         batches.map((batch, i) => (
           <div key={i} className="mb-4 border rounded-lg shadow-lg bg-white overflow-hidden">

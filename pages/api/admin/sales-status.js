@@ -15,8 +15,17 @@ export default async function handler(req, res) {
     const mappingSheet = await client.getRows('mapping');
     const sessionSheet = await client.getRows('V8');
 
+    // Read Maju reports sheet
+    let majuSheet = [];
+    try {
+      majuSheet = await client.getRows('LaporanMaju');
+    } catch (e) {
+      console.warn('⚠️ LaporanMaju sheet not found, skipping Maju reports');
+    }
+
     console.log(`📊 Loaded ${mappingSheet.length} rows from mapping sheet`);
-    console.log(`📊 Loaded ${sessionSheet.length} rows from V8 sheet`); 
+    console.log(`📊 Loaded ${sessionSheet.length} rows from V8 (Bangkit) sheet`);
+    console.log(`📊 Loaded ${majuSheet.length} rows from LaporanMaju sheet`); 
     
     // Try to get batch sheet, if it doesn't exist, extract batches from mapping
     let batchSheet;
@@ -34,6 +43,8 @@ export default async function handler(req, res) {
     }
 
     const sessionsByMentee = new Map();
+
+    // Process Bangkit sessions (V8 sheet)
     for (const session of sessionSheet) {
       const menteeName = session['Nama Usahawan'];
       if (!menteeName) continue;
@@ -42,6 +53,7 @@ export default async function handler(req, res) {
       const sessionData = {
         reportLabel: session['Sesi Laporan'] || '',
         status: session['Status Sesi'] || '',
+        programType: 'bangkit',
         Jan: session.Jan, Feb: session.Feb, Mar: session.Mar,
         Apr: session.Apr, Mei: session.Mei, Jun: session.Jun,
         Jul: session.Jul, Ogos: session.Ogos, Sep: session.Sep,
@@ -53,6 +65,51 @@ export default async function handler(req, res) {
       }
       sessionsByMentee.get(menteeName).push(sessionData);
     }
+
+    // Process Maju sessions (LaporanMaju sheet)
+    for (const session of majuSheet) {
+      const menteeName = (session['NAMA_MENTEE'] || '').toString().trim();
+      if (!menteeName) continue;
+
+      const sesiNumber = session['SESI_NUMBER'];
+      const miaStatus = (session['MIA_STATUS'] || 'Tidak MIA').toString().trim();
+
+      // Find mentee's batch to get round info
+      const menteeRow = mappingSheet.find(r =>
+        (r['Mentee'] || r['Nama Usahawan'] || '').toString().trim() === menteeName
+      );
+
+      let roundNumber = '1';
+      if (menteeRow) {
+        const batch = menteeRow['Batch'];
+        const batchInfo = batchSheet?.find(b => b['Batch'] === batch);
+        if (batchInfo) {
+          const roundLabel = batchInfo['Mentoring Round'] || 'Round 1';
+          const roundMatch = roundLabel.match(/\d+$/);
+          roundNumber = roundMatch ? roundMatch[0] : '1';
+        }
+      }
+
+      // Construct report label similar to Bangkit format
+      const reportLabel = `Sesi #${sesiNumber} (Round ${roundNumber})`;
+
+      const sessionData = {
+        reportLabel,
+        status: miaStatus.toLowerCase() === 'mia' ? 'MIA' : 'Selesai',
+        programType: 'maju',
+        sesiNumber,
+        miaStatus,
+        // Maju stores sales data in JSON format
+        dataKewanganJson: session['DATA_KEWANGAN_BULANAN_JSON'] || '',
+      };
+
+      if (!sessionsByMentee.has(menteeName)) {
+        sessionsByMentee.set(menteeName, []);
+      }
+      sessionsByMentee.get(menteeName).push(sessionData);
+    }
+
+    console.log(`✅ Processed ${sessionSheet.length} Bangkit sessions and ${majuSheet.length} Maju sessions`);
 
     const batches = [];
 
@@ -78,14 +135,27 @@ export default async function handler(req, res) {
           skippedRows++;
           continue;
         }
-        if (!mentorMap[mentor]) {
-            mentorMap[mentor] = { mentees: [], zone: zone || 'N/A' };
+
+        // Use composite key: mentor + zone to support mentors in multiple zones
+        const normalizedZone = zone || 'N/A';
+        const mentorZoneKey = `${mentor}|||${normalizedZone}`;
+
+        if (!mentorMap[mentorZoneKey]) {
+            mentorMap[mentorZoneKey] = {
+              mentorName: mentor,
+              mentees: [],
+              zone: normalizedZone
+            };
         }
-        mentorMap[mentor].mentees.push(mentee);
+        mentorMap[mentorZoneKey].mentees.push(mentee);
       }
       if (skippedRows > 0) {
         console.log(`⚠️ Skipped ${skippedRows} rows with missing Mentor or Mentee data`);
       }
+
+      // DEBUG: Log all mentor-zone combinations found in this batch
+      const mentorZonePairs = Object.values(mentorMap).map(m => `${m.mentorName} (${m.zone})`);
+      console.log(`📝 Mentor-Zone pairs in batch "${batchName}":`, mentorZonePairs);
 
       const mentors = Object.entries(mentorMap).map(([mentor, data]) => {
         let totalSessions = 0;
@@ -99,34 +169,64 @@ export default async function handler(req, res) {
 
         data.mentees.forEach(name => {
           const menteeSessions = sessionsByMentee.get(name) || [];
-          
+
           const reportsForThisRound = menteeSessions.filter(session => {
             if (!session.reportLabel) return false;
-            
-            // Use a regular expression to reliably get the number
-            const reportMatch = session.reportLabel.match(/\d+$/);
-            const reportNumber = reportMatch ? reportMatch[0] : null;
 
-            return reportNumber === roundNumber;
+            // Extract round number from report label
+            // For Maju: "Sesi #1 (Round 1)" -> extract "1" from "(Round X)"
+            // For Bangkit: "Sesi 1 Round 1" -> extract "1" from end
+            let reportRoundNumber = null;
+
+            const majuMatch = session.reportLabel.match(/Round (\d+)\)/);
+            if (majuMatch) {
+              reportRoundNumber = majuMatch[1];
+            } else {
+              const bangkitMatch = session.reportLabel.match(/\d+$/);
+              reportRoundNumber = bangkitMatch ? bangkitMatch[0] : null;
+            }
+
+            return reportRoundNumber === roundNumber;
           });
 
           const completedSessions = reportsForThisRound.filter(r => r.status === 'Selesai');
-          totalSessions += completedSessions.length;
-          
-          const miaSessions = reportsForThisRound.filter(r => r.status === 'MIA');
-          miaCount += miaSessions.length;
+          // Count mentee as completed if they have at least 1 completed session this round
+          if (completedSessions.length > 0) {
+            totalSessions += 1; // Count 1 per mentee, not all sessions
+          }
 
-          // Count completed sessions that have sales data
+          const miaSessions = reportsForThisRound.filter(r => r.status === 'MIA');
+          if (miaSessions.length > 0) {
+            miaCount += 1; // Count 1 per mentee, not all MIA sessions
+          }
+
+          // Count mentee as having sales data if at least one completed session has sales data
           const salesDataCompleteSessions = completedSessions.filter(session => {
-            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ogos', 'Sep', 'Okt', 'Nov', 'Dis'];
-            // Check if at least one month column has a value
-            return months.some(month => session[month] && session[month] !== '');
+            if (session.programType === 'maju') {
+              // For Maju: Check if DATA_KEWANGAN_BULANAN_JSON has content
+              const jsonData = session.dataKewanganJson;
+              if (!jsonData || jsonData === '') return false;
+
+              try {
+                const parsed = JSON.parse(jsonData);
+                // Check if JSON array has at least one entry with sales data
+                return Array.isArray(parsed) && parsed.length > 0;
+              } catch (e) {
+                return false;
+              }
+            } else {
+              // For Bangkit: Check if at least one month column has a value
+              const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ogos', 'Sep', 'Okt', 'Nov', 'Dis'];
+              return months.some(month => session[month] && session[month] !== '');
+            }
           });
-          salesDataCount += salesDataCompleteSessions.length;
+          if (salesDataCompleteSessions.length > 0) {
+            salesDataCount += 1; // Count 1 per mentee
+          }
         });
         
         return {
-          mentorName: mentor,
+          mentorName: data.mentorName,
           zone: data.zone,
           totalMentees: data.mentees.length,
           totalSessions,
@@ -156,6 +256,12 @@ export default async function handler(req, res) {
     }
 
     console.log(`Found ${batches.length} batches with data`);
+
+    // Prevent caching - always fetch fresh data
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+
     res.status(200).json(batches);
   } catch (err) {
     console.error('❌ ERROR IN /api/admin/sales-status:', err);
