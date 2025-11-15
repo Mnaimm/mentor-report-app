@@ -70,7 +70,7 @@ export default async function handler(req, res) {
         requestBody: { values: [rowData] },
       }),
       new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Google Sheets API timeout after 8 seconds')), 8000)
+        setTimeout(() => reject(new Error('Google Sheets API timeout after 8 seconds')), 10000)
       )
     ]);
     console.log('✅ Sheet append successful');
@@ -100,7 +100,7 @@ export default async function handler(req, res) {
 
     // Add 5-second timeout for Apps Script (Google Sheets API already took ~2s, need to stay under 10s total)
     const appsScriptTimeout = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Apps Script timeout after 5 seconds')), 5000)
+      setTimeout(() => reject(new Error('Apps Script timeout after 5 seconds')), 20000)
     );
 
     const appsScriptCall = fetch(appsScriptUrl, {
