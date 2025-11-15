@@ -27,17 +27,11 @@ export default async function handler(req, res) {
     // Environment variables
     const spreadsheetId = process.env.GOOGLE_SHEETS_MAJU_REPORT_ID || process.env.GOOGLE_SHEETS_REPORT_ID;
     const range = 'LaporanMaju!A1';
-    const appsScriptUrl = process.env.NEXT_PUBLIC_APPS_SCRIPT_LAPORAN_MAJU_URL;
 
     console.log('🔗 Using spreadsheet ID:', spreadsheetId);
-    console.log('🔗 Using Apps Script URL:', appsScriptUrl);
 
     if (!spreadsheetId) {
       throw new Error('Missing GOOGLE_SHEETS_MAJU_REPORT_ID environment variable.');
-    }
-
-    if (!appsScriptUrl) {
-      throw new Error('Missing NEXT_PUBLIC_APPS_SCRIPT_LAPORAN_MAJU_URL environment variable.');
     }
 
     // DEBUG: Verify all critical fields are populated
@@ -70,7 +64,7 @@ export default async function handler(req, res) {
         requestBody: { values: [rowData] },
       }),
       new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Google Sheets API timeout after 8 seconds')), 10000)
+        setTimeout(() => reject(new Error('Google Sheets API timeout after 10 seconds')), 10000)
       )
     ]);
     console.log('✅ Sheet append successful');
@@ -87,135 +81,30 @@ export default async function handler(req, res) {
       throw new Error('Could not determine the row number where data was inserted.');
     }
 
-    // Trigger Apps Script for document generation
-    console.log('🚀 Triggering Apps Script for document generation...');
+    // Document will be generated automatically by Apps Script time-driven trigger
+    console.log(`✅ Data saved to row ${newRowNumber}. Document will be generated automatically.`);
 
-    const appsScriptPayload = {
-      action: 'processRow',
-      rowNumber: parseInt(newRowNumber, 10),
-      programType: 'maju'
-    };
+    // Invalidate cache on successful submission
+    const mentorEmail = reportData?.mentorEmail;
+    if (mentorEmail) {
+      const cacheKeysToInvalidate = [
+        `mentor-stats:${mentorEmail.toLowerCase().trim()}`,
+        'mapping:bangkit',
+        'mapping:maju'
+      ];
 
-    console.log('📤 Apps Script payload:', appsScriptPayload);
-
-    // Add 5-second timeout for Apps Script (Google Sheets API already took ~2s, need to stay under 10s total)
-    const appsScriptTimeout = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Apps Script timeout after 5 seconds')), 20000)
-    );
-
-    const appsScriptCall = fetch(appsScriptUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(appsScriptPayload),
-    });
-
-    let appsScriptResponse;
-    try {
-      appsScriptResponse = await Promise.race([appsScriptCall, appsScriptTimeout]);
-    } catch (timeoutError) {
-      console.error('⚠️ Apps Script timed out after 5 seconds');
-      // Return partial success - sheet data is saved, document generation can be done manually
-      return res.status(200).json({
-        success: false,
-        partialSuccess: true,
-        sheetSaved: true,
-        documentCreated: false,
-        error: 'Data disimpan tetapi dokumen gagal dicipta (timeout)',
-        message: 'Laporan telah disimpan di Google Sheet tetapi dokumen tidak dapat dijana kerana timeout. Sila hubungi admin dengan nombor row di bawah.',
-        warning: 'Apps Script timeout after 5 seconds',
-        rowNumber: newRowNumber,
-        phase: 'document_generation',
-        retryable: true
-      });
-    }
-
-    const appsScriptText = await appsScriptResponse.text();
-    console.log('📥 [SUBMIT API] Apps Script response status:', appsScriptResponse.status);
-    console.log('📥 [SUBMIT API] Apps Script response text:', appsScriptText.substring(0, 500));
-
-    if (appsScriptResponse.ok) {
-      try {
-        const appsScriptResult = JSON.parse(appsScriptText);
-        console.log('📦 [SUBMIT API] Apps Script parsed response:', {
-          success: appsScriptResult.success,
-          message: appsScriptResult.message,
-          docId: appsScriptResult.docId,
-          docUrl: appsScriptResult.docUrl
-        });
-
-        if (appsScriptResult.success) {
-          console.log('✅ [SUBMIT API] Document created successfully:', appsScriptResult.docId);
-
-          // Invalidate cache on successful submission
-          const mentorEmail = reportData?.mentorEmail;
-          if (mentorEmail) {
-            const cacheKeysToInvalidate = [
-              `mentor-stats:${mentorEmail.toLowerCase().trim()}`,
-              'mapping:bangkit',
-              'mapping:maju'
-            ];
-
-            for (const key of cacheKeysToInvalidate) {
-              cache.delete(key);
-            }
-
-            console.log(`🗑️ Cache invalidated for mentor: ${mentorEmail}`);
-          }
-
-          return res.status(200).json({
-            success: true,
-            message: 'Laporan berjaya dihantar dan dokumen telah dicipta!',
-            rowNumber: newRowNumber,
-            docId: appsScriptResult.docId
-          });
-        } else {
-          console.error('❌ [SUBMIT API] Apps Script returned error:', appsScriptResult.message);
-          console.error('❌ [SUBMIT API] Error details:', appsScriptResult);
-
-          // Partial success: Sheet saved but document failed
-          return res.status(200).json({
-            success: false,
-            partialSuccess: true,
-            sheetSaved: true,
-            documentCreated: false,
-            error: 'Data disimpan tetapi dokumen gagal dicipta',
-            message: 'Laporan telah disimpan di Google Sheet tetapi dokumen tidak dapat dijana. Sila hubungi admin dengan nombor row di bawah.',
-            warning: appsScriptResult.message,
-            rowNumber: newRowNumber,
-            phase: 'document_generation',
-            retryable: true
-          });
-        }
-      } catch (parseError) {
-        console.error('❌ [SUBMIT API] Failed to parse Apps Script response:', parseError);
-        return res.status(200).json({
-          success: false,
-          partialSuccess: true,
-          sheetSaved: true,
-          documentCreated: false,
-          error: 'Data disimpan tetapi respons dokumen tidak dapat diproses',
-          message: 'Laporan telah disimpan di Google Sheet tetapi respons dokumen tidak sah. Sila hubungi admin dengan nombor row di bawah.',
-          warning: 'Document processing response invalid',
-          rowNumber: newRowNumber,
-          phase: 'document_generation',
-          retryable: true
-        });
+      for (const key of cacheKeysToInvalidate) {
+        cache.delete(key);
       }
-    } else {
-      console.error('❌ [SUBMIT API] Apps Script call failed with status:', appsScriptResponse.status);
-      return res.status(200).json({
-        success: false,
-        partialSuccess: true,
-        sheetSaved: true,
-        documentCreated: false,
-        error: 'Data disimpan tetapi Apps Script gagal',
-        message: 'Laporan telah disimpan di Google Sheet tetapi Apps Script gagal dipanggil. Sila hubungi admin dengan nombor row di bawah.',
-        warning: `Apps Script HTTP ${appsScriptResponse.status}`,
-        rowNumber: newRowNumber,
-        phase: 'document_generation',
-        retryable: true
-      });
+
+      console.log(`🗑️ Cache invalidated for mentor: ${mentorEmail}`);
     }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Laporan berjaya dihantar! Dokumen akan dicipta secara automatik dalam masa 1-2 minit.',
+      rowNumber: newRowNumber
+    });
 
   } catch (error) {
     console.error('❌ Error in /api/submitMajuReport:', error);
