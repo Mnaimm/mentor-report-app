@@ -126,7 +126,6 @@ export default async function handler(req, res) {
     let spreadsheetId;
     let range;
     let rowData;
-    let appsScriptUrl; // URL for the Apps Script to trigger document generation
 
     // Only Bangkit is handled by this endpoint now
     // Maju has its own dedicated endpoint: /api/submitMajuReport
@@ -134,9 +133,8 @@ export default async function handler(req, res) {
       spreadsheetId = process.env.GOOGLE_SHEETS_REPORT_ID;
       range = 'V8!A1';
       rowData = mapBangkitDataToSheetRow(reportData);
-      appsScriptUrl = process.env.NEXT_PUBLIC_APPS_SCRIPT_URL;
-      if (!spreadsheetId || !appsScriptUrl) {
-          throw new Error('Missing environment variables for Bangkit program.');
+      if (!spreadsheetId) {
+          throw new Error('Missing GOOGLE_SHEETS_REPORT_ID environment variable for Bangkit program.');
       }
     } else {
       return res.status(400).json({
@@ -155,7 +153,7 @@ export default async function handler(req, res) {
         requestBody: { values: [rowData] },
       }),
       new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Google Sheets API timeout after 8 seconds')), 10000)
+        setTimeout(() => reject(new Error('Google Sheets API timeout after 10 seconds')), 10000)
       )
     ]);
     console.log(`✅ Sheet append successful for ${programType}`);
@@ -164,30 +162,8 @@ export default async function handler(req, res) {
     const updatedRange = appendRes.data?.updates?.updatedRange || '';
     const newRowNumber = getRowNumberFromUpdatedRange(updatedRange);
 
-    // If successful, trigger the corresponding Apps Script automation
-    if (newRowNumber) {
-      try {
-        console.log(`🤖 Triggering ${programType} Apps Script automation for row ${newRowNumber}...`);
-
-        // Add 5-second timeout for Apps Script (Google Sheets API already took ~2s, need to stay under 10s total)
-        const appsScriptTimeout = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Apps Script timeout after 5 seconds')), 10000)
-        );
-
-        const appsScriptCall = fetch(appsScriptUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'processRow', rowNumber: newRowNumber, programType: programType }),
-        });
-
-        await Promise.race([appsScriptCall, appsScriptTimeout]);
-        console.log(`✅ Apps Script automation completed for ${programType} row ${newRowNumber}`);
-      } catch (e) {
-        console.error(`⚠️ Automation ping for ${programType} failed:`, e.message);
-        // Do not block submission success if automation ping fails
-        // Data is already in sheet - document can be generated manually
-      }
-    }
+    // Document will be generated automatically by Apps Script time-driven trigger
+    console.log(`✅ Data saved to row ${newRowNumber}. Document will be generated automatically.`);
 
     // Invalidate relevant cache entries on successful submission
     const mentorEmail = reportData?.mentorEmail;
@@ -205,7 +181,11 @@ export default async function handler(req, res) {
       console.log(`🗑️ Cache invalidated for mentor: ${mentorEmail}`);
     }
 
-    return res.status(200).json({ success: true, message: 'Laporan berjaya dihantar!' });
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Laporan berjaya dihantar! Dokumen akan dicipta secara automatik dalam masa 1-2 minit.',
+      rowNumber: newRowNumber
+    });
 
   } catch (error) {
     console.error('❌ Error in /api/submitReport:', error);
