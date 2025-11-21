@@ -1628,9 +1628,9 @@ Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun la
                 </Section>
               </div>
 
-              {/* --- Dapatan Sesi Mentoring --- */}
+              {/* --- Keputusan Mentee - Inisiatif yang mahu diambil --- */}
               <div className="bg-white p-6 rounded-lg shadow-sm">
-                <Section title="Dapatan Sesi Mentoring *">
+                <Section title="Keputusan Mentee - Inisiatif yang mahu diambil *">
                   <div className="mb-4 p-3 bg-blue-50 border-l-4 border-blue-400 rounded-r">
                     <p className="text-sm text-blue-800">
                       <strong>Required:</strong> Minimum 1 Topik Perbincangan dengan sekurang-kurangnya 1 Pelan Tindakan yang lengkap.
@@ -1980,13 +1980,18 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                         <span className="ml-2 text-gray-700">Lawatan Premis Telah Dijalankan?</span>
                       </label>
                       {lawatanPremisChecked && (
-                        <FileInput
-                          label="Gambar Premis (Pelbagai Gambar)"
-                          name="URL_GAMBAR_PREMIS_JSON"
-                          onFileChange={(e) => handleFileChange('premis', e.target.files, true)}
-                          multiple={true}
-                          required={lawatanPremisChecked}
-                        />
+                        <div>
+                          <FileInput
+                            label="Gambar Lawatan Premis *"
+                            name="URL_GAMBAR_PREMIS_JSON"
+                            onFileChange={(e) => handleFileChange('premis', e.target.files, true)}
+                            multiple={true}
+                            required={lawatanPremisChecked}
+                          />
+                          <p className="mt-1 text-sm text-gray-600 italic">
+                            Gambar bahagian depan premis bisnes mentee, Gambar-gambar ruang dalam bisnes mentee, Gambar-gambar aset yang ada (terutama yang dibeli menggunakan geran BIMB), selfie depan premise
+                          </p>
+                        </div>
                       )}
                       {formData.URL_GAMBAR_PREMIS_JSON.length > 0 && lawatanPremisChecked && (
                         <div className="mt-2">

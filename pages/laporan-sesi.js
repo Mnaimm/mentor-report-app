@@ -903,7 +903,7 @@ const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async 
           <TextArea rows={10} value={formState.pemerhatian || ''} onChange={(e) => setFormState((p) => ({ ...p, pemerhatian: e.target.value }))} />
         </Section>
 
-        <Section title="Inisiatif Utama" description="Berdasarkan pemerhatian, pilih Fokus Area dan Keputusan yang perlu diambil.">
+        <Section title="Keputusan Mentee - Inisiatif yang mahu diambil" description="Berdasarkan pemerhatian, pilih Fokus Area dan Keputusan yang perlu diambil.">
           {(formState.inisiatif || []).map((inisiatifItem, index) => {
             const keputusanOptions = inisiatifItem.focusArea ? frameworkData.filter((item) => item.Focus_Area === inisiatifItem.focusArea) : [];
             const cadangan = frameworkData.find((item) => item.Keputusan === inisiatifItem.keputusan);
@@ -962,7 +962,12 @@ const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async 
           <FileInput label="Satu (1) Gambar Individu Usahawan (Profil)" onChange={(e) => handleFileChange('profil', e.target.files)} required />
           <FileInput label="Dua (2) Gambar Sesi Mentoring" multiple onChange={(e) => handleFileChange('sesi', e.target.files, true)} required />
           {formState.sesi.premisDilawat && (
-            <FileInput label="Dua (2) Gambar Premis Perniagaan" multiple onChange={(e) => handleFileChange('premis', e.target.files, true)} required />
+            <div>
+              <FileInput label="Gambar Lawatan Premis *" multiple onChange={(e) => handleFileChange('premis', e.target.files, true)} required />
+              <p className="mt-1 text-sm text-gray-600 italic">
+                Gambar bahagian depan premis bisnes mentee, Gambar-gambar ruang dalam bisnes mentee, Gambar-gambar aset yang ada (terutama yang dibeli menggunakan geran BIMB), selfie depan premise
+              </p>
+            </div>
           )}
         </Section>
       </div>
@@ -1014,7 +1019,7 @@ const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async 
           </div>
         </Section>
 
-        <Section title="Inisiatif Utama Sesi Ini">
+        <Section title="Keputusan Mentee - Inisiatif yang mahu diambil Sesi Ini">
           {(formState.inisiatif || []).map((inisiatifItem, index) => {
             const keputusanOptions = inisiatifItem.focusArea ? frameworkData.filter((item) => item.Focus_Area === inisiatifItem.focusArea) : [];
             const cadangan = frameworkData.find((item) => item.Keputusan === inisiatifItem.keputusan);
@@ -1065,16 +1070,19 @@ const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async 
         <Section title={`Muat Naik Gambar (Sesi ${currentSession})`}>
           <FileInput label="Gambar Sesi Mentoring" multiple onChange={(e) => handleFileChange('sesi', e.target.files, true)} required />
           {!previousData.premisDilawat && (
-            <>
+            <div>
               <div className="text-sm text-yellow-800 bg-yellow-50 border border-yellow-200 rounded p-2 mb-2">
                 Premis belum pernah dilawat. Disarankan muat naik gambar premis pada sesi ini (tidak wajib).
               </div>
               <FileInput
-                label="Gambar Premis Perniagaan (disyorkan – belum dilawat)"
+                label="Gambar Lawatan Premis (disyorkan – belum dilawat)"
                 multiple
                 onChange={(e) => handleFileChange('premis', e.target.files, true)}
               />
-            </>
+              <p className="mt-1 text-sm text-gray-600 italic">
+                Gambar bahagian depan premis bisnes mentee, Gambar-gambar ruang dalam bisnes mentee, Gambar-gambar aset yang ada (terutama yang dibeli menggunakan geran BIMB), selfie depan premise
+              </p>
+            </div>
           )}
         </Section>
       </div>
