@@ -70,11 +70,16 @@ const auth = new google.auth.GoogleAuth({
       formData.ulasanOnlineSales, // AR: Ulasan Mentor (Jualan dan Pemasaran)
     ];
 
+    // Use proper range format: SheetName!A2:AR to append after headers (row 1)
+    const sheetName = process.env.RESPONSES_SHEET_NAME || 'UM';
+    const range = `${sheetName}!A2:AR`; // Start from row 2, append at bottom
+
     await sheets.spreadsheets.values.append({
       spreadsheetId: process.env.UPWARD_MOBILITY_SPREADSHEET_ID,
-      range: process.env.RESPONSES_SHEET_NAME,
+      range: range,
       valueInputOption: 'USER_ENTERED',
-      resource: {
+      insertDataOption: 'INSERT_ROWS', // This ensures it inserts a new row instead of overwriting
+      requestBody: {
         values: [newRow],
       },
     });
