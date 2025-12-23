@@ -254,34 +254,48 @@ useEffect(() => {
     if (status === 'authenticated') {
       setIsLoading(true);
       try {
+        console.log('🔍 Fetching mapping data...');
         // Fetch data from both programs
         const [bangkitRes, majuRes] = await Promise.all([
           fetch('/api/mapping?programType=bangkit'),
           fetch('/api/mapping?programType=maju')
         ]);
-        
+
+        console.log('📊 Bangkit response status:', bangkitRes.status);
+        console.log('📊 Maju response status:', majuRes.status);
+
         const [bangkitData, majuData] = await Promise.all([
           bangkitRes.json(),
           majuRes.json()
         ]);
-        
+
+        console.log('✅ Bangkit mentees:', bangkitData.length);
+        console.log('✅ Maju mentees:', majuData.length);
+
         // Combine both datasets
         const mappingData = [...bangkitData, ...majuData];
-        
+        console.log('📦 Total combined mentees:', mappingData.length);
+
         if (bangkitRes.ok && majuRes.ok) {
           setAllMentees(mappingData);
           if (isAdmin) {
+            console.log('👤 User is ADMIN');
             const mentors = [...new Set(mappingData.map((m) => m.Mentor))];
+            console.log('👥 Unique mentors:', mentors.length);
             setUniqueMentors(mentors);
             setFilteredMentees([]);
           } else {
+            console.log('👤 User is MENTOR:', session.user.email);
             const filtered = mappingData.filter((m) => m.Mentor_Email === session.user.email);
+            console.log('✅ Filtered mentees for this mentor:', filtered.length);
+            console.log('📋 Mentees:', filtered.map(m => m.Usahawan));
             setFilteredMentees(filtered);
           }
         } else {
           setError('Gagal memuatkan data usahawan.');
         }
       } catch (err) {
+        console.error('❌ Error fetching data:', err);
         setError('Gagal memuatkan data awal.');
       } finally {
         setIsLoading(false);
@@ -338,10 +352,11 @@ useEffect(() => {
       const fullFormData = {
         ...formState,
         namaMentor: session.user.name,
-        namaUsahawan: selectedMentee.Mentee,
+        namaUsahawan: selectedMentee.Usahawan,
         namaPerniagaan: selectedMentee.Nama_Syarikat,
         alamatPerniagaan: selectedMentee.Alamat,
         nomborTelefon: selectedMentee.No_Tel,
+        batch: selectedMentee.Batch || 'Unknown',
       };
 
       const response = await fetch('/api/submit-upward-mobility', {
@@ -421,7 +436,27 @@ useEffect(() => {
       value={session?.user?.name || ''}
       disabled
     />
-    
+
+    {isAdmin && (
+      <SelectField
+        id="mentor-selector"
+        label="Pilih Mentor (Admin Only)"
+        name="adminMentor"
+        value={selectedAdminMentor}
+        onChange={(e) => handleAdminMentorChange(e.target.value)}
+        required={false}
+      >
+        <option value="">-- Sila Pilih Mentor --</option>
+        {uniqueMentors.map((mentor) => (
+          <option key={mentor} value={mentor}>
+            {mentor}
+          </option>
+        ))}
+      </SelectField>
+    )}
+  </div>
+
+  <div className="grid grid-cols-1 gap-6 mt-4">
     <SelectField
       id="mentee-selector"
       label="Pilih Usahawan (Mentee)"
@@ -429,12 +464,12 @@ useEffect(() => {
       value={selectedMentee?.Usahawan || ''}
       onChange={(e) => handleMenteeChange(e.target.value)}
       required
-      disabled={false} // Force enable for testing
+      disabled={isAdmin && !selectedAdminMentor}
     >
       <option value="">-- Sila Pilih Usahawan --</option>
       {filteredMentees.map((mentee) => (
-    <option key={mentee.Usahawan} value={mentee.Usahawan}> 
-      {mentee.Usahawan} 
+        <option key={mentee.Usahawan} value={mentee.Usahawan}>
+          {mentee.Usahawan}
         </option>
       ))}
     </SelectField>
