@@ -1,22 +1,19 @@
 /**
- * API Endpoint: GET/POST /api/monitoring/discrepancies
+ * API Endpoint: GET /api/monitoring/discrepancies
  *
- * GET: Fetch data discrepancies
- * POST: Mark discrepancy as resolved
+ * GET: Fetch data discrepancies from view
  *
  * Query params (GET):
- * - resolved: 'true' | 'false' | 'all' (default: 'false')
  * - table: filter by table name
- * - severity: filter by severity (low, medium, high, critical)
- * - limit: number of records (default: 50)
+ * - discrepancy_type: filter by discrepancy type
+ * - limit: number of records (default: 50, max: 200)
  *
- * Request body (POST):
- * {
- *   id: 'uuid',
- *   resolved: true,
- *   resolvedBy: 'admin@email.com',
- *   notes: 'Fixed by manual sync'
- * }
+ * View columns:
+ * - id, operation_type, table_name, record_id, program
+ * - user_email, created_at, discrepancy_type
+ * - sheets_error, supabase_error
+ *
+ * Note: This is a read-only view. POST is not supported.
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -42,32 +39,28 @@ export default async function handler(req, res) {
 async function handleGet(req, res) {
   try {
     const {
-      resolved = 'false',
       table,
-      severity,
+      discrepancy_type,
       limit = '50'
     } = req.query;
 
     const parsedLimit = Math.min(parseInt(limit), 200);
 
-    // Build query
+    // Build query - view columns: id, operation_type, table_name, record_id,
+    // program, user_email, created_at, discrepancy_type, sheets_error, supabase_error
     let query = supabase
       .from('data_discrepancies')
       .select('*')
-      .order('detected_at', { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(parsedLimit);
 
-    // Apply filters
-    if (resolved !== 'all') {
-      query = query.eq('resolved', resolved === 'true');
-    }
-
+    // Apply filters based on actual view columns
     if (table) {
       query = query.eq('table_name', table);
     }
 
-    if (severity) {
-      query = query.eq('severity', severity);
+    if (discrepancy_type) {
+      query = query.eq('discrepancy_type', discrepancy_type);
     }
 
     const { data, error } = await query;
@@ -76,23 +69,21 @@ async function handleGet(req, res) {
       throw error;
     }
 
-    // Get counts by severity for unresolved
+    // Get counts by discrepancy type
     const { data: counts } = await supabase
       .from('data_discrepancies')
-      .select('severity')
-      .eq('resolved', false);
+      .select('discrepancy_type');
 
-    const severityCounts = {
-      low: counts?.filter(c => c.severity === 'low').length || 0,
-      medium: counts?.filter(c => c.severity === 'medium').length || 0,
-      high: counts?.filter(c => c.severity === 'high').length || 0,
-      critical: counts?.filter(c => c.severity === 'critical').length || 0
-    };
+    const typeCounts = {};
+    counts?.forEach(c => {
+      const type = c.discrepancy_type || 'unknown';
+      typeCounts[type] = (typeCounts[type] || 0) + 1;
+    });
 
     return res.status(200).json({
       discrepancies: data || [],
       total: data?.length || 0,
-      severityCounts
+      typeCounts
     });
 
   } catch (error) {
@@ -105,49 +96,11 @@ async function handleGet(req, res) {
 }
 
 /**
- * POST handler - Update discrepancy status
+ * POST handler - Not supported (view is read-only)
  */
 async function handlePost(req, res) {
-  try {
-    const { id, resolved, resolvedBy, notes } = req.body;
-
-    if (!id) {
-      return res.status(400).json({ error: 'Missing discrepancy ID' });
-    }
-
-    const updateData = {
-      resolved: resolved === true,
-      updated_at: new Date().toISOString()
-    };
-
-    if (resolved) {
-      updateData.resolved_at = new Date().toISOString();
-      updateData.resolved_by = resolvedBy || null;
-      updateData.resolution_notes = notes || null;
-    }
-
-    const { data, error } = await supabase
-      .from('data_discrepancies')
-      .update(updateData)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) {
-      throw error;
-    }
-
-    return res.status(200).json({
-      success: true,
-      discrepancy: data,
-      message: resolved ? 'Discrepancy marked as resolved' : 'Discrepancy updated'
-    });
-
-  } catch (error) {
-    console.error('Error in discrepancies POST:', error);
-    return res.status(500).json({
-      error: 'Failed to update discrepancy',
-      message: error.message
-    });
-  }
+  return res.status(405).json({
+    error: 'POST not supported',
+    message: 'data_discrepancies is a read-only view. Discrepancies are auto-detected and cannot be manually updated.'
+  });
 }

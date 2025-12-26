@@ -23,36 +23,51 @@ export default async function handler(req, res) {
   try {
     let stats = {};
 
-    // System Admin - Full statistics
+    // Check roles in priority order (highest privilege first)
+    // Note: requireAuth middleware already populated user.roles from database
+
+    // System Admin - Full statistics (highest priority)
     if (hasRole(user, 'system_admin')) {
+      console.log('✅ Dashboard access: system_admin');
       stats = await getSystemAdminStats();
     }
     // Program Coordinator - Program-specific stats
     else if (hasRole(user, 'program_coordinator')) {
+      console.log('✅ Dashboard access: program_coordinator');
       stats = await getProgramCoordinatorStats(user);
     }
     // Report Admin - Report-focused stats
     else if (hasRole(user, 'report_admin')) {
+      console.log('✅ Dashboard access: report_admin');
       stats = await getReportAdminStats();
     }
     // Payment Admin - Payment-focused stats
     else if (hasRole(user, 'payment_admin')) {
+      console.log('✅ Dashboard access: payment_admin');
       stats = await getPaymentAdminStats();
     }
     // Payment Approver - Approval-focused stats
     else if (hasRole(user, 'payment_approver')) {
+      console.log('✅ Dashboard access: payment_approver');
       stats = await getPaymentApproverStats();
     }
     // Mentor - Own stats only
     else if (hasRole(user, 'mentor') || hasRole(user, 'premier_mentor')) {
+      console.log('✅ Dashboard access: mentor/premier_mentor');
       stats = await getMentorStats(user);
     }
     // Stakeholder - Aggregate stats only
     else if (hasRole(user, 'stakeholder')) {
+      console.log('✅ Dashboard access: stakeholder');
       stats = await getStakeholderStats();
     }
     else {
-      return res.status(403).json({ error: 'No valid role for dashboard access' });
+      console.error('❌ No valid role for dashboard access. User roles:', user.roles);
+      return res.status(403).json({
+        error: 'No valid role for dashboard access',
+        userRoles: user.roles,
+        validRoles: ['system_admin', 'program_coordinator', 'report_admin', 'payment_admin', 'payment_approver', 'mentor', 'premier_mentor', 'stakeholder']
+      });
     }
 
     return res.status(200).json(stats);
