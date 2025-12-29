@@ -4,10 +4,24 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "sync:mappings": "node scripts/sync-mappings.js",
+    "sync:mappings:test": "node scripts/sync-mappings.js --test",
+    "sync:bangkit": "node scripts/sync-bangkit-reports.js",
+    "sync:bangkit:test": "node scripts/sync-bangkit-reports.js --test",
+    "sync:maju": "node scripts/sync-maju-reports.js",
+    "sync:maju:test": "node scripts/sync-maju-reports.js --test",
+    "sync:um": "node scripts/sync-um-reports.js",
+    "sync:um:test": "node scripts/sync-um-reports.js --test",
+    "sync:docurl": "node scripts/sync-docurl.js",
+    "sync:docurl:live": "node scripts/sync-docurl.js --live",
+    "sync:validate": "node scripts/validate-setup.js",
+    "validate:sync": "node scripts/validate-sync.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.89.0",
     "date-fns": "^4.1.0",
+    "dotenv": "^16.6.1",
     "file-saver": "^2.0.5",
     "formidable": "^3.5.4",
     "googleapis": "^156.0.0",
