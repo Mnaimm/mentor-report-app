@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { useSession } from 'next-auth/react';
-import { isAdmin } from '../../lib/auth';
+import { getSession } from 'next-auth/react';
+import { canAccessAdmin, isReadOnly } from '../../lib/auth';
+import AccessDenied from '../../components/AccessDenied';
+import ReadOnlyBadge from '../../components/ReadOnlyBadge';
 
 const CollapseIcon = ({ is_open }) => (
     <svg className={`w-6 h-6 transition-transform duration-200 ${is_open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -8,12 +10,16 @@ const CollapseIcon = ({ is_open }) => (
     </svg>
 );
 
-export default function AdminDashboard() {
-  const { data: session, status } = useSession();
+export default function AdminDashboard({ userEmail, isReadOnlyUser, accessDenied }) {
   const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [openBatches, setOpenBatches] = useState({});
+
+  // If access is denied, show AccessDenied component
+  if (accessDenied) {
+    return <AccessDenied userEmail={userEmail} />;
+  }
 
   const fetchData = () => {
     setLoading(true);
@@ -38,30 +44,33 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
-    if (status === 'authenticated') {
-      fetchData();
-    }
-  }, [status]);
+    fetchData();
+  }, []);
   
   const toggleBatch = (index) => {
     setOpenBatches(prev => ({ ...prev, [index]: !prev[index] }));
   };
 
-  if (status === 'loading') return <p className="text-center p-10">Loading authentication...</p>;
-  if (!session || !isAdmin(session.user.email)) return <p className="text-red-600 font-bold text-center p-10">❌ Access denied. Admins only.</p>;
   if (loading) return <p className="text-center p-10">Loading report data...</p>;
-  if (error) return <p className="text-red-500 text-center p-10">Error loading data: {error.message}</p>;
+  if (error) return <p className="text-red-500 text-center p-10">Error loading data: {error}</p>;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 bg-gray-50 min-h-screen">
+      {/* Read-Only Badge */}
+      {isReadOnlyUser && <ReadOnlyBadge userEmail={userEmail} />}
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold text-gray-800">
           Admin Dashboard - Status Laporan Jualan
         </h1>
         <button
           onClick={fetchData}
-          disabled={loading}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+          disabled={loading || isReadOnlyUser}
+          className={`px-4 py-2 rounded-lg transition-colors font-medium ${
+            isReadOnlyUser
+              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              : 'bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed'
+          }`}
+          title={isReadOnlyUser ? 'View-only access - refresh disabled' : ''}
         >
           {loading ? 'Loading...' : '🔄 Refresh Data'}
         </button>
@@ -128,4 +137,44 @@ export default function AdminDashboard() {
       )}
     </div>
   );
+}
+
+// Server-side authentication and authorization check
+export async function getServerSideProps(context) {
+  const session = await getSession(context);
+
+  // Check if user is authenticated
+  if (!session) {
+    return {
+      redirect: {
+        destination: '/api/auth/signin',
+        permanent: false,
+      },
+    };
+  }
+
+  const userEmail = session.user.email;
+
+  // Check if user has access to admin page
+  const hasAccess = await canAccessAdmin(userEmail);
+
+  if (!hasAccess) {
+    // Return props that will render AccessDenied component
+    return {
+      props: {
+        accessDenied: true,
+        userEmail,
+      },
+    };
+  }
+
+  // Check if user is in read-only mode
+  const isReadOnlyUser = await isReadOnly(userEmail);
+
+  return {
+    props: {
+      userEmail,
+      isReadOnlyUser,
+    },
+  };
 }

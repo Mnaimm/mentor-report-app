@@ -1,7 +1,10 @@
 // pages/monitoring.js
 import React, { useEffect, useState } from "react";
-import { useSession, signIn } from "next-auth/react";
+import { getSession } from "next-auth/react";
+import { canAccessMonitoring, isReadOnly } from "../lib/auth";
 import Head from "next/head";
+import AccessDenied from "../components/AccessDenied";
+import ReadOnlyBadge from "../components/ReadOnlyBadge";
 
 const StatusBadge = ({ status }) => {
   const colors = {
@@ -240,7 +243,7 @@ const OperationsTable = ({ operations, loading }) => {
   );
 };
 
-const DiscrepanciesPanel = ({ discrepancies, loading, onResolve }) => {
+const DiscrepanciesPanel = ({ discrepancies, loading, onResolve, isReadOnly }) => {
   if (loading) {
     return (
       <div className="bg-white rounded-xl shadow-md p-6">
@@ -285,12 +288,14 @@ const DiscrepanciesPanel = ({ discrepancies, loading, onResolve }) => {
                   {disc.table_name}.{disc.field_name}
                 </span>
               </div>
-              <button
-                onClick={() => onResolve(disc.id)}
-                className="text-xs bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
-              >
-                Resolve
-              </button>
+              {!isReadOnly && (
+                <button
+                  onClick={() => onResolve(disc.id)}
+                  className="text-xs bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+                >
+                  Resolve
+                </button>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4 mt-2 text-sm">
               <div>
@@ -312,8 +317,7 @@ const DiscrepanciesPanel = ({ discrepancies, loading, onResolve }) => {
   );
 };
 
-export default function MonitoringDashboard() {
-  const { data: session, status } = useSession();
+export default function MonitoringDashboard({ userEmail, isReadOnlyUser, accessDenied }) {
   const [health, setHealth] = useState(null);
   const [stats, setStats] = useState(null);
   const [operations, setOperations] = useState([]);
@@ -321,6 +325,11 @@ export default function MonitoringDashboard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
+
+  // If access is denied, show AccessDenied component
+  if (accessDenied) {
+    return <AccessDenied userEmail={userEmail} />;
+  }
 
   const fetchData = async () => {
     try {
@@ -404,48 +413,23 @@ export default function MonitoringDashboard() {
   };
 
   useEffect(() => {
-    if (status === "authenticated") {
-      fetchData();
-    }
-  }, [status]);
+    fetchData();
+  }, []);
 
   useEffect(() => {
-    if (autoRefresh && status === "authenticated") {
+    if (autoRefresh) {
       const interval = setInterval(() => {
         fetchData();
       }, 30000); // Refresh every 30 seconds
 
       return () => clearInterval(interval);
     }
-  }, [autoRefresh, status]);
-
-  if (status === "loading") {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="text-xl text-gray-600">Loading...</div>
-      </div>
-    );
-  }
-
-  if (status === "unauthenticated") {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="bg-white p-8 rounded-xl shadow-lg text-center">
-          <h1 className="text-2xl font-bold mb-4">Monitoring Dashboard</h1>
-          <p className="text-gray-600 mb-6">Please sign in to view the monitoring dashboard</p>
-          <button
-            onClick={() => signIn("google")}
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
-          >
-            Sign In with Google
-          </button>
-        </div>
-      </div>
-    );
-  }
+  }, [autoRefresh]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      {/* Read-Only Badge */}
+      {isReadOnlyUser && <ReadOnlyBadge userEmail={userEmail} />}
       <Head>
         <title>Monitoring Dashboard | iTEKAD Mentor Portal</title>
       </Head>
@@ -474,8 +458,13 @@ export default function MonitoringDashboard() {
               </button>
               <button
                 onClick={handleTriggerComparison}
-                disabled={loading}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-semibold disabled:opacity-50"
+                disabled={loading || isReadOnlyUser}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50 ${
+                  isReadOnlyUser
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-purple-600 text-white hover:bg-purple-700'
+                }`}
+                title={isReadOnlyUser ? 'View-only access - comparison disabled' : ''}
               >
                 🔍 Compare Now
               </button>
@@ -592,6 +581,7 @@ export default function MonitoringDashboard() {
             discrepancies={discrepancies}
             loading={loading}
             onResolve={handleResolveDiscrepancy}
+            isReadOnly={isReadOnlyUser}
           />
         </div>
 
@@ -606,4 +596,44 @@ export default function MonitoringDashboard() {
       </div>
     </div>
   );
+}
+
+// Server-side authentication and authorization check
+export async function getServerSideProps(context) {
+  const session = await getSession(context);
+
+  // Check if user is authenticated
+  if (!session) {
+    return {
+      redirect: {
+        destination: '/api/auth/signin',
+        permanent: false,
+      },
+    };
+  }
+
+  const userEmail = session.user.email;
+
+  // Check if user has access to monitoring page
+  const hasAccess = await canAccessMonitoring(userEmail);
+
+  if (!hasAccess) {
+    // Return props that will render AccessDenied component
+    return {
+      props: {
+        accessDenied: true,
+        userEmail,
+      },
+    };
+  }
+
+  // Check if user is in read-only mode
+  const isReadOnlyUser = await isReadOnly(userEmail);
+
+  return {
+    props: {
+      userEmail,
+      isReadOnlyUser,
+    },
+  };
 }

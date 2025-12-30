@@ -1,14 +1,16 @@
 // pages/coordinator/dashboard.js
 import { useState, useEffect, useRef } from 'react';
-import { useSession } from 'next-auth/react';
+import { getSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
+import { canAccessCoordinator, isReadOnly } from '../../lib/auth';
 import Layout from '../../components/Layout';
 import StatCard from '../../components/StatCard';
 import KpiCard from '../../components/KpiCard';
 import StatusBadge from '../../components/StatusBadge';
+import AccessDenied from '../../components/AccessDenied';
+import ReadOnlyBadge from '../../components/ReadOnlyBadge';
 
-export default function CoordinatorDashboard() {
-  const { data: session, status } = useSession();
+export default function CoordinatorDashboard({ userEmail, isReadOnlyUser, accessDenied }) {
   const router = useRouter();
 
   const [stats, setStats] = useState(null);
@@ -45,13 +47,14 @@ export default function CoordinatorDashboard() {
   const [assignmentNotes, setAssignmentNotes] = useState('');
   const [assigning, setAssigning] = useState(false);
 
+  // If access is denied, show AccessDenied component
+  if (accessDenied) {
+    return <AccessDenied userEmail={userEmail} />;
+  }
+
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/api/auth/signin');
-    } else if (status === 'authenticated') {
-      fetchDashboardData();
-    }
-  }, [status, router]);
+    fetchDashboardData();
+  }, []);
 
   async function fetchDashboardData() {
     setLoading(true);
@@ -335,7 +338,7 @@ export default function CoordinatorDashboard() {
   // Get unique batches from all mentees for mentor filtering
   const mentorBatches = [...new Set(mentees.map(m => m.batch).filter(Boolean))].sort();
 
-  if (status === 'loading' || loading) {
+  if (loading) {
     return (
       <Layout>
         <div className="flex items-center justify-center min-h-screen">
@@ -350,6 +353,9 @@ export default function CoordinatorDashboard() {
 
   return (
     <Layout>
+      {/* Read-Only Badge */}
+      {isReadOnlyUser && <ReadOnlyBadge userEmail={userEmail} />}
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -477,13 +483,26 @@ export default function CoordinatorDashboard() {
           <div className="flex flex-wrap gap-3">
             <button
               onClick={fetchDashboardData}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded transition-colors"
+              disabled={isReadOnlyUser}
+              className={`font-medium py-2 px-4 rounded transition-colors ${
+                isReadOnlyUser
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white'
+              }`}
+              title={isReadOnlyUser ? 'View-only access - refresh disabled' : ''}
             >
               🔄 Refresh Data
             </button>
-            <div className="text-sm text-gray-600 flex items-center">
-              💡 Tip: Click "Assign" or "Reassign" on mentee cards to assign mentors
-            </div>
+            {!isReadOnlyUser && (
+              <div className="text-sm text-gray-600 flex items-center">
+                💡 Tip: Click "Assign" or "Reassign" on mentee cards to assign mentors
+              </div>
+            )}
+            {isReadOnlyUser && (
+              <div className="text-sm text-yellow-700 bg-yellow-50 px-3 py-2 rounded flex items-center">
+                👁️ You have view-only access to this dashboard
+              </div>
+            )}
           </div>
         </div>
 
@@ -667,7 +686,7 @@ export default function CoordinatorDashboard() {
           </div>
 
           {/* Bulk Assignment Bar */}
-          {selectedMentees.size > 0 && (
+          {selectedMentees.size > 0 && !isReadOnlyUser && (
             <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
@@ -750,19 +769,21 @@ export default function CoordinatorDashboard() {
           </div>
 
           {/* Select All Checkbox */}
-          <div className="mb-4">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={selectedMentees.size === filteredMentees.length && filteredMentees.length > 0}
-                onChange={handleSelectAll}
-                className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-              />
-              <span className="text-sm font-medium text-gray-700">
-                Select all mentees ({filteredMentees.length})
-              </span>
-            </label>
-          </div>
+          {!isReadOnlyUser && (
+            <div className="mb-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selectedMentees.size === filteredMentees.length && filteredMentees.length > 0}
+                  onChange={handleSelectAll}
+                  className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                />
+                <span className="text-sm font-medium text-gray-700">
+                  Select all mentees ({filteredMentees.length})
+                </span>
+              </label>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {filteredMentees.length === 0 ? (
@@ -771,15 +792,16 @@ export default function CoordinatorDashboard() {
               </div>
             ) : (
               filteredMentees.slice(0, 12).map((mentee) => (
-                <MenteeCard 
-                  key={mentee.id} 
-                  mentee={mentee} 
+                <MenteeCard
+                  key={mentee.id}
+                  mentee={mentee}
                   selected={selectedMentees.has(mentee.id)}
                   onSelect={() => handleSelectMentee(mentee.id)}
                   onAssign={() => {
                     setSelectedMentee(mentee);
                     setShowAssignModal(true);
-                  }} 
+                  }}
+                  isReadOnly={isReadOnlyUser}
                 />
               ))
             )}
@@ -872,23 +894,25 @@ export default function CoordinatorDashboard() {
                         <div className="text-sm text-gray-900">{mentee.phone || 'N/A'}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                        <button
-                          onClick={() => {
-                            setSelectedMentee({
-                              id: mentee.id,
-                              name: mentee.name,
-                              email: mentee.email,
-                              businessName: mentee.business_name,
-                              batch: mentee.cohort,
-                              region: mentee.state,
-                              program: mentee.program
-                            });
-                            setShowAssignModal(true);
-                          }}
-                          className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                        >
-                          Assign
-                        </button>
+                        {!isReadOnlyUser && (
+                          <button
+                            onClick={() => {
+                              setSelectedMentee({
+                                id: mentee.id,
+                                name: mentee.name,
+                                email: mentee.email,
+                                businessName: mentee.business_name,
+                                batch: mentee.cohort,
+                                region: mentee.state,
+                                program: mentee.program
+                              });
+                              setShowAssignModal(true);
+                            }}
+                            className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                          >
+                            Assign
+                          </button>
+                        )}
                         <button
                           onClick={() => {
                             alert(`Mentee Details:\n\nName: ${mentee.name}\nBusiness: ${mentee.business_name || 'N/A'}\nProgram: ${mentee.program}\nCohort: ${mentee.cohort}\nRegion: ${mentee.state}\nEmail: ${mentee.email}\nPhone: ${mentee.phone || 'N/A'}`);
@@ -917,7 +941,7 @@ export default function CoordinatorDashboard() {
 }
 
 // Mentee Card Component
-function MenteeCard({ mentee, selected, onSelect, onAssign, onViewDetails }) {
+function MenteeCard({ mentee, selected, onSelect, onAssign, onViewDetails, isReadOnly }) {
   const statusColors = {
     'Active': 'bg-green-100 text-green-800',
     'MIA': 'bg-red-100 text-red-800',
@@ -953,16 +977,18 @@ function MenteeCard({ mentee, selected, onSelect, onAssign, onViewDetails }) {
 
   return (
     <div className={`bg-white rounded-lg shadow p-4 hover:shadow-lg transition-shadow relative ${selected ? 'ring-2 ring-blue-500' : ''}`}>
-      {/* Checkbox in top-right corner */}
-      <div className="absolute top-3 right-3">
-        <input
-          type="checkbox"
-          checked={selected}
-          onChange={onSelect}
-          className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
-          onClick={(e) => e.stopPropagation()}
-        />
-      </div>
+      {/* Checkbox in top-right corner - only show if not read-only */}
+      {!isReadOnly && (
+        <div className="absolute top-3 right-3">
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={onSelect}
+            className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
 
       <div className="mb-3 pr-6">
         <h4 className="font-semibold text-gray-900">{mentee.name}</h4>
@@ -1003,18 +1029,20 @@ function MenteeCard({ mentee, selected, onSelect, onAssign, onViewDetails }) {
       </div>
 
       <div className="flex gap-2">
-        <button 
+        <button
           onClick={handleViewDetails}
           className="flex-1 text-xs bg-blue-600 hover:bg-blue-700 text-white font-medium py-1 px-2 rounded"
         >
           View Details
         </button>
-        <button 
-          onClick={onAssign}
-          className="flex-1 text-xs bg-green-600 hover:bg-green-700 text-white font-medium py-1 px-2 rounded"
-        >
-          {mentee.mentorId ? 'Reassign' : 'Assign'}
-        </button>
+        {!isReadOnly && (
+          <button
+            onClick={onAssign}
+            className="flex-1 text-xs bg-green-600 hover:bg-green-700 text-white font-medium py-1 px-2 rounded"
+          >
+            {mentee.mentorId ? 'Reassign' : 'Assign'}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -1097,4 +1125,44 @@ function AssignMentorModal({ mentee, mentors, selectedMentor, setSelectedMentor,
       </div>
     </div>
   );
+}
+
+// Server-side authentication and authorization check
+export async function getServerSideProps(context) {
+  const session = await getSession(context);
+
+  // Check if user is authenticated
+  if (!session) {
+    return {
+      redirect: {
+        destination: '/api/auth/signin',
+        permanent: false,
+      },
+    };
+  }
+
+  const userEmail = session.user.email;
+
+  // Check if user has access to coordinator page
+  const hasAccess = await canAccessCoordinator(userEmail);
+
+  if (!hasAccess) {
+    // Return props that will render AccessDenied component
+    return {
+      props: {
+        accessDenied: true,
+        userEmail,
+      },
+    };
+  }
+
+  // Check if user is in read-only mode
+  const isReadOnlyUser = await isReadOnly(userEmail);
+
+  return {
+    props: {
+      userEmail,
+      isReadOnlyUser,
+    },
+  };
 }
