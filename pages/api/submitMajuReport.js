@@ -1,6 +1,7 @@
 // pages/api/submitMajuReport.js
 import { google } from 'googleapis';
 import cache from '../../lib/simple-cache';
+import { supabase } from '../../lib/supabaseClient';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -83,6 +84,129 @@ export default async function handler(req, res) {
 
     // Document will be generated automatically by Apps Script time-driven trigger
     console.log(`✅ Data saved to row ${newRowNumber}. Document will be generated automatically.`);
+
+    // ============================================================
+    // DUAL-WRITE TO SUPABASE (NON-BLOCKING)
+    // ============================================================
+    let supabaseSuccess = false;
+    let supabaseError = null;
+    let supabaseRecordId = null;
+
+    try {
+      console.log('📊 Starting Supabase dual-write for MAJU report...');
+
+      // Prepare Supabase payload
+      const supabasePayload = {
+        // Metadata
+        created_at: new Date().toISOString(),
+        google_sheets_row: newRowNumber,
+
+        // Mentor & Mentee Info
+        mentor_name: reportData.NAMA_MENTOR || null,
+        mentor_email: reportData.EMAIL_MENTOR || null,
+        mentee_name: reportData.NAMA_MENTEE || null,
+        business_name: reportData.NAMA_BISNES || null,
+        business_location: reportData.LOKASI_BISNES || null,
+        product_service: reportData.PRODUK_SERVIS || null,
+        phone_number: reportData.NO_TELEFON || null,
+
+        // Session Info
+        session_date: reportData.TARIKH_SESI || null,
+        session_number: reportData.SESI_NUMBER || null,
+        session_mode: reportData.MOD_SESI || null,
+        session_location_f2f: reportData.LOKASI_F2F || null,
+        session_start_time: reportData.MASA_MULA || null,
+        session_end_time: reportData.MASA_TAMAT || null,
+
+        // Business Information
+        entrepreneur_background: reportData.LATARBELAKANG_USAHAWAN || null,
+        business_overall_status: reportData.STATUS_PERNIAGAAN_KESELURUHAN || null,
+        summary_and_next_steps: reportData.RUMUSAN_DAN_LANGKAH_KEHADAPAN || null,
+
+        // Financial Data (JSON)
+        monthly_financial_data: reportData.DATA_KEWANGAN_BULANAN_JSON || [],
+
+        // Mentoring Findings (JSON)
+        mentoring_findings: reportData.MENTORING_FINDINGS_JSON || [],
+
+        // Reflection
+        reflection_feelings: reportData.REFLEKSI_MENTOR_PERASAAN || null,
+        reflection_commitment: reportData.REFLEKSI_MENTOR_KOMITMEN || null,
+        reflection_other: reportData.REFLEKSI_MENTOR_LAIN || null,
+
+        // Images (JSON arrays/strings)
+        image_urls_premises: reportData.URL_GAMBAR_PREMIS_JSON || [],
+        image_urls_session: reportData.URL_GAMBAR_SESI_JSON || [],
+        image_url_growthwheel: reportData.URL_GAMBAR_GW360 || null,
+
+        // Folder & Document IDs
+        folder_id: reportData.Folder_ID || null,
+
+        // MIA Status
+        mia_status: reportData.MIA_STATUS === 'MIA',
+        mia_reason: reportData.MIA_REASON || null,
+        mia_proof_url: reportData.MIA_PROOF_URL || null,
+
+        // Program type
+        program_type: 'maju'
+      };
+
+      const { data: insertedData, error: supabaseInsertError } = await supabase
+        .from('maju_reports')
+        .insert(supabasePayload)
+        .select();
+
+      if (supabaseInsertError) throw supabaseInsertError;
+
+      supabaseSuccess = true;
+      supabaseRecordId = insertedData?.[0]?.id || null;
+      console.log(`✅ Supabase dual-write successful. Record ID: ${supabaseRecordId}`);
+
+      // Log success to dual_write_monitoring
+      await supabase.from('dual_write_monitoring').insert({
+        source_system: 'google_sheets',
+        target_system: 'supabase',
+        operation_type: 'insert',
+        table_name: 'maju_reports',
+        record_id: supabaseRecordId,
+        google_sheets_row: newRowNumber,
+        status: 'success',
+        timestamp: new Date().toISOString(),
+        metadata: {
+          mentor_email: reportData.EMAIL_MENTOR,
+          mentee_name: reportData.NAMA_MENTEE,
+          session_number: reportData.SESI_NUMBER
+        }
+      });
+
+    } catch (error) {
+      supabaseError = error.message;
+      console.error('⚠️ Supabase dual-write failed (non-blocking):', error);
+
+      // Log failure to dual_write_monitoring (best effort)
+      try {
+        await supabase.from('dual_write_monitoring').insert({
+          source_system: 'google_sheets',
+          target_system: 'supabase',
+          operation_type: 'insert',
+          table_name: 'maju_reports',
+          google_sheets_row: newRowNumber,
+          status: 'failed',
+          error_message: error.message,
+          timestamp: new Date().toISOString(),
+          metadata: {
+            mentor_email: reportData.EMAIL_MENTOR,
+            mentee_name: reportData.NAMA_MENTEE,
+            session_number: reportData.SESI_NUMBER
+          }
+        });
+      } catch (monitoringError) {
+        console.error('⚠️ Failed to log to dual_write_monitoring:', monitoringError);
+      }
+    }
+    // ============================================================
+    // END DUAL-WRITE TO SUPABASE
+    // ============================================================
 
     // Invalidate cache on successful submission
     const mentorEmail = reportData?.mentorEmail;

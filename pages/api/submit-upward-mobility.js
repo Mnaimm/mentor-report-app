@@ -1,5 +1,6 @@
 // pages/api/submit-upward-mobility.js
 import { google } from 'googleapis';
+import { supabase } from '../../lib/supabaseClient';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -74,7 +75,7 @@ const auth = new google.auth.GoogleAuth({
     const sheetName = process.env.RESPONSES_SHEET_NAME || 'UM';
     const range = `${sheetName}!A2:AR`; // Start from row 2, append at bottom
 
-    await sheets.spreadsheets.values.append({
+    const appendResult = await sheets.spreadsheets.values.append({
       spreadsheetId: process.env.UPWARD_MOBILITY_SPREADSHEET_ID,
       range: range,
       valueInputOption: 'USER_ENTERED',
@@ -83,6 +84,153 @@ const auth = new google.auth.GoogleAuth({
         values: [newRow],
       },
     });
+
+    // Extract row number from the updated range
+    const updatedRange = appendResult.data?.updates?.updatedRange || '';
+    const newRowNumber = updatedRange.match(/!A(\d+):/)?.[1] || null;
+    console.log(`✅ Data saved to Google Sheets row ${newRowNumber}`);
+
+    // ============================================================
+    // DUAL-WRITE TO SUPABASE (NON-BLOCKING)
+    // ============================================================
+    let supabaseSuccess = false;
+    let supabaseError = null;
+    let supabaseRecordId = null;
+
+    try {
+      console.log('📊 Starting Supabase dual-write for Upward Mobility report...');
+
+      // Prepare Supabase payload
+      const supabasePayload = {
+        // Metadata
+        created_at: new Date().toISOString(),
+        google_sheets_row: newRowNumber,
+
+        // Basic Info
+        email: formData.email || null,
+        program: formData.program || null,
+        batch: formData.batch || null,
+        session_mentoring: formData.sesiMentoring || null,
+
+        // Mentor & Entrepreneur Info
+        mentor_name: formData.namaMentor || null,
+        entrepreneur_name: formData.namaUsahawan || null,
+        business_name: formData.namaPerniagaan || null,
+        business_type: formData.jenisPerniagaan || null,
+        business_address: formData.alamatPerniagaan || null,
+        phone_number: formData.nomborTelefon || null,
+
+        // Status & Mobility
+        engagement_status: formData.statusPenglibatan || null,
+        upward_mobility_status: formData.upwardMobilityStatus || null,
+        improvement_criteria: formData.kriteriaImprovement || null,
+        premises_visit_date: formData.tarikhLawatan || null,
+
+        // Banking & Fintech Usage
+        uses_bimb_current_account: formData.penggunaanAkaunSemasa || null,
+        uses_bimb_biz: formData.penggunaanBimbBiz || null,
+        opened_al_awfar_account: formData.bukaAkaunAlAwfar || null,
+        uses_bimb_merchant: formData.penggunaanBimbMerchant || null,
+        uses_other_bimb_facilities: formData.lainLainFasiliti || null,
+        subscribes_mesinkira: formData.langganMesinKira || null,
+
+        // Financial Situation - Revenue
+        revenue_before: parseFloat(formData.pendapatanSebelum) || null,
+        revenue_after: parseFloat(formData.pendapatanSelepas) || null,
+        revenue_mentor_comments: formData.ulasanPendapatan || null,
+
+        // Financial Situation - Employment
+        employment_before: parseInt(formData.pekerjaanSebelum) || null,
+        employment_after: parseInt(formData.pekerjaanSelepas) || null,
+        employment_mentor_comments: formData.ulasanPekerjaan || null,
+
+        // Financial Situation - Assets
+        non_cash_assets_before: parseFloat(formData.asetBukanTunaiSebelum) || null,
+        non_cash_assets_after: parseFloat(formData.asetBukanTunaiSelepas) || null,
+        cash_assets_before: parseFloat(formData.asetTunaiSebelum) || null,
+        cash_assets_after: parseFloat(formData.asetTunaiSelepas) || null,
+        assets_mentor_comments: formData.ulasanAset || null,
+
+        // Financial Situation - Savings
+        savings_before: parseFloat(formData.simpananSebelum) || null,
+        savings_after: parseFloat(formData.simpananSelepas) || null,
+        savings_mentor_comments: formData.ulasanSimpanan || null,
+
+        // Financial Situation - Zakat
+        zakat_before: parseFloat(formData.zakatSebelum) || null,
+        zakat_after: parseFloat(formData.zakatSelepas) || null,
+        zakat_mentor_comments: formData.ulasanZakat || null,
+
+        // Digitalization
+        digital_usage_before: formData.digitalSebelum || [],
+        digital_usage_after: formData.digitalSelepas || [],
+        digital_mentor_comments: formData.ulasanDigital || null,
+
+        // Online Sales & Marketing
+        online_sales_before: formData.onlineSalesSebelum || [],
+        online_sales_after: formData.onlineSalesSelepas || [],
+        online_sales_mentor_comments: formData.ulasanOnlineSales || null,
+
+        // Program type
+        program_type: 'tubf_upward_mobility'
+      };
+
+      const { data: insertedData, error: supabaseInsertError } = await supabase
+        .from('upward_mobility_reports')
+        .insert(supabasePayload)
+        .select();
+
+      if (supabaseInsertError) throw supabaseInsertError;
+
+      supabaseSuccess = true;
+      supabaseRecordId = insertedData?.[0]?.id || null;
+      console.log(`✅ Supabase dual-write successful. Record ID: ${supabaseRecordId}`);
+
+      // Log success to dual_write_monitoring
+      await supabase.from('dual_write_monitoring').insert({
+        source_system: 'google_sheets',
+        target_system: 'supabase',
+        operation_type: 'insert',
+        table_name: 'upward_mobility_reports',
+        record_id: supabaseRecordId,
+        google_sheets_row: newRowNumber,
+        status: 'success',
+        timestamp: new Date().toISOString(),
+        metadata: {
+          mentor_name: formData.namaMentor,
+          entrepreneur_name: formData.namaUsahawan,
+          session: formData.sesiMentoring
+        }
+      });
+
+    } catch (error) {
+      supabaseError = error.message;
+      console.error('⚠️ Supabase dual-write failed (non-blocking):', error);
+
+      // Log failure to dual_write_monitoring (best effort)
+      try {
+        await supabase.from('dual_write_monitoring').insert({
+          source_system: 'google_sheets',
+          target_system: 'supabase',
+          operation_type: 'insert',
+          table_name: 'upward_mobility_reports',
+          google_sheets_row: newRowNumber,
+          status: 'failed',
+          error_message: error.message,
+          timestamp: new Date().toISOString(),
+          metadata: {
+            mentor_name: formData.namaMentor,
+            entrepreneur_name: formData.namaUsahawan,
+            session: formData.sesiMentoring
+          }
+        });
+      } catch (monitoringError) {
+        console.error('⚠️ Failed to log to dual_write_monitoring:', monitoringError);
+      }
+    }
+    // ============================================================
+    // END DUAL-WRITE TO SUPABASE
+    // ============================================================
 
     res.status(200).json({ message: 'Form submitted successfully' });
   } catch (error) {

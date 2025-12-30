@@ -1,6 +1,7 @@
 // pages/api/submitReport.js
 import { google } from 'googleapis';
 import cache from '../../lib/simple-cache';
+import { supabase } from '../../lib/supabaseClient';
 
 /** Extract the row number from "SheetName!A37:T37" */
 function getRowNumberFromUpdatedRange(updatedRange) {
@@ -164,6 +165,143 @@ export default async function handler(req, res) {
 
     // Document will be generated automatically by Apps Script time-driven trigger
     console.log(`✅ Data saved to row ${newRowNumber}. Document will be generated automatically.`);
+
+    // ============================================================
+    // DUAL-WRITE TO SUPABASE (NON-BLOCKING)
+    // ============================================================
+    let supabaseSuccess = false;
+    let supabaseError = null;
+    let supabaseRecordId = null;
+
+    try {
+      console.log('📊 Starting Supabase dual-write for Bangkit session report...');
+
+      // Prepare Supabase payload
+      const supabasePayload = {
+        // Metadata
+        created_at: new Date().toISOString(),
+        google_sheets_row: newRowNumber,
+
+        // Mentor & Mentee Info
+        mentor_email: reportData?.mentorEmail || null,
+        mentor_name: reportData?.namaMentor || null,
+        mentee_name: reportData?.usahawan || null,
+        company_name: reportData?.namaSyarikat || null,
+
+        // Session Info
+        session_number: reportData?.sesiLaporan || null,
+        session_date: reportData?.sesi?.date || null,
+        session_time: reportData?.sesi?.time || null,
+        session_platform: reportData?.sesi?.platform || null,
+        session_location: reportData?.sesi?.lokasiF2F || null,
+        session_status: reportData?.status || 'Selesai',
+
+        // Business Info
+        product_service: reportData?.tambahan?.produkServis || null,
+        social_media_links: reportData?.tambahan?.pautanMediaSosial || null,
+        business_type: reportData?.tambahan?.jenisBisnes || null,
+
+        // Initiatives (JSON array)
+        initiatives: reportData?.inisiatif || [],
+        initiative_updates: reportData?.kemaskiniInisiatif || [],
+
+        // Technology adoption
+        technology_systems: reportData?.teknologi || [],
+
+        // Sales data (JSON array for 12 months)
+        monthly_sales_current: reportData?.jualanTerkini || [],
+        annual_sales_previous_year: reportData?.jualanTahunSebelum?.setahun || null,
+        monthly_sales_min_previous: reportData?.jualanTahunSebelum?.bulananMin || null,
+        monthly_sales_max_previous: reportData?.jualanTahunSebelum?.bulananMaks || null,
+
+        // Observations & Summary
+        observation_notes: reportData?.pemerhatian || null,
+        session_summary: reportData?.rumusan || null,
+        session_summary_2plus: reportData?.rumusanSesi2Plus || null,
+
+        // Reflection
+        reflection_feelings: reportData?.refleksi?.perasaan || null,
+        reflection_score: reportData?.refleksi?.skor || null,
+        reflection_score_reason: reportData?.refleksi?.alasan || null,
+        reflection_eliminate: reportData?.refleksi?.eliminate || null,
+        reflection_raise: reportData?.refleksi?.raise || null,
+        reflection_reduce: reportData?.refleksi?.reduce || null,
+        reflection_create: reportData?.refleksi?.create || null,
+
+        // Images (JSON arrays/strings)
+        image_urls_session: reportData?.imageUrls?.sesi || [],
+        image_url_growthwheel: reportData?.imageUrls?.growthwheel || null,
+        image_url_profile: reportData?.imageUrls?.profil || null,
+        image_urls_premises: reportData?.imageUrls?.premis || [],
+        image_url_mia_proof: reportData?.imageUrls?.mia || null,
+
+        // Premises visit
+        premises_visited: reportData?.premisDilawatChecked || false,
+
+        // MIA status
+        mia_status: reportData?.status === 'MIA',
+        mia_reason: reportData?.mia?.alasan || null,
+
+        // Program type
+        program_type: programType || 'bangkit'
+      };
+
+      const { data: insertedData, error: supabaseInsertError } = await supabase
+        .from('session_reports')
+        .insert(supabasePayload)
+        .select();
+
+      if (supabaseInsertError) throw supabaseInsertError;
+
+      supabaseSuccess = true;
+      supabaseRecordId = insertedData?.[0]?.id || null;
+      console.log(`✅ Supabase dual-write successful. Record ID: ${supabaseRecordId}`);
+
+      // Log success to dual_write_monitoring
+      await supabase.from('dual_write_monitoring').insert({
+        source_system: 'google_sheets',
+        target_system: 'supabase',
+        operation_type: 'insert',
+        table_name: 'session_reports',
+        record_id: supabaseRecordId,
+        google_sheets_row: newRowNumber,
+        status: 'success',
+        timestamp: new Date().toISOString(),
+        metadata: {
+          mentor_email: reportData?.mentorEmail,
+          mentee_name: reportData?.usahawan,
+          session_number: reportData?.sesiLaporan
+        }
+      });
+
+    } catch (error) {
+      supabaseError = error.message;
+      console.error('⚠️ Supabase dual-write failed (non-blocking):', error);
+
+      // Log failure to dual_write_monitoring (best effort)
+      try {
+        await supabase.from('dual_write_monitoring').insert({
+          source_system: 'google_sheets',
+          target_system: 'supabase',
+          operation_type: 'insert',
+          table_name: 'session_reports',
+          google_sheets_row: newRowNumber,
+          status: 'failed',
+          error_message: error.message,
+          timestamp: new Date().toISOString(),
+          metadata: {
+            mentor_email: reportData?.mentorEmail,
+            mentee_name: reportData?.usahawan,
+            session_number: reportData?.sesiLaporan
+          }
+        });
+      } catch (monitoringError) {
+        console.error('⚠️ Failed to log to dual_write_monitoring:', monitoringError);
+      }
+    }
+    // ============================================================
+    // END DUAL-WRITE TO SUPABASE
+    // ============================================================
 
     // Invalidate relevant cache entries on successful submission
     const mentorEmail = reportData?.mentorEmail;
