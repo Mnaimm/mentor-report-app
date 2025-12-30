@@ -325,6 +325,7 @@ export default function MonitoringDashboard({ userEmail, isReadOnlyUser, accessD
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   // If access is denied, show AccessDenied component
   if (accessDenied) {
@@ -361,6 +362,7 @@ export default function MonitoringDashboard({ userEmail, isReadOnlyUser, accessD
       setError(err.message);
     } finally {
       setLoading(false);
+      setLastUpdated(new Date().toISOString());
     }
   };
 
@@ -590,7 +592,7 @@ export default function MonitoringDashboard({ userEmail, isReadOnlyUser, accessD
 
         {/* Footer */}
         <div className="mt-8 text-center text-sm text-gray-500">
-          Last updated: {new Date().toLocaleString()} •
+          Last updated: {lastUpdated ? new Date(lastUpdated).toISOString().replace('T', ' ').slice(0, 19) : 'Loading...'} •
           {autoRefresh && ' Auto-refreshing every 30 seconds'}
         </div>
       </div>
