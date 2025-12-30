@@ -110,22 +110,78 @@ export default async function handler(req, res) {
       });
     }
 
-    // Get mentor's batch info
+    // Get mentor's batch info and determine current round based on date
     const mentorBatch = mentorMappings[0]['Batch'];
-    const batchInfo = batchSheet.find(b => b['Batch'] === mentorBatch);
-    
+
+    // Helper function to check if current date falls within period range
+    const isCurrentPeriod = (periodStr) => {
+      if (!periodStr) return false;
+
+      const now = new Date();
+      const currentMonth = now.getMonth(); // 0-11 (Jan=0, Dec=11)
+      const currentYear = now.getFullYear();
+
+      // Parse period string like "Sept-Nov" or "Dec-Feb"
+      const months = {
+        'jan': 0, 'feb': 1, 'mar': 2, 'apr': 3, 'mei': 4, 'may': 4,
+        'jun': 5, 'jul': 6, 'ogos': 7, 'aug': 7, 'sep': 8, 'sept': 8,
+        'okt': 9, 'oct': 9, 'nov': 10, 'dis': 11, 'dec': 11
+      };
+
+      const parts = periodStr.toLowerCase().split('-');
+      if (parts.length !== 2) return false;
+
+      const startMonth = months[parts[0].trim()];
+      const endMonth = months[parts[1].trim()];
+
+      if (startMonth === undefined || endMonth === undefined) return false;
+
+      // Handle period that spans year boundary (e.g., Dec-Feb)
+      if (startMonth <= endMonth) {
+        return currentMonth >= startMonth && currentMonth <= endMonth;
+      } else {
+        return currentMonth >= startMonth || currentMonth <= endMonth;
+      }
+    };
+
+    // Find all batch info for this mentor's batch
+    const allBatchInfo = batchSheet.filter(b => b['Batch'] === mentorBatch);
+
+    // Find the current round based on period
     let currentRound = null;
+    let batchInfo = null;
+
+    for (const info of allBatchInfo) {
+      const period = info['Period'] || '';
+      if (isCurrentPeriod(period)) {
+        batchInfo = info;
+        break;
+      }
+    }
+
+    // If no match found by period, use the first one as fallback
+    if (!batchInfo && allBatchInfo.length > 0) {
+      console.warn(`⚠️ [${debugInfo.requestId}] No current period match found, using first batch info as fallback`);
+      batchInfo = allBatchInfo[0];
+    }
+
     if (batchInfo) {
       const roundLabel = batchInfo['Mentoring Round'] || 'Round 1';
       const period = batchInfo['Period'] || '';
       const roundMatch = roundLabel.match(/\d+$/);
       const roundNumber = roundMatch ? roundMatch[0] : '1';
-      
+
       currentRound = {
         round: parseInt(roundNumber),
         label: period ? `Round ${roundNumber} (${period})` : `Round ${roundNumber}`,
         batchName: mentorBatch
       };
+
+      console.log(`📅 [${debugInfo.requestId}] Current round detected:`, {
+        roundNumber: currentRound.round,
+        period,
+        label: currentRound.label
+      });
     }
 
     // 3) Get mentor's mentees and organize by batch
@@ -189,7 +245,8 @@ export default async function handler(req, res) {
         reportLabel: session['Sesi Laporan'] || '',
         status: session['Status Sesi'] || '',
         programType: 'bangkit',
-        premisDilawat: session['Premis Dilawat'] || false, // Track premises visit
+        // Track premises visit - handle various truthy values
+        premisDilawat: ['TRUE', 'true', 'True', 'YES', 'yes', 'Yes', '1', 1, true].includes(session['Premis Dilawat']),
         // Sales data columns
         Jan: session.Jan, Feb: session.Feb, Mar: session.Mar,
         Apr: session.Apr, Mei: session.Mei, Jun: session.Jun,
@@ -231,7 +288,8 @@ export default async function handler(req, res) {
         programType: 'maju',
         sesiNumber,
         miaStatus,
-        premisDilawat: session['LAWATAN_PREMIS'] || false // Track premises visit for Maju
+        // Track premises visit for Maju - handle various truthy values
+        premisDilawat: ['TRUE', 'true', 'True', 'YES', 'yes', 'Yes', '1', 1, true].includes(session['LAWATAN_PREMIS'])
       };
 
       if (!sessionsByMentee.has(menteeName)) {
@@ -266,15 +324,18 @@ export default async function handler(req, res) {
     const currentRoundSessionsByMentee = {};
     const sessionsByBatch = {};
     const miaByBatch = {};
+    const miaMenteesList = []; // Detailed MIA list with batch info for dedicated section
     const menteesWithPremisVisit = new Set(); // Track mentees with premises visit
+
+    const menteeToMiaCount = new Map(); // Track total MIA count per mentee
 
     for (const [menteeName, sessions] of sessionsByMentee) {
       const batch = menteeToBatch[menteeName] || 'Unknown';
-      
+
       // Initialize batch tracking
       if (!sessionsByBatch[batch]) sessionsByBatch[batch] = {};
       if (!miaByBatch[batch]) miaByBatch[batch] = {};
-      
+
       sessionsByBatch[batch][menteeName] = new Set();
       miaByBatch[batch][menteeName] = 0;
 
@@ -283,8 +344,8 @@ export default async function handler(req, res) {
 
         allTimeTotalReports++;
 
-        // Track if mentee has had premises visit
-        if (premisDilawat === true || premisDilawat === 'TRUE' || premisDilawat === 'true') {
+        // Track if mentee has had premises visit (premisDilawat is already boolean from earlier parsing)
+        if (premisDilawat === true) {
           menteesWithPremisVisit.add(menteeName);
         }
 
@@ -320,7 +381,11 @@ export default async function handler(req, res) {
         if (status.toLowerCase() === 'mia') {
           allTimeMiaCount++;
           miaByBatch[batch][menteeName]++;
-          
+
+          // Track total MIA count per mentee
+          const currentCount = menteeToMiaCount.get(menteeName) || 0;
+          menteeToMiaCount.set(menteeName, currentCount + 1);
+
           if (isCurrentRound) {
             currentRoundMiaCount++;
           }
@@ -330,7 +395,7 @@ export default async function handler(req, res) {
           if (!allTimeSessionsByMentee[menteeName]) allTimeSessionsByMentee[menteeName] = new Set();
           allTimeSessionsByMentee[menteeName].add(reportLabel);
           sessionsByBatch[batch][menteeName].add(reportLabel);
-          
+
           // Current round tracking
           if (isCurrentRound) {
             currentRoundReportedMentees.add(menteeName);
@@ -340,6 +405,25 @@ export default async function handler(req, res) {
         }
       }
     }
+
+    // Build detailed MIA list grouped by batch
+    for (const [menteeName, miaCount] of menteeToMiaCount.entries()) {
+      if (miaCount > 0) {
+        const batch = menteeToBatch[menteeName] || 'Unknown';
+        miaMenteesList.push({
+          name: menteeName,
+          batch,
+          miaCount,
+          totalSessions: allTimeSessionsByMentee[menteeName]?.size || 0
+        });
+      }
+    }
+
+    // Sort MIA list by batch, then by name
+    miaMenteesList.sort((a, b) => {
+      if (a.batch !== b.batch) return a.batch.localeCompare(b.batch);
+      return a.name.localeCompare(b.name);
+    });
 
     // Convert sets to counts
     const allTimePerMenteeSessions = Object.fromEntries(
@@ -395,6 +479,9 @@ export default async function handler(req, res) {
       menteesByBatch,
       sessionsByBatch: sessionsByBatchCount,
       miaByBatch,
+
+      // Detailed MIA list for dedicated section
+      miaMentees: miaMenteesList,
 
       source: {
         batchInfo: batchInfo || null,

@@ -33,7 +33,7 @@ const StatCard = ({ label, value, sublabel = null, color = "blue" }) => {
   );
 };
 
-const BatchCard = ({ batch, mentees, sessionData, miaData }) => (
+const BatchCard = ({ batch, mentees, sessionData }) => (
   <div className="bg-white rounded-xl shadow-md p-6 mb-6">
     <h4 className="text-lg font-bold text-blue-600 mb-4">{batch}</h4>
     <div className="overflow-x-auto">
@@ -42,7 +42,6 @@ const BatchCard = ({ batch, mentees, sessionData, miaData }) => (
           <tr>
             <th className="py-2 border-b">Usahawan</th>
             <th className="py-2 border-b">Bil. Sesi Dihantar</th>
-            <th className="py-2 border-b">MIA</th>
           </tr>
         </thead>
         <tbody>
@@ -50,7 +49,6 @@ const BatchCard = ({ batch, mentees, sessionData, miaData }) => (
             <tr key={mentee}>
               <td className="py-2 border-b">{mentee}</td>
               <td className="py-2 border-b">{sessionData?.[mentee] || 0}</td>
-              <td className="py-2 border-b">{miaData?.[mentee] || 0}</td>
             </tr>
           ))}
         </tbody>
@@ -58,6 +56,63 @@ const BatchCard = ({ batch, mentees, sessionData, miaData }) => (
     </div>
   </div>
 );
+
+const MiaSection = ({ miaMentees }) => {
+  if (!miaMentees || miaMentees.length === 0) {
+    return null;
+  }
+
+  // Group by batch
+  const miaByBatch = {};
+  miaMentees.forEach(mentee => {
+    if (!miaByBatch[mentee.batch]) {
+      miaByBatch[mentee.batch] = [];
+    }
+    miaByBatch[mentee.batch].push(mentee);
+  });
+
+  return (
+    <div className="mt-10 mb-8">
+      <h3 className="text-2xl font-bold mb-4 text-red-600">
+        Usahawan MIA (Missing In Action)
+      </h3>
+      <div className="mb-4 text-sm text-gray-600">
+        Jumlah MIA: <span className="font-bold text-red-600">{miaMentees.length}</span> usahawan
+      </div>
+      <div className="space-y-6">
+        {Object.entries(miaByBatch)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([batch, mentees]) => (
+            <div key={batch} className="bg-white rounded-xl shadow-md p-6">
+              <h4 className="text-lg font-bold text-gray-700 mb-4">
+                {batch} <span className="text-red-600">({mentees.length} MIA)</span>
+              </h4>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr>
+                      <th className="py-2 border-b">Usahawan</th>
+                      <th className="py-2 border-b">Bil. MIA</th>
+                      <th className="py-2 border-b">Bil. Sesi Dihantar</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {mentees.map((mentee) => (
+                      <tr key={mentee.name}>
+                        <td className="py-2 border-b">{mentee.name}</td>
+                        <td className="py-2 border-b text-red-600 font-semibold">{mentee.miaCount}</td>
+                        <td className="py-2 border-b">{mentee.totalSessions}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
+      </div>
+    </div>
+  );
+};
 
 export default function HomePage() {
   const { data: session, status } = useSession();
@@ -303,6 +358,9 @@ export default function HomePage() {
               />
             </div>
 
+            {/* MIA Section - Dedicated section for MIA mentees */}
+            {stats?.miaMentees && <MiaSection miaMentees={stats.miaMentees} />}
+
             {/* Per-batch tables */}
             {stats && stats.menteesByBatch && Object.keys(stats.menteesByBatch).length > 0 && (
               <div className="mt-10">
@@ -320,7 +378,6 @@ export default function HomePage() {
                       batch={batch}
                       mentees={mentees}
                       sessionData={stats.sessionsByBatch?.[batch]}
-                      miaData={stats.miaByBatch?.[batch]}
                     />
                   ))}
               </div>
