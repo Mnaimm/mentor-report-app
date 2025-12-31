@@ -110,9 +110,6 @@ export default async function handler(req, res) {
       });
     }
 
-    // Get mentor's batch info and determine current round based on date
-    const mentorBatch = mentorMappings[0]['Batch'];
-
     // Helper function to check if current date falls within period range
     const isCurrentPeriod = (periodStr) => {
       if (!periodStr) return false;
@@ -121,14 +118,16 @@ export default async function handler(req, res) {
       const currentMonth = now.getMonth(); // 0-11 (Jan=0, Dec=11)
       const currentYear = now.getFullYear();
 
-      // Parse period string like "Sept-Nov" or "Dec-Feb"
+      // Parse period string like "Sept-Nov", "Dec-Feb", "Dis-Feb"
       const months = {
         'jan': 0, 'feb': 1, 'mar': 2, 'apr': 3, 'mei': 4, 'may': 4,
         'jun': 5, 'jul': 6, 'ogos': 7, 'aug': 7, 'sep': 8, 'sept': 8,
         'okt': 9, 'oct': 9, 'nov': 10, 'dis': 11, 'dec': 11
       };
 
-      const parts = periodStr.toLowerCase().split('-');
+      // Clean up the period string - handle formats like "Sept – Nov" with various dashes
+      const cleanPeriod = periodStr.toLowerCase().replace(/\s*[–-]\s*/g, '-').trim();
+      const parts = cleanPeriod.split('-');
       if (parts.length !== 2) return false;
 
       const startMonth = months[parts[0].trim()];
@@ -144,45 +143,74 @@ export default async function handler(req, res) {
       }
     };
 
-    // Find all batch info for this mentor's batch
-    const allBatchInfo = batchSheet.filter(b => b['Batch'] === mentorBatch);
+    // Get all unique batches for this mentor's mentees
+    const mentorBatches = [...new Set(mentorMappings.map(m => m['Batch']).filter(Boolean))];
 
-    // Find the current round based on period
-    let currentRound = null;
-    let batchInfo = null;
+    console.log(`📦 [${debugInfo.requestId}] Mentor's batches:`, mentorBatches);
 
-    for (const info of allBatchInfo) {
-      const period = info['Period'] || '';
-      if (isCurrentPeriod(period)) {
-        batchInfo = info;
-        break;
+    // Find ALL batch info entries that are currently active (matching current period)
+    // This handles mentors with multiple batches in different rounds but same period
+    const activeBatchInfos = [];
+    let currentPeriodName = null;
+
+    for (const batch of mentorBatches) {
+      const batchInfos = batchSheet.filter(b => b['Batch'] === batch);
+
+      for (const info of batchInfos) {
+        const period = info['Period'] || '';
+        if (isCurrentPeriod(period)) {
+          activeBatchInfos.push({
+            batch,
+            period,
+            roundLabel: info['Mentoring Round'] || 'Round 1',
+            info
+          });
+
+          // Store the period name (they should all be the same period, e.g., "Dec-Feb")
+          if (!currentPeriodName) {
+            currentPeriodName = period;
+          }
+        }
       }
     }
 
-    // If no match found by period, use the first one as fallback
-    if (!batchInfo && allBatchInfo.length > 0) {
+    // If no active batches found, use first available as fallback
+    if (activeBatchInfos.length === 0) {
       console.warn(`⚠️ [${debugInfo.requestId}] No current period match found, using first batch info as fallback`);
-      batchInfo = allBatchInfo[0];
+      for (const batch of mentorBatches) {
+        const batchInfos = batchSheet.filter(b => b['Batch'] === batch);
+        if (batchInfos.length > 0) {
+          const info = batchInfos[0];
+          activeBatchInfos.push({
+            batch,
+            period: info['Period'] || '',
+            roundLabel: info['Mentoring Round'] || 'Round 1',
+            info
+          });
+          currentPeriodName = info['Period'] || '';
+          break;
+        }
+      }
     }
 
-    if (batchInfo) {
-      const roundLabel = batchInfo['Mentoring Round'] || 'Round 1';
-      const period = batchInfo['Period'] || '';
-      const roundMatch = roundLabel.match(/\d+$/);
-      const roundNumber = roundMatch ? roundMatch[0] : '1';
+    // Create period-based tracking object
+    const currentPeriod = activeBatchInfos.length > 0 ? {
+      periodName: currentPeriodName,
+      label: currentPeriodName || 'Current Period',
+      activeBatches: activeBatchInfos.map(b => ({
+        batch: b.batch,
+        round: b.roundLabel
+      }))
+    } : null;
 
-      currentRound = {
-        round: parseInt(roundNumber),
-        label: period ? `Round ${roundNumber} (${period})` : `Round ${roundNumber}`,
-        batchName: mentorBatch
-      };
+    console.log(`📅 [${debugInfo.requestId}] Current period detected:`, {
+      periodName: currentPeriodName,
+      activeBatchCount: activeBatchInfos.length,
+      batches: activeBatchInfos.map(b => `${b.batch} (${b.roundLabel})`)
+    });
 
-      console.log(`📅 [${debugInfo.requestId}] Current round detected:`, {
-        roundNumber: currentRound.round,
-        period,
-        label: currentRound.label
-      });
-    }
+    // Create a Set of active batch names for quick lookup
+    const activeBatchNames = new Set(activeBatchInfos.map(b => b.batch));
 
     // 3) Get mentor's mentees and organize by batch
     const menteeSet = new Set();
@@ -241,12 +269,25 @@ export default async function handler(req, res) {
       const menteeName = session['Nama Usahawan'];
       if (!menteeName || !menteeSet.has(menteeName)) continue;
 
+      // Check if premises were actually visited based on uploaded images
+      const premisImages = session['Link_Gambar_Premis'] || '';
+      let hasPremisImages = false;
+
+      // Images are stored as JSON array, e.g., ["url1", "url2"]
+      try {
+        const imageArray = premisImages ? JSON.parse(premisImages) : [];
+        hasPremisImages = Array.isArray(imageArray) && imageArray.length > 0 && imageArray.some(url => url && url.trim() !== '');
+      } catch (e) {
+        // If not valid JSON, check if it's a non-empty string (old format)
+        hasPremisImages = premisImages.trim() !== '' && premisImages !== '[]';
+      }
+
       const sessionData = {
         reportLabel: session['Sesi Laporan'] || '',
         status: session['Status Sesi'] || '',
         programType: 'bangkit',
-        // Track premises visit - handle various truthy values
-        premisDilawat: ['TRUE', 'true', 'True', 'YES', 'yes', 'Yes', '1', 1, true].includes(session['Premis Dilawat']),
+        // Track premises visit based on actual uploaded images
+        premisDilawat: hasPremisImages,
         // Sales data columns
         Jan: session.Jan, Feb: session.Feb, Mar: session.Mar,
         Apr: session.Apr, Mei: session.Mei, Jun: session.Jun,
@@ -282,14 +323,27 @@ export default async function handler(req, res) {
       // Construct report label similar to Bangkit format
       const reportLabel = `Sesi #${sesiNumber} (Round ${roundNumber})`;
 
+      // Check if premises were actually visited based on uploaded images (Maju format)
+      const premisImagesMaju = session['URL_GAMBAR_PREMIS_JSON'] || '';
+      let hasPremisImagesMaju = false;
+
+      // Images are stored as JSON array, e.g., ["url1", "url2"]
+      try {
+        const imageArray = premisImagesMaju ? JSON.parse(premisImagesMaju) : [];
+        hasPremisImagesMaju = Array.isArray(imageArray) && imageArray.length > 0 && imageArray.some(url => url && url.trim() !== '');
+      } catch (e) {
+        // If not valid JSON, check if it's a non-empty string (old format)
+        hasPremisImagesMaju = premisImagesMaju.trim() !== '' && premisImagesMaju !== '[]';
+      }
+
       const sessionData = {
         reportLabel,
         status: miaStatus.toLowerCase() === 'mia' ? 'MIA' : 'Selesai',
         programType: 'maju',
         sesiNumber,
         miaStatus,
-        // Track premises visit for Maju - handle various truthy values
-        premisDilawat: ['TRUE', 'true', 'True', 'YES', 'yes', 'Yes', '1', 1, true].includes(session['LAWATAN_PREMIS'])
+        // Track premises visit based on actual uploaded images
+        premisDilawat: hasPremisImagesMaju
       };
 
       if (!sessionsByMentee.has(menteeName)) {
@@ -349,34 +403,9 @@ export default async function handler(req, res) {
           menteesWithPremisVisit.add(menteeName);
         }
 
-        // Extract round number from report label
-        // For Maju: "Sesi #1 (Round 1)" -> extract "1" from "(Round 1)"
-        // For Bangkit: "Sesi 1 Round 1" -> extract "1" from end
-        let reportRoundNumber = null;
-
-        // Try to match "Round X)" pattern first (for Maju)
-        const majuMatch = reportLabel.match(/Round (\d+)\)/);
-        if (majuMatch) {
-          reportRoundNumber = majuMatch[1];
-        } else {
-          // Fallback to original pattern for Bangkit reports
-          const bangkitMatch = reportLabel.match(/\d+$/);
-          reportRoundNumber = bangkitMatch ? bangkitMatch[0] : null;
-        }
-
-        const isCurrentRound = currentRound && reportRoundNumber === currentRound.round.toString();
-
-        // Debug logging for first few Maju reports
-        if (programType === 'maju' && allTimeTotalReports <= 5) {
-          console.log(`🔍 [${debugInfo.requestId}] Maju report debug:`, {
-            mentee: menteeName,
-            reportLabel,
-            reportRoundNumber,
-            currentRoundNumber: currentRound?.round,
-            isCurrentRound,
-            status
-          });
-        }
+        // Check if this report is from the current period
+        // A report is "current period" if the mentee's batch is in the active batches list
+        const isCurrentPeriod = activeBatchNames.has(batch);
 
         if (status.toLowerCase() === 'mia') {
           allTimeMiaCount++;
@@ -386,7 +415,7 @@ export default async function handler(req, res) {
           const currentCount = menteeToMiaCount.get(menteeName) || 0;
           menteeToMiaCount.set(menteeName, currentCount + 1);
 
-          if (isCurrentRound) {
+          if (isCurrentPeriod) {
             currentRoundMiaCount++;
           }
         } else if (status.toLowerCase() === 'selesai') {
@@ -396,8 +425,8 @@ export default async function handler(req, res) {
           allTimeSessionsByMentee[menteeName].add(reportLabel);
           sessionsByBatch[batch][menteeName].add(reportLabel);
 
-          // Current round tracking
-          if (isCurrentRound) {
+          // Current period tracking (instead of round tracking)
+          if (isCurrentPeriod) {
             currentRoundReportedMentees.add(menteeName);
             if (!currentRoundSessionsByMentee[menteeName]) currentRoundSessionsByMentee[menteeName] = new Set();
             currentRoundSessionsByMentee[menteeName].add(reportLabel);
@@ -449,14 +478,22 @@ export default async function handler(req, res) {
       if (Object.keys(miaByBatch[batch]).length === 0) delete miaByBatch[batch];
     }
 
-    // Calculate pending reports for current round
-    const currentRoundPending = totalMentees - currentRoundReportedMentees.size;
+    // Calculate pending reports for current period
+    // Only count mentees in active batches (current period)
+    const menteesInActiveBatches = Array.from(menteeSet).filter(mentee => {
+      const batch = menteeToBatch[mentee];
+      return activeBatchNames.has(batch);
+    }).length;
+
+    const currentPeriodPending = menteesInActiveBatches - currentRoundReportedMentees.size;
 
     // 6) Response
     const responseData = {
       mentorEmail: loginEmail,
-      currentRound,
+      currentPeriod, // Period-based instead of round-based
+      currentRound: currentPeriod, // Keep for backward compatibility
       totalMentees,
+      totalMenteesInCurrentPeriod: menteesInActiveBatches, // New field
 
       // All-time stats
       allTime: {
@@ -467,10 +504,10 @@ export default async function handler(req, res) {
         perMenteeSessions: allTimePerMenteeSessions,
       },
 
-      // Current round stats
+      // Current period stats (renamed from currentRoundStats but kept old name for compatibility)
       currentRoundStats: {
         reportedThisRound: currentRoundReportedMentees.size,
-        pendingThisRound: currentRoundPending,
+        pendingThisRound: currentPeriodPending,
         miaThisRound: currentRoundMiaCount,
         perMenteeSessions: currentRoundPerMenteeSessions,
       },
@@ -484,8 +521,7 @@ export default async function handler(req, res) {
       miaMentees: miaMenteesList,
 
       source: {
-        batchInfo: batchInfo || null,
-        mentorBatch,
+        activeBatchInfos, // Include all active batches
         totalMenteeRecords: mentorMappings.length,
       },
 

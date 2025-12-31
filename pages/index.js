@@ -198,9 +198,9 @@ export default function HomePage() {
           <p className="text-gray-500 mt-1">
             Sila pilih borang yang ingin anda isi atau kemaskini.
           </p>
-          {stats?.currentRound && (
+          {stats?.currentPeriod && (
             <div className="mt-2 inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-              {stats.currentRound.label}
+              {stats.currentPeriod.periodName || stats.currentPeriod.label}
             </div>
           )}
           <div className="flex justify-center items-center mt-6 border-t pt-6">
@@ -257,31 +257,32 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* Current Round Stats - Most Important */}
+            {/* Current Period Stats - Most Important */}
             {stats?.currentRoundStats && (
               <div className="mb-8">
                 <h3 className="text-lg font-semibold text-gray-700 mb-4">
-                  Kemajuan {stats.currentRound?.label || 'Semasa'}
+                  Kemajuan Semasa ({stats.currentPeriod?.periodName || stats.currentPeriod?.label || 'Current Period'})
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
                   <StatCard
-                    label="Jumlah Usahawan"
-                    value={stats.totalMentees ?? 0}
+                    label="Jumlah Usahawan (Batch Aktif)"
+                    value={stats.totalMenteesInCurrentPeriod ?? stats.totalMentees ?? 0}
+                    sublabel={stats.currentPeriod?.activeBatches ? `${stats.currentPeriod.activeBatches.length} batch aktif` : ''}
                     color="blue"
                   />
                   <StatCard
-                    label="Sudah Dilapor Pusingan Ini"
+                    label="Sudah Dilapor Tempoh Ini"
                     value={stats.currentRoundStats.reportedThisRound ?? 0}
-                    sublabel={`daripada ${stats.totalMentees}`}
+                    sublabel={`daripada ${stats.totalMenteesInCurrentPeriod ?? stats.totalMentees}`}
                     color="green"
                   />
                   <StatCard
-                    label="Belum Dilapor Pusingan Ini"
+                    label="Belum Dilapor Tempoh Ini"
                     value={stats.currentRoundStats.pendingThisRound ?? 0}
                     color="orange"
                   />
                   <StatCard
-                    label="MIA Pusingan Ini"
+                    label="MIA Tempoh Ini"
                     value={stats.currentRoundStats.miaThisRound ?? 0}
                     color="red"
                   />
