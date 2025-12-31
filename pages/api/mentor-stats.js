@@ -5,6 +5,29 @@ import { authOptions } from "./auth/[...nextauth]";
 import cache from '../../lib/simple-cache';
 import { getEffectiveUserEmail, canImpersonate } from '../../lib/impersonation';
 
+/**
+ * Normalize round/session number for comparison
+ * Handles various formats: "Mentoring 2", "Round 4", "Sesi 1", "Sesi #2", "2"
+ *
+ * @param {string|number} value - The round/session value to normalize
+ * @returns {string|null} - Normalized number as string, or null if invalid
+ *
+ * Examples:
+ *   "Mentoring 2" → "2"
+ *   "Round 4" → "4"
+ *   "Sesi 1" → "1"
+ *   "Sesi #2" → "2"
+ *   "2" → "2"
+ *   4 → "4"
+ */
+function normalizeRoundNumber(value) {
+  if (!value && value !== 0) return null;
+
+  // Convert to string and extract first number
+  const match = String(value).match(/(\d+)/);
+  return match ? match[1] : null;
+}
+
 export default async function handler(req, res) {
   const debugInfo = {
     timestamp: new Date().toISOString(),
@@ -76,9 +99,61 @@ export default async function handler(req, res) {
       console.warn(`⚠️ [${debugInfo.requestId}] LaporanMaju sheet not found, skipping Maju reports`);
     }
 
+    // Read Upward Mobility forms
+    console.log('📋 Reading Upward Mobility forms...');
+    let umRows = [];
+    try {
+      const umSheetId = process.env.GOOGLE_SHEET_ID_UM;
+      console.log('🔑 GOOGLE_SHEET_ID_UM:', umSheetId ? `${umSheetId.substring(0, 20)}...` : 'NOT SET');
+
+      if (umSheetId) {
+        console.log('📡 Attempting to read UM sheet from:', umSheetId);
+        const { sheets } = client;
+        const umData = await sheets.spreadsheets.values.get({
+          spreadsheetId: umSheetId,
+          range: 'UM!A:Z', // Read all columns from UM tab
+        });
+
+        console.log('📦 UM sheet raw data received, rows:', umData.data.values?.length || 0);
+        const umRawRows = umData.data.values || [];
+
+        if (umRawRows.length > 1) {
+          const umHeaders = umRawRows[0];
+          console.log('📋 UM Sheet has', umRawRows.length - 1, 'data rows');
+          console.log('📋 UM Sheet columns:', umHeaders);
+
+          umRows = umRawRows.slice(1).map(row => {
+            const obj = {};
+            umHeaders.forEach((header, idx) => {
+              obj[header] = row[idx] || '';
+            });
+            return obj;
+          });
+          console.log(`✅ Loaded ${umRows.length} UM form submissions`);
+
+          // Debug: Show sample entries
+          console.log('📋 Sample UM entries:', umRows.slice(0, 3).map(row => ({
+            batch: row['Batch.'],
+            menteeName: row['Nama Penuh Usahawan.'],
+            menteeEmail: row['Email Usahawan'] || row['Email Address Usahawan'] || 'N/A',
+            session: row['Sesi Mentoring.']
+          })));
+        } else if (umRawRows.length === 1) {
+          console.warn('⚠️ UM sheet has headers but no data rows');
+        } else {
+          console.warn('⚠️ UM sheet is completely empty');
+        }
+      } else {
+        console.warn('⚠️ UM sheet ID not configured in environment (GOOGLE_SHEET_ID_UM)');
+      }
+    } catch (error) {
+      console.error('❌ Error reading UM sheet:', error.message);
+      console.error('❌ Full error:', error);
+    }
+
     const sheetsEndTime = Date.now();
     console.log(`⏱️ [${debugInfo.requestId}] Google Sheets data fetched in ${sheetsEndTime - sheetsStartTime}ms`);
-    console.log(`📋 [${debugInfo.requestId}] Data counts: mapping=${mappingSheet.length}, bangkit=${bangkitSheet.length}, maju=${majuSheet.length}, batches=${batchSheet.length}`);
+    console.log(`📋 [${debugInfo.requestId}] Data counts: mapping=${mappingSheet.length}, bangkit=${bangkitSheet.length}, maju=${majuSheet.length}, batches=${batchSheet.length}, um=${umRows.length}`);
 
     // 2) Find mentor's batch and current round info
     const mentorMappings = mappingSheet.filter(row => {
@@ -212,19 +287,38 @@ export default async function handler(req, res) {
     // Create a Set of active batch names for quick lookup
     const activeBatchNames = new Set(activeBatchInfos.map(b => b.batch));
 
+    // Create a Map linking batch name to expected round number
+    // This is used to filter reports by both batch AND session number
+    const activeBatchRounds = new Map(
+      activeBatchInfos.map(info => [info.batch, info.roundLabel])
+    );
+
+    console.log(`🗺️ [${debugInfo.requestId}] Active batch rounds:`,
+      Array.from(activeBatchRounds.entries()).map(([batch, round]) => `${batch}→${round}`).join(', ')
+    );
+
     // 3) Get mentor's mentees and organize by batch
     const menteeSet = new Set();
     const menteeToBatch = {};
     const menteesByBatch = {};
+    const menteeEmailToName = {}; // NEW: Map email → name for UM matching
+    const menteeNameToEmail = {}; // NEW: Map name → email for reverse lookup
     let skippedRows = 0;
 
     for (const row of mentorMappings) {
       const mentee = (row['Mentee'] || row['Nama Usahawan'] || '').toString().trim();
+      const menteeEmail = (row['Mentee_Email'] || row['Email Usahawan'] || '').toString().toLowerCase().trim();
       const batch = (row['Batch'] || '').toString().trim() || 'Unknown';
 
       if (mentee) {
         menteeSet.add(mentee);
         menteeToBatch[mentee] = batch;
+
+        // Build email mappings for UM matching
+        if (menteeEmail) {
+          menteeEmailToName[menteeEmail] = mentee;
+          menteeNameToEmail[mentee] = menteeEmail;
+        }
 
         if (!menteesByBatch[batch]) menteesByBatch[batch] = [];
         menteesByBatch[batch].push(mentee);
@@ -282,10 +376,20 @@ export default async function handler(req, res) {
         hasPremisImages = premisImages.trim() !== '' && premisImages !== '[]';
       }
 
+      // Get the batch for this mentee to check session/round matching
+      const menteeBatch = menteeToBatch[menteeName];
+      const reportSessionLabel = session['Sesi Laporan'] || '';
+
+      // Extract session number from report label (e.g., "Sesi #1 (Round 2)" → "1")
+      const reportSessionMatch = reportSessionLabel.match(/Sesi\s*#?(\d+)/i);
+      const reportSessionNumber = reportSessionMatch ? reportSessionMatch[1] : null;
+
       const sessionData = {
-        reportLabel: session['Sesi Laporan'] || '',
+        reportLabel: reportSessionLabel,
         status: session['Status Sesi'] || '',
         programType: 'bangkit',
+        batch: menteeBatch, // Store batch for filtering
+        sessionNumber: reportSessionNumber, // Store session number for filtering
         // Track premises visit based on actual uploaded images
         premisDilawat: hasPremisImages,
         // Sales data columns
@@ -340,6 +444,8 @@ export default async function handler(req, res) {
         reportLabel,
         status: miaStatus.toLowerCase() === 'mia' ? 'MIA' : 'Selesai',
         programType: 'maju',
+        batch: batch, // Store batch for filtering
+        sessionNumber: String(sesiNumber), // Store session number for filtering
         sesiNumber,
         miaStatus,
         // Track premises visit based on actual uploaded images
@@ -394,7 +500,7 @@ export default async function handler(req, res) {
       miaByBatch[batch][menteeName] = 0;
 
       for (const session of sessions) {
-        const { reportLabel, status, programType, premisDilawat } = session;
+        const { reportLabel, status, programType, premisDilawat, batch: sessionBatch, sessionNumber } = session;
 
         allTimeTotalReports++;
 
@@ -403,9 +509,17 @@ export default async function handler(req, res) {
           menteesWithPremisVisit.add(menteeName);
         }
 
-        // Check if this report is from the current period
-        // A report is "current period" if the mentee's batch is in the active batches list
-        const isCurrentPeriod = activeBatchNames.has(batch);
+        // Check if this report is from the current period AND current session
+        // Match on BOTH batch AND session number
+        const expectedRound = activeBatchRounds.get(batch);
+        const matchesBatch = activeBatchNames.has(batch);
+        const matchesRound = normalizeRoundNumber(sessionNumber) === normalizeRoundNumber(expectedRound);
+        const isCurrentPeriod = matchesBatch && matchesRound;
+
+        // Debug logging for excluded reports
+        if (matchesBatch && !matchesRound) {
+          console.log(`⚠️ [${debugInfo.requestId}] Excluding late/old report - Batch: ${batch}, Report Session: ${sessionNumber}, Expected: ${expectedRound}, Label: ${reportLabel}`);
+        }
 
         if (status.toLowerCase() === 'mia') {
           allTimeMiaCount++;
@@ -425,7 +539,7 @@ export default async function handler(req, res) {
           allTimeSessionsByMentee[menteeName].add(reportLabel);
           sessionsByBatch[batch][menteeName].add(reportLabel);
 
-          // Current period tracking (instead of round tracking)
+          // Current period tracking with session/round matching
           if (isCurrentPeriod) {
             currentRoundReportedMentees.add(menteeName);
             if (!currentRoundSessionsByMentee[menteeName]) currentRoundSessionsByMentee[menteeName] = new Set();
@@ -487,6 +601,155 @@ export default async function handler(req, res) {
 
     const currentPeriodPending = menteesInActiveBatches - currentRoundReportedMentees.size;
 
+    // Process UM forms per batch
+    console.log('\n📊 Processing Upward Mobility forms...');
+    const umSubmissionsByBatch = new Map(); // batch-session → Set of mentee names who submitted UM
+
+    for (const umRow of umRows) {
+      const batch = umRow['Batch.'];
+      const umMenteeName = umRow['Nama Penuh Usahawan.'];
+      const umMenteeEmail = (umRow['Email Usahawan'] || umRow['Email Address Usahawan'] || '').toLowerCase().trim();
+      const sesiMentoring = umRow['Sesi Mentoring.']; // "Sesi 2" or "Sesi 4"
+
+      if (!batch || !sesiMentoring) {
+        console.log('⚠️ Skipping UM row with missing batch/session:', { batch, sesiMentoring });
+        continue;
+      }
+
+      // Try to find the mentee name from our mapping using email
+      let menteeName = umMenteeName;
+      if (umMenteeEmail && menteeEmailToName[umMenteeEmail]) {
+        menteeName = menteeEmailToName[umMenteeEmail];
+        console.log(`✅ Matched UM by email: "${umMenteeName}" (${umMenteeEmail}) → "${menteeName}"`);
+      } else if (!umMenteeEmail) {
+        console.log(`⚠️ UM row has no email, using name as-is: "${umMenteeName}"`);
+      } else {
+        console.log(`⚠️ UM email not found in mapping: ${umMenteeEmail}, trying name match for "${umMenteeName}"`);
+      }
+
+      if (!menteeName) {
+        console.log('⚠️ Skipping UM row - no valid mentee identifier');
+        continue;
+      }
+
+      // Extract session number: "Sesi 2" → "2"
+      const sessionNum = normalizeRoundNumber(sesiMentoring);
+      if (!sessionNum) {
+        console.log('⚠️ Could not extract session number from:', sesiMentoring);
+        continue;
+      }
+
+      // Create key: batch + session
+      const key = `${batch}-Session${sessionNum}`;
+
+      if (!umSubmissionsByBatch.has(key)) {
+        umSubmissionsByBatch.set(key, new Set());
+      }
+      umSubmissionsByBatch.get(key).add(menteeName);
+    }
+
+    console.log('📊 UM submissions processed:', umSubmissionsByBatch.size, 'batch-session combinations');
+    console.log('🗂️ UM submissions grouped by batch-session:');
+    Array.from(umSubmissionsByBatch.entries()).forEach(([key, names]) => {
+      console.log(`  ${key}: ${names.size} mentees -`, Array.from(names).slice(0, 3).join(', '));
+    });
+
+    // Calculate UM completion for active batches
+    const umStatsByBatch = [];
+
+    for (const batchInfo of activeBatchInfos) {
+      const batch = batchInfo.batch;
+      const roundNum = normalizeRoundNumber(batchInfo.roundLabel);
+
+      // Only track UM for Session 2 and Session 4
+      if (roundNum !== '2' && roundNum !== '4') {
+        continue;
+      }
+
+      // CRITICAL FIX: Get only mentees who have SUBMITTED reports for THIS session
+      // Build list of mentees who submitted this session's reports
+      const menteesWithSessionReports = new Set();
+
+      for (const [menteeName, sessions] of sessionsByMentee) {
+        const menteeBatch = menteeToBatch[menteeName];
+
+        // Check if this mentee belongs to the current batch
+        if (menteeBatch !== batch) continue;
+
+        // Check if mentee has submitted reports for THIS session
+        for (const session of sessions) {
+          if (session.batch === batch &&
+              normalizeRoundNumber(session.sessionNumber) === roundNum &&
+              session.status.toLowerCase() === 'selesai') {
+            menteesWithSessionReports.add(menteeName);
+            break; // Found a report for this session, no need to check more
+          }
+        }
+      }
+
+      // Convert Set to Array for easier manipulation
+      const menteesEligibleForUM = Array.from(menteesWithSessionReports);
+      const totalMentees = menteesEligibleForUM.length;
+
+      console.log(`\n🔍 UM Stats for ${batch} Session ${roundNum}:`);
+      console.log(`  - Total assigned in batch: ${menteesByBatch?.[batch]?.length || 0}`);
+      console.log(`  - Submitted Sesi ${roundNum} reports: ${menteesEligibleForUM.length}`);
+      console.log(`  - Mentees who submitted reports:`, menteesEligibleForUM);
+
+      // Check if any reports have been submitted for this session
+      if (menteesEligibleForUM.length === 0) {
+        // No reports submitted yet - add warning entry instead of stats
+        console.log(`⚠️ ${batch} Session ${roundNum}: No reports submitted yet`);
+
+        umStatsByBatch.push({
+          batch: batch,
+          session: roundNum,
+          sessionLabel: `Sesi ${roundNum}`,
+          totalMentees: 0,
+          submitted: 0,
+          pending: 0,
+          pendingMentees: [],
+          noReportsYet: true  // Flag to trigger warning display
+        });
+
+        continue; // Skip normal calculation
+      }
+
+      // Check how many have submitted UM for this session
+      const umKey = `${batch}-Session${roundNum}`;
+      const submittedSet = umSubmissionsByBatch.get(umKey) || new Set();
+
+      console.log(`  - UM key: ${umKey}`);
+      console.log(`  - UM submitters found:`, Array.from(submittedSet));
+
+      // Count how many of the eligible mentees have submitted UM
+      const submittedCount = menteesEligibleForUM.filter(name =>
+        submittedSet.has(name)
+      ).length;
+
+      const pendingCount = totalMentees - submittedCount;
+
+      // List of mentees who submitted reports but NOT UM
+      const pendingMentees = menteesEligibleForUM.filter(name =>
+        !submittedSet.has(name)
+      );
+
+      console.log(`  - Match count: ${submittedCount}/${totalMentees}`);
+      console.log(`  ✅ UM submissions found: ${submittedCount}/${totalMentees}`);
+
+      umStatsByBatch.push({
+        batch: batch,
+        session: roundNum,
+        sessionLabel: `Sesi ${roundNum}`,
+        totalMentees: totalMentees,
+        submitted: submittedCount,
+        pending: pendingCount,
+        pendingMentees: pendingMentees
+      });
+    }
+
+    console.log('📈 UM stats calculated for', umStatsByBatch.length, 'batches');
+
     // 6) Response
     const responseData = {
       mentorEmail: loginEmail,
@@ -520,6 +783,9 @@ export default async function handler(req, res) {
       // Detailed MIA list for dedicated section
       miaMentees: miaMenteesList,
 
+      // Upward Mobility form tracking
+      upwardMobilityStats: umStatsByBatch,
+
       source: {
         activeBatchInfos, // Include all active batches
         totalMenteeRecords: mentorMappings.length,
@@ -530,6 +796,8 @@ export default async function handler(req, res) {
         ...debugInfo,
         processingTimeMs: Date.now() - sheetsEndTime,
         totalTimeMs: Date.now() - new Date(debugInfo.timestamp).getTime(),
+        umFormsLoaded: umRows.length,
+        umBatchesTracked: umStatsByBatch.length,
         impersonation: {
           isImpersonating,
           realUser: realUserEmail,
