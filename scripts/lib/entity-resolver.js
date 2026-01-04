@@ -164,7 +164,7 @@ async function resolveSessionId(supabase, sessionData) {
  * @param {number} sessionNumber - Parsed session number
  * @returns {Promise<{success: boolean, entities: Object, errors: Array}>}
  */
-async function resolveAllEntities(supabase, row, sessionNumber) {
+async function resolveAllEntities(supabase, row, sessionNumber, program) {
   const errors = [];
   const entities = {
     entrepreneur_id: null,
@@ -197,7 +197,7 @@ async function resolveAllEntities(supabase, row, sessionNumber) {
     const sessionData = {
       mentor_id: entities.mentor_id,
       entrepreneur_id: entities.entrepreneur_id,
-      program: 'Bangkit',
+      program,
       session_number: sessionNumber,
       session_date: row[4] || null // Column E
     };

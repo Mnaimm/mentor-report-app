@@ -206,7 +206,7 @@ async function syncMajuReports() {
       const parsedSessionNumber = sessionNumber ? parseInt(sessionNumber, 10) : null;
 
       // Resolve FK entities
-      const resolution = await resolveAllEntities(supabase, entityResolutionArray, parsedSessionNumber);
+      const resolution = await resolveAllEntities(supabase, entityResolutionArray, parsedSessionNumber,'Maju');
 
       if (!resolution.success) {
         stats.errors++;

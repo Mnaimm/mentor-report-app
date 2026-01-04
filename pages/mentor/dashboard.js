@@ -17,7 +17,8 @@ export default function MentorDashboard() {
     program: 'all',
     search: ''
   });
-  const [sortBy, setSortBy] = useState('progress'); // Default: show incomplete first
+  const [sortBy, setSortBy] = useState('urgency'); // Default: urgency-based sort
+  const [groupByBatch, setGroupByBatch] = useState(true); // Default: group by batch
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -79,43 +80,68 @@ export default function MentorDashboard() {
     // Apply sorting
     const sorted = [...filtered].sort((a, b) => {
       switch (sortBy) {
+        case 'urgency':
+          // Enhanced urgency-based sort with UM tracking
+          const getUrgencyScore = (mentee) => {
+            // Higher score = more urgent
+            if (mentee.status === 'overdue') return 1000;
+            if (mentee.status === 'due_soon') return 500;
+            if (mentee.umStatus?.status === 'pending') return 300;
+            if (mentee.status === 'on_track') return 10;
+            if (mentee.status === 'pending_first_session') return 5;
+            return 0;
+          };
+
+          const scoreA = getUrgencyScore(a);
+          const scoreB = getUrgencyScore(b);
+
+          if (scoreA !== scoreB) return scoreB - scoreA; // Descending: most urgent first
+
+          // Within same urgency, sort by days until due
+          if (a.daysUntilDue !== null && b.daysUntilDue !== null) {
+            return a.daysUntilDue - b.daysUntilDue;
+          }
+
+          // Fallback to name
+          return a.name.localeCompare(b.name);
+
         case 'dueDate':
-          // Sort by status first (on_track last, others by urgency), then by due date
+          // Sort by due date
           const statusOrder = {
             'overdue': 1,
             'due_soon': 2,
             'pending': 3,
             'mia': 4,
             'pending_first_session': 5,
-            'on_track': 6  // Completed goes to bottom
+            'on_track': 6
           };
-          
+
           const statusDiff = (statusOrder[a.status] || 99) - (statusOrder[b.status] || 99);
           if (statusDiff !== 0) return statusDiff;
-          
+
           // Within same status, sort by due date
           if (!a.daysUntilDue) return 1;
           if (!b.daysUntilDue) return -1;
           return a.daysUntilDue - b.daysUntilDue;
-          
+
         case 'name':
           return a.name.localeCompare(b.name);
-          
+
         case 'progress':
-          const aProgress = a.expectedReportsThisRound > 0 
-            ? (a.reportsThisRound / a.expectedReportsThisRound) 
+          const aProgress = a.expectedReportsThisRound > 0
+            ? (a.reportsThisRound / a.expectedReportsThisRound)
             : 0;
-          const bProgress = b.expectedReportsThisRound > 0 
-            ? (b.reportsThisRound / b.expectedReportsThisRound) 
+          const bProgress = b.expectedReportsThisRound > 0
+            ? (b.reportsThisRound / b.expectedReportsThisRound)
             : 0;
           return aProgress - bProgress; // Ascending: 0/1 first, 1/1 last
-          
+
         case 'batch':
-          // Sort by batch name (handle null/undefined)
+          // Sort by batch name
           const aBatch = a.batch || '';
           const bBatch = b.batch || '';
           return aBatch.localeCompare(bBatch);
-          
+
         default:
           return 0;
       }
@@ -160,6 +186,27 @@ export default function MentorDashboard() {
 
   const filteredMentees = getFilteredAndSortedMentees();
 
+  // Group mentees by batch if enabled
+  const groupedMentees = () => {
+    if (!groupByBatch || sortBy === 'batch') {
+      return { 'All Mentees': filteredMentees };
+    }
+
+    const groups = {};
+    filteredMentees.forEach(mentee => {
+      const batch = mentee.batch || 'Unknown Batch';
+      if (!groups[batch]) {
+        groups[batch] = [];
+      }
+      groups[batch].push(mentee);
+    });
+
+    // Sort batch names alphabetically
+    return Object.fromEntries(
+      Object.entries(groups).sort(([a], [b]) => a.localeCompare(b))
+    );
+  };
+
   if (loading) {
     return (
       <Layout title="My Mentees">
@@ -202,24 +249,49 @@ export default function MentorDashboard() {
             Welcome back, {session?.user?.name || 'Mentor'}! Track your mentees' progress and upcoming sessions.
           </p>
           
-          {/* Quick Insights */}
+          {/* Enhanced Summary Panel */}
           {dashboardData && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
-              <div className="flex items-start gap-3">
-                <span className="text-2xl">📊</span>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-gray-700 mb-2">Quick Insights:</p>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm text-gray-600">
-                    <div>
-                      <span className="font-medium text-green-600">{dashboardData.stats?.onTrack || 0}</span> mentees on track
-                    </div>
-                    <div>
-                      <span className="font-medium text-yellow-600">{dashboardData.stats?.dueSoon || 0}</span> due soon
-                    </div>
-                    <div>
-                      <span className="font-medium text-red-600">{dashboardData.stats?.overdue || 0}</span> overdue
-                    </div>
-                  </div>
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6 mt-4 shadow-sm">
+              <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                📊 My Mentees Dashboard
+                {dashboardData.mentor?.currentPeriod && (
+                  <span className="ml-auto text-sm font-normal bg-blue-100 text-blue-800 px-3 py-1 rounded-full">
+                    {dashboardData.mentor.currentPeriod}
+                  </span>
+                )}
+              </h2>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                <div className="bg-white rounded-lg p-3 shadow-sm">
+                  <div className="text-2xl font-bold text-blue-600">{dashboardData.stats?.totalMentees || 0}</div>
+                  <div className="text-xs text-gray-600">Total Mentees</div>
+                </div>
+                <div className="bg-white rounded-lg p-3 shadow-sm">
+                  <div className="text-2xl font-bold text-green-600">{dashboardData.stats?.onTrack || 0}</div>
+                  <div className="text-xs text-gray-600">✓ On Track</div>
+                </div>
+                <div className="bg-white rounded-lg p-3 shadow-sm">
+                  <div className="text-2xl font-bold text-orange-600">{dashboardData.stats?.needsAction || 0}</div>
+                  <div className="text-xs text-gray-600">⚠️ Need Action</div>
+                </div>
+                <div className="bg-white rounded-lg p-3 shadow-sm">
+                  <div className="text-2xl font-bold text-purple-600">{dashboardData.stats?.umPending || 0}</div>
+                  <div className="text-xs text-gray-600">UM Pending</div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🔴</span>
+                  <span><span className="font-semibold text-red-600">{dashboardData.stats?.overdue || 0}</span> Overdue</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🟡</span>
+                  <span><span className="font-semibold text-yellow-600">{dashboardData.stats?.dueSoon || 0}</span> Due Soon</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🟣</span>
+                  <span><span className="font-semibold text-purple-600">{dashboardData.stats?.umPending || 0}</span> UM Forms Pending</span>
                 </div>
               </div>
             </div>
@@ -355,18 +427,18 @@ export default function MentorDashboard() {
           </div>
         )}
 
-        {/* Filters and Search */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            {/* Search */}
-            <div className="lg:col-span-2">
+        {/* Filters and Search - Mobile Optimized */}
+        <div className="bg-white rounded-lg shadow-md p-4 md:p-6 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
+            {/* Search - Full width on mobile, 2 cols on desktop */}
+            <div className="sm:col-span-2 lg:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
               <input
                 type="text"
                 placeholder="Search by name, business, or email..."
                 value={filters.search}
                 onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
               />
             </div>
 
@@ -376,7 +448,7 @@ export default function MentorDashboard() {
               <select
                 value={filters.status}
                 onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base appearance-none bg-white"
               >
                 <option value="all">All Statuses</option>
                 <option value="on_track">On Track</option>
@@ -393,7 +465,7 @@ export default function MentorDashboard() {
               <select
                 value={filters.batch}
                 onChange={(e) => setFilters({ ...filters, batch: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base appearance-none bg-white"
               >
                 <option value="all">All Batches</option>
                 {uniqueBatches.map(batch => (
@@ -408,7 +480,7 @@ export default function MentorDashboard() {
               <select
                 value={filters.program}
                 onChange={(e) => setFilters({ ...filters, program: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base appearance-none bg-white"
               >
                 <option value="all">All Programs</option>
                 {uniquePrograms.map(program => (
@@ -419,57 +491,67 @@ export default function MentorDashboard() {
           </div>
 
           {/* Sort Options */}
-          <div className="mt-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          <div className="mt-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-medium text-gray-700">Sort by:</span>
               <button
-                onClick={() => setSortBy('progress')}
-                className={`px-3 py-1 text-sm rounded ${
-                  sortBy === 'progress' 
-                    ? 'bg-blue-600 text-white' 
+                onClick={() => setSortBy('urgency')}
+                className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${
+                  sortBy === 'urgency'
+                    ? 'bg-blue-600 text-white shadow-sm'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                Progress
-              </button>
-              <button
-                onClick={() => setSortBy('batch')}
-                className={`px-3 py-1 text-sm rounded ${
-                  sortBy === 'batch' 
-                    ? 'bg-blue-600 text-white' 
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                Batch
+                🔥 Urgency
               </button>
               <button
                 onClick={() => setSortBy('dueDate')}
-                className={`px-3 py-1 text-sm rounded ${
-                  sortBy === 'dueDate' 
-                    ? 'bg-blue-600 text-white' 
+                className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${
+                  sortBy === 'dueDate'
+                    ? 'bg-blue-600 text-white shadow-sm'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                Due Date
+                📅 Due Date
+              </button>
+              <button
+                onClick={() => setSortBy('batch')}
+                className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${
+                  sortBy === 'batch'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                📦 Batch
               </button>
               <button
                 onClick={() => setSortBy('name')}
-                className={`px-3 py-1 text-sm rounded ${
-                  sortBy === 'name' 
-                    ? 'bg-blue-600 text-white' 
+                className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${
+                  sortBy === 'name'
+                    ? 'bg-blue-600 text-white shadow-sm'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
-                Name
+                🔤 Name
+              </button>
+              <button
+                onClick={() => setSortBy('progress')}
+                className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${
+                  sortBy === 'progress'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                📊 Progress
               </button>
             </div>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-600 whitespace-nowrap">
               Showing {filteredMentees.length} of {dashboardData?.mentees?.length || 0} mentees
             </p>
           </div>
         </div>
 
-        {/* Mentees Grid */}
+        {/* Mentees Grid with Batch Grouping */}
         {filteredMentees.length === 0 ? (
           <div className="bg-white rounded-lg shadow-md p-12 text-center">
             <div className="text-6xl mb-4">📭</div>
@@ -481,15 +563,34 @@ export default function MentorDashboard() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredMentees.map(mentee => (
-              <MenteeCard
-                key={mentee.id}
-                mentee={mentee}
-                onSubmitReport={handleSubmitReport}
-                onViewDetails={handleViewDetails}
-                onContact={handleContact}
-              />
+          <div className="space-y-8">
+            {Object.entries(groupedMentees()).map(([batchName, mentees]) => (
+              <div key={batchName}>
+                {/* Batch Header - Only show if grouping enabled */}
+                {groupByBatch && sortBy !== 'batch' && Object.keys(groupedMentees()).length > 1 && (
+                  <div className="sticky top-0 z-10 bg-gradient-to-r from-gray-50 to-gray-100 border-l-4 border-blue-500 px-4 py-3 mb-4 rounded-lg shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-bold text-gray-800">{batchName}</h3>
+                      <span className="bg-blue-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
+                        {mentees.length} {mentees.length === 1 ? 'mentee' : 'mentees'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Mentee Cards Grid - Mobile-first responsive */}
+                <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                  {mentees.map(mentee => (
+                    <MenteeCard
+                      key={mentee.id}
+                      mentee={mentee}
+                      onSubmitReport={handleSubmitReport}
+                      onViewDetails={handleViewDetails}
+                      onContact={handleContact}
+                    />
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         )}

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getSession } from 'next-auth/react';
+import Link from 'next/link';
 import { canAccessAdmin, isReadOnly } from '../../lib/auth';
 import AccessDenied from '../../components/AccessDenied';
 import ReadOnlyBadge from '../../components/ReadOnlyBadge';
@@ -58,6 +59,21 @@ export default function AdminDashboard({ userEmail, isReadOnlyUser, accessDenied
     <div className="p-4 sm:p-6 lg:p-8 bg-gray-50 min-h-screen">
       {/* Read-Only Badge */}
       {isReadOnlyUser && <ReadOnlyBadge userEmail={userEmail} />}
+
+      {/* Navigation to Progress Dashboard */}
+      <div className="mb-6">
+        <Link
+          href="/admin/dashboard"
+          className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all shadow-md hover:shadow-lg font-medium"
+        >
+          <span className="text-xl">📊</span>
+          <span>View Progress Dashboard</span>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </Link>
+      </div>
+
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold text-gray-800">
           Admin Dashboard - Status Laporan Jualan

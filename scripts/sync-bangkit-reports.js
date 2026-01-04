@@ -219,7 +219,7 @@ async function syncBangkitReports() {
           .filter(k => k.startsWith('GW_Skor_'))
           .slice(3, 20)
           .map(k => row[k])
-      ], sessionNumber);
+      ], sessionNumber, 'Bangkit');
 
       if (!resolution.success) {
         stats.errors++;

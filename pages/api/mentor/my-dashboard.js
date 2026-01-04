@@ -2,11 +2,22 @@
 import { createClient } from '@supabase/supabase-js';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
+import { getSheetsClient } from '../../../lib/sheets';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
+
+/**
+ * Normalize round/session number for comparison
+ * Handles: "Mentoring 2", "Round 4", "Sesi 1", "Sesi #2", "2"
+ */
+function normalizeRoundNumber(value) {
+  if (!value && value !== 0) return null;
+  const match = String(value).match(/(\d+)/);
+  return match ? match[1] : null;
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -172,16 +183,20 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Failed to fetch mentees' });
     }
 
-    // 2. Get all sessions for this mentor
-    const { data: sessions, error: sessionsError } = await supabase
-      .from('sessions')
-      .select('*')
-      .eq('mentor_id', mentorId)
-      .order('session_date', { ascending: false });
+    // 2. CRITICAL: Read sessions from Google Sheets (source of truth), NOT Supabase
+    console.log('📋 Reading session data from Google Sheets...');
+    const client = await getSheetsClient();
+    const bangkitSheet = await client.getRows('V8');
 
-    if (sessionsError) {
-      console.error('Error fetching sessions:', sessionsError);
+    // Read Maju reports sheet
+    let majuSheet = [];
+    try {
+      majuSheet = await client.getRows('LaporanMaju');
+    } catch (e) {
+      console.warn('⚠️ LaporanMaju sheet not found, skipping Maju reports');
     }
+
+    console.log(`📊 Loaded ${bangkitSheet.length} Bangkit reports and ${majuSheet.length} Maju reports`);
 
     // 3. Get payment requests for this mentor (if table exists)
     let paymentRequests = [];
@@ -197,6 +212,57 @@ export default async function handler(req, res) {
       }
     } catch (e) {
       console.warn('Payment requests table not found, skipping');
+    }
+
+    // 3b. Read Upward Mobility forms from Google Sheets
+    console.log('📋 Reading Upward Mobility forms...');
+    let umSubmissions = new Map(); // Format: Map<batch-session-menteeId, true>
+    try {
+      const umSheetId = process.env.GOOGLE_SHEET_ID_UM;
+      if (umSheetId) {
+        const client = await getSheetsClient();
+        const { sheets } = client;
+        const umData = await sheets.spreadsheets.values.get({
+          spreadsheetId: umSheetId,
+          range: 'UM!A:Z',
+        });
+
+        const umRawRows = umData.data.values || [];
+        if (umRawRows.length > 1) {
+          const umHeaders = umRawRows[0];
+          const umRows = umRawRows.slice(1).map(row => {
+            const obj = {};
+            umHeaders.forEach((header, idx) => {
+              obj[header] = row[idx] || '';
+            });
+            return obj;
+          });
+
+          console.log(`✅ Loaded ${umRows.length} UM form submissions`);
+
+          // Build UM submission map
+          for (const row of umRows) {
+            const batch = row['Batch.'];
+            const menteeEmail = (row['Email Usahawan'] || row['Email Address Usahawan'] || '').toLowerCase().trim();
+            const sesiMentoring = row['Sesi Mentoring.'];
+
+            if (!batch || !sesiMentoring) continue;
+
+            const sessionNum = normalizeRoundNumber(sesiMentoring);
+            if (!sessionNum) continue;
+
+            // Create composite key: batch-session-email
+            const key = `${batch}-${sessionNum}-${menteeEmail}`;
+            umSubmissions.set(key, true);
+          }
+
+          console.log(`📊 UM submissions indexed: ${umSubmissions.size} entries`);
+        }
+      } else {
+        console.warn('⚠️ UM sheet ID not configured (GOOGLE_SHEET_ID_UM)');
+      }
+    } catch (error) {
+      console.error('❌ Error reading UM sheet:', error.message);
     }
 
     // 4. Process mentees with their session data
@@ -221,41 +287,122 @@ export default async function handler(req, res) {
         console.log(`✅ Found batch info for ${entrepreneur.name}:`, batchInfo);
       }
       
-      // Get sessions for this mentee
-      const menteeSessions = sessions?.filter(s => s.entrepreneur_id === entrepreneur.id) || [];
-      
+      // CRITICAL FIX: Get sessions from Google Sheets for this mentee
+      const menteeName = entrepreneur.name;
+      let menteeSessions = [];
+
+      // Get Bangkit sessions
+      const bangkitSessions = bangkitSheet.filter(row => {
+        const rowMenteeName = (row['Nama Usahawan'] || '').trim();
+        return rowMenteeName === menteeName;
+      }).map(row => ({
+        menteeName: row['Nama Usahawan'],
+        sessionLabel: row['Sesi Laporan'] || '',
+        status: row['Status Sesi'] || '',
+        sessionDate: row['Tarikh Sesi'] || '',
+        programType: 'bangkit'
+      }));
+
+      // Get Maju sessions
+      const majuSessions = majuSheet.filter(row => {
+        const rowMenteeName = (row['NAMA_MENTEE'] || '').trim();
+        return rowMenteeName === menteeName;
+      }).map(row => ({
+        menteeName: row['NAMA_MENTEE'],
+        sessionNumber: row['SESI_NUMBER'],
+        status: row['MIA_STATUS'] || 'Tidak MIA',
+        sessionDate: row['TARIKH_SESI'] || '',
+        programType: 'maju'
+      }));
+
+      // Combine and sort by date
+      menteeSessions = [...bangkitSessions, ...majuSessions].sort((a, b) => {
+        const dateA = new Date(a.sessionDate || '1970-01-01');
+        const dateB = new Date(b.sessionDate || '1970-01-01');
+        return dateA - dateB;
+      });
+
+      // Assign sequential session numbers based on chronological order
+      const sessionsWithNumbers = menteeSessions.map((s, index) => {
+        // Extract session number from label (e.g., "Sesi #2 (Round 1)" -> 2)
+        let sessionNum = index + 1; // Default: chronological order
+        if (s.sessionLabel) {
+          const match = s.sessionLabel.match(/Sesi\s*#?(\d+)/i);
+          if (match) sessionNum = parseInt(match[1]);
+        } else if (s.sessionNumber) {
+          sessionNum = parseInt(s.sessionNumber);
+        }
+
+        return {
+          ...s,
+          calculatedSessionNumber: sessionNum
+        };
+      });
+
       // Debug logging for sessions
-      if (menteeSessions.length > 0) {
-        console.log(`📊 ${entrepreneur.name}: ${menteeSessions.length} sessions found`);
-        console.log('Session statuses:', menteeSessions.map(s => s.Status || s.status).join(', '));
+      if (sessionsWithNumbers.length > 0) {
+        console.log(`📊 ${entrepreneur.name}: ${sessionsWithNumbers.length} sessions found in Google Sheets`);
+        console.log('Session data:', sessionsWithNumbers.map(s => ({
+          session_num: s.calculatedSessionNumber,
+          Status: s.status,
+          date: s.sessionDate,
+          program: s.programType
+        })));
       }
-      
+
       // Get current round info
       const currentRound = batchInfo?.round || 'Mentoring 1';
+      const currentRoundNum = batchInfo?.roundNumber || 1;
       const dueDate = batchInfo ? calculateDueDate(batchInfo.endMonth) : null;
-      
-      // Count completed sessions FOR CURRENT ROUND ONLY
-      // Check both "Status" (capital S) and "status" (lowercase s) for compatibility
-      const completedSessions = menteeSessions.filter(s => {
-        const statusValue = (s.Status || s.status || '').toLowerCase();
-        return statusValue === 'selesai' || 
-               statusValue === 'completed' || 
-               statusValue === 'done' ||
-               statusValue === 'submitted';
+
+      // Count ALL completed sessions (for display purposes)
+      const completedSessions = sessionsWithNumbers.filter(s => {
+        const statusValue = (s.status || '').toLowerCase();
+        // For Maju: check MIA_STATUS !== 'MIA'
+        // For Bangkit: check Status Sesi === 'Selesai'
+        if (s.programType === 'maju') {
+          return statusValue !== 'mia' && statusValue.includes('tidak');
+        } else {
+          return statusValue === 'selesai' || statusValue === 'completed';
+        }
       });
-      
-      console.log(`✅ ${entrepreneur.name}: ${completedSessions.length} completed sessions`);
-      
+
+      console.log(`✅ ${entrepreneur.name}: ${completedSessions.length} total completed sessions`);
+
+      // CRITICAL FIX: Check if THIS ROUND'S session has been submitted
+      const currentRoundSession = sessionsWithNumbers.find(s => {
+        const sessionNum = s.calculatedSessionNumber;
+        const statusValue = (s.status || '').toLowerCase();
+
+        // Check if completed
+        let isCompleted = false;
+        if (s.programType === 'maju') {
+          isCompleted = statusValue !== 'mia' && statusValue.includes('tidak');
+        } else {
+          isCompleted = statusValue === 'selesai' || statusValue === 'completed';
+        }
+
+        return sessionNum == currentRoundNum && isCompleted;
+      });
+
       // Expected reports for current round (usually 1 per round)
       const expectedReportsThisRound = 1;
-      const reportsThisRound = completedSessions.length > 0 ? 1 : 0;
+      const reportsThisRound = currentRoundSession ? 1 : 0;
+
+      console.log(`🔍 ${entrepreneur.name}: Round ${currentRoundNum} session ${currentRoundSession ? 'SUBMITTED ✅' : 'NOT SUBMITTED ❌'}`);
 
       // Check for MIA status
-      const hasMIASession = menteeSessions.some(s => s.Status?.toUpperCase() === 'MIA');
+      const hasMIASession = sessionsWithNumbers.some(s => {
+        if (s.programType === 'maju') {
+          return (s.status || '').toUpperCase() === 'MIA';
+        } else {
+          return (s.status || '').toUpperCase() === 'MIA';
+        }
+      });
 
-      // Calculate last session date
-      const lastSession = completedSessions.length > 0 ? completedSessions[0] : null;
-      const lastSessionDate = lastSession?.session_date || null;
+      // Calculate last session date (from most recent completed session)
+      const lastSession = completedSessions.length > 0 ? completedSessions[completedSessions.length - 1] : null;
+      const lastSessionDate = lastSession?.sessionDate || null;
 
       // Calculate days until due
       let daysUntilDue = null;
@@ -289,6 +436,40 @@ export default async function handler(req, res) {
         status = 'pending';
       }
 
+      // Check UM form submission status
+      let umStatus = null;
+      const currentRoundNumStr = normalizeRoundNumber(batchInfo?.roundNumber || currentRound);
+
+      // Only check UM for Session 2 and 4
+      if (currentRoundNumStr === '2' || currentRoundNumStr === '4') {
+        // CRITICAL FIX: Only check UM if THIS ROUND'S session has been submitted
+        const hasSubmittedThisRoundSession = currentRoundSession !== undefined;
+
+        if (hasSubmittedThisRoundSession) {
+          // Check if UM form submitted
+          const umKey = `${menteeBatch}-${currentRoundNumStr}-${entrepreneur.email.toLowerCase().trim()}`;
+          const hasSubmittedUM = umSubmissions.has(umKey);
+
+          console.log(`🔍 UM Check for ${entrepreneur.name}: key="${umKey}", found=${hasSubmittedUM}`);
+
+          if (!hasSubmittedUM) {
+            umStatus = {
+              session: currentRoundNumStr,
+              status: 'pending',
+              message: `UM Pending (Session ${currentRoundNumStr})`
+            };
+          } else {
+            umStatus = {
+              session: currentRoundNumStr,
+              status: 'submitted',
+              message: `UM Submitted (Session ${currentRoundNumStr})`
+            };
+          }
+        } else {
+          console.log(`⚠️ ${entrepreneur.name}: Session ${currentRoundNumStr} not yet submitted, UM check skipped`);
+        }
+      }
+
       return {
         id: entrepreneur.id,
         name: entrepreneur.name,
@@ -299,6 +480,7 @@ export default async function handler(req, res) {
         program: entrepreneur.program || 'Unknown',
         batch: menteeBatch,
         currentRound: currentRound,
+        currentRoundNumber: currentRoundNum,
         status: status,
         totalSessions: menteeSessions.length,
         completedSessions: completedSessions.length,
@@ -308,11 +490,14 @@ export default async function handler(req, res) {
         roundDueDate: dueDate?.toISOString().split('T')[0],
         daysUntilDue: daysUntilDue,
         assignedAt: assignment.assigned_at,
-        batchPeriod: batchInfo?.period || ''
+        batchPeriod: batchInfo?.period || '',
+        umStatus: umStatus // NEW: UM form tracking
       };
     }).filter(m => m !== null) || [];
 
     // 5. Calculate summary stats
+    const umPendingCount = mentees.filter(m => m.umStatus?.status === 'pending').length;
+
     const stats = {
       totalMentees: mentees.length,
       onTrack: mentees.filter(m => m.status === 'on_track').length,
@@ -320,43 +505,20 @@ export default async function handler(req, res) {
       overdue: mentees.filter(m => m.status === 'overdue').length,
       mia: mentees.filter(m => m.status === 'mia').length,
       pendingFirstSession: mentees.filter(m => m.status === 'pending_first_session').length,
-      totalSessions: sessions?.length || 0,
-      completedSessions: sessions?.filter(s => {
-        const statusValue = (s.Status || s.status || '').toLowerCase();
-        return statusValue === 'selesai' || 
-               statusValue === 'completed' || 
-               statusValue === 'done' ||
-               statusValue === 'submitted';
-      }).length || 0,
-      sessionsThisMonth: sessions?.filter(s => {
-        const sessionDate = new Date(s.created_at);
-        const now = new Date();
-        return sessionDate.getMonth() === now.getMonth() && 
-               sessionDate.getFullYear() === now.getFullYear();
-      }).length || 0,
-      completionRate: sessions?.length > 0 
-        ? Math.round((sessions.filter(s => 
-            s.Status?.toLowerCase() === 'selesai' || s.Status?.toLowerCase() === 'completed'
-          ).length / sessions.length) * 100) 
-        : 0
+      umPending: umPendingCount, // NEW: UM forms pending
+      needsAction: mentees.filter(m =>
+        m.status === 'overdue' ||
+        m.status === 'due_soon' ||
+        m.umStatus?.status === 'pending'
+      ).length,
+      totalSessions: mentees.reduce((sum, m) => sum + m.totalSessions, 0),
+      completedSessions: mentees.reduce((sum, m) => sum + m.completedSessions, 0),
+      sessionsThisMonth: 0, // Can calculate if needed
+      completionRate: 0 // Can calculate if needed
     };
 
-    // 6. Recent reports (last 10 completed sessions)
-    const recentReports = sessions
-      ?.filter(s => s.Status?.toLowerCase() === 'selesai' || s.Status?.toLowerCase() === 'completed')
-      .slice(0, 10)
-      .map(s => {
-        const mentee = mentees.find(m => m.id === s.entrepreneur_id);
-        return {
-          id: s.id,
-          sessionDate: s.session_date,
-          menteeName: mentee?.name || 'Unknown',
-          businessName: mentee?.businessName || 'Unknown',
-          program: s.program || mentee?.program,
-          status: s.Status,
-          createdAt: s.created_at
-        };
-      }) || [];
+    // 6. Recent reports - skip for now (can be added later if needed)
+    const recentReports = [];
 
     // 7. Upcoming sessions (sessions due in next 14 days)
     const upcomingSessions = mentees
