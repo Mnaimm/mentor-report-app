@@ -445,7 +445,43 @@ export default async function handler(req, res) {
     });
 
     console.log('Sessions grouped by mentee:', Object.keys(sessionsByMentee).length, 'mentees with sessions');
-    console.log('Total completed sessions:', Object.values(sessionsByMentee).reduce((sum, sessions) => sum + sessions.length, 0));
+    const beforeDedup = Object.values(sessionsByMentee).reduce((sum, sessions) => sum + sessions.length, 0);
+    console.log('Before deduplication:', beforeDedup, 'total sessions');
+
+    // Deduplicate sessions per mentee
+    Object.keys(sessionsByMentee).forEach((entrepreneurId) => {
+      const sessions = sessionsByMentee[entrepreneurId];
+
+      // Create unique key: sessionNumber + batch + mentorEmail
+      const uniqueSessions = new Map();
+
+      sessions.forEach(session => {
+        const uniqueKey = `${session.sessionNumber}-${session.batch}-${session.mentorEmail}`;
+
+        if (!uniqueSessions.has(uniqueKey)) {
+          // First occurrence - keep it
+          uniqueSessions.set(uniqueKey, session);
+        } else {
+          // Duplicate found - keep the one with later session_date
+          const existing = uniqueSessions.get(uniqueKey);
+          const existingDate = new Date(existing.sessionDate);
+          const newDate = new Date(session.sessionDate);
+
+          // Keep whichever has a later timestamp (in case dates differ slightly)
+          // If dates are same, just keep the first one
+          if (newDate > existingDate) {
+            uniqueSessions.set(uniqueKey, session);
+          }
+        }
+      });
+
+      // Replace with deduplicated sessions
+      sessionsByMentee[entrepreneurId] = Array.from(uniqueSessions.values());
+    });
+
+    const afterDedup = Object.values(sessionsByMentee).reduce((sum, sessions) => sum + sessions.length, 0);
+    console.log('After deduplication:', afterDedup, 'unique sessions');
+    console.log('Duplicates removed:', beforeDedup - afterDedup);
 
     // Now, process each mentee's sessions using actual session numbers from DB
     Object.values(sessionsByMentee).forEach((menteeSessions) => {
