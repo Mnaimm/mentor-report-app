@@ -176,78 +176,76 @@ export default async function handler(req, res) {
     try {
       console.log('📊 Starting Supabase dual-write for Bangkit session report...');
 
-      // Prepare Supabase payload
+      // Prepare Supabase payload - MUST match 'reports' table schema
       const supabasePayload = {
-        // Metadata
-        created_at: new Date().toISOString(),
-        google_sheets_row: newRowNumber,
+        // Program & Metadata
+        program: 'Bangkit',
+        source: 'web_form',
+        status: 'submitted',
+        submission_date: new Date().toISOString(),
+        sheets_row_number: newRowNumber,
 
-        // Mentor & Mentee Info
+        // Mentor Info
         mentor_email: reportData?.mentorEmail || null,
-        mentor_name: reportData?.namaMentor || null,
-        mentee_name: reportData?.usahawan || null,
-        company_name: reportData?.namaSyarikat || null,
+        nama_mentor: reportData?.namaMentor || null,
+
+        // Entrepreneur/Mentee Info (use reports table column names!)
+        nama_usahawan: reportData?.usahawan || null,      // NOT 'mentee_name'
+        nama_syarikat: reportData?.namaSyarikat || null,  // NOT 'company_name'
 
         // Session Info
         session_number: reportData?.sesiLaporan || null,
         session_date: reportData?.sesi?.date || null,
-        session_time: reportData?.sesi?.time || null,
-        session_platform: reportData?.sesi?.platform || null,
-        session_location: reportData?.sesi?.lokasiF2F || null,
-        session_status: reportData?.status || 'Selesai',
+        masa_mula: reportData?.sesi?.time || null,        // NOT 'session_time'
+        mod_sesi: reportData?.sesi?.platform || null,     // NOT 'session_platform'
+        lokasi_f2f: reportData?.sesi?.lokasiF2F || null,  // NOT 'session_location'
 
         // Business Info
-        product_service: reportData?.tambahan?.produkServis || null,
-        social_media_links: reportData?.tambahan?.pautanMediaSosial || null,
-        business_type: reportData?.tambahan?.jenisBisnes || null,
+        produk_servis: reportData?.tambahan?.produkServis || null,
+        pautan_media_sosial: reportData?.tambahan?.pautanMediaSosial || null,
 
-        // Initiatives (JSON array)
-        initiatives: reportData?.inisiatif || [],
-        initiative_updates: reportData?.kemaskiniInisiatif || [],
+        // Initiatives (JSONB array)
+        inisiatif: reportData?.inisiatif || [],
+        kemaskini_inisiatif: reportData?.kemaskiniInisiatif?.join('\n\n') || null,
 
-        // Technology adoption
-        technology_systems: reportData?.teknologi || [],
-
-        // Sales data (JSON array for 12 months)
-        monthly_sales_current: reportData?.jualanTerkini || [],
-        annual_sales_previous_year: reportData?.jualanTahunSebelum?.setahun || null,
-        monthly_sales_min_previous: reportData?.jualanTahunSebelum?.bulananMin || null,
-        monthly_sales_max_previous: reportData?.jualanTahunSebelum?.bulananMaks || null,
+        // Sales data (JSONB - can be null or array)
+        jualan_terkini: reportData?.jualanTerkini || null,
 
         // Observations & Summary
-        observation_notes: reportData?.pemerhatian || null,
-        session_summary: reportData?.rumusan || null,
-        session_summary_2plus: reportData?.rumusanSesi2Plus || null,
+        pemerhatian: reportData?.pemerhatian || null,
+        rumusan: reportData?.rumusan || null,
 
-        // Reflection
-        reflection_feelings: reportData?.refleksi?.perasaan || null,
-        reflection_score: reportData?.refleksi?.skor || null,
-        reflection_score_reason: reportData?.refleksi?.alasan || null,
-        reflection_eliminate: reportData?.refleksi?.eliminate || null,
-        reflection_raise: reportData?.refleksi?.raise || null,
-        reflection_reduce: reportData?.refleksi?.reduce || null,
-        reflection_create: reportData?.refleksi?.create || null,
+        // Reflection (JSONB object)
+        refleksi: reportData?.refleksi || null,
 
-        // Images (JSON arrays/strings)
-        image_urls_session: reportData?.imageUrls?.sesi || [],
-        image_url_growthwheel: reportData?.imageUrls?.growthwheel || null,
-        image_url_profile: reportData?.imageUrls?.profil || null,
-        image_urls_premises: reportData?.imageUrls?.premis || [],
-        image_url_mia_proof: reportData?.imageUrls?.mia || null,
+        // GrowthWheel scores (JSONB array)
+        gw_skor: reportData?.gwSkor || null,
+
+        // Images (JSONB object with nested structure)
+        image_urls: {
+          sesi: reportData?.imageUrls?.sesi || [],
+          growthwheel: reportData?.imageUrls?.growthwheel || '',
+          profil: reportData?.imageUrls?.profil || '',
+          premis: reportData?.imageUrls?.premis || []
+        },
 
         // Premises visit
-        premises_visited: reportData?.premisDilawatChecked || false,
+        premis_dilawat: reportData?.premisDilawatChecked || false,
 
-        // MIA status
-        mia_status: reportData?.status === 'MIA',
+        // MIA status (TEXT field: 'Selesai' or 'MIA', NOT boolean!)
+        mia_status: reportData?.status || 'Selesai',
+        mia_proof_url: reportData?.imageUrls?.mia || null,
         mia_reason: reportData?.mia?.alasan || null,
 
-        // Program type
-        program_type: programType || 'bangkit'
+        // Folder ID for Google Drive integration
+        folder_id: reportData?.folder_id || null,
+
+        // Payment fields (defaults)
+        payment_status: 'pending'
       };
 
       const { data: insertedData, error: supabaseInsertError } = await supabase
-        .from('session_reports')
+        .from('reports')  // ✅ FIXED: Use existing 'reports' table
         .insert(supabasePayload)
         .select();
 
@@ -262,7 +260,7 @@ export default async function handler(req, res) {
         source_system: 'google_sheets',
         target_system: 'supabase',
         operation_type: 'insert',
-        table_name: 'session_reports',
+        table_name: 'reports',  // ✅ FIXED: Correct table name
         record_id: supabaseRecordId,
         google_sheets_row: newRowNumber,
         status: 'success',
@@ -270,7 +268,8 @@ export default async function handler(req, res) {
         metadata: {
           mentor_email: reportData?.mentorEmail,
           mentee_name: reportData?.usahawan,
-          session_number: reportData?.sesiLaporan
+          session_number: reportData?.sesiLaporan,
+          program: 'Bangkit'
         }
       });
 
@@ -284,7 +283,7 @@ export default async function handler(req, res) {
           source_system: 'google_sheets',
           target_system: 'supabase',
           operation_type: 'insert',
-          table_name: 'session_reports',
+          table_name: 'reports',  // ✅ FIXED: Correct table name
           google_sheets_row: newRowNumber,
           status: 'failed',
           error_message: error.message,
@@ -292,7 +291,8 @@ export default async function handler(req, res) {
           metadata: {
             mentor_email: reportData?.mentorEmail,
             mentee_name: reportData?.usahawan,
-            session_number: reportData?.sesiLaporan
+            session_number: reportData?.sesiLaporan,
+            program: 'Bangkit'
           }
         });
       } catch (monitoringError) {

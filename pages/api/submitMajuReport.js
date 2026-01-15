@@ -95,64 +95,72 @@ export default async function handler(req, res) {
     try {
       console.log('📊 Starting Supabase dual-write for MAJU report...');
 
-      // Prepare Supabase payload
+      // Prepare Supabase payload - MUST match 'reports' table schema
       const supabasePayload = {
-        // Metadata
-        created_at: new Date().toISOString(),
-        google_sheets_row: newRowNumber,
+        // Program & Metadata
+        program: 'Maju',
+        source: 'web_form',
+        status: 'submitted',
+        submission_date: new Date().toISOString(),
+        sheets_row_number: newRowNumber,
 
-        // Mentor & Mentee Info
-        mentor_name: reportData.NAMA_MENTOR || null,
+        // Mentor Info
+        nama_mentor: reportData.NAMA_MENTOR || null,
         mentor_email: reportData.EMAIL_MENTOR || null,
-        mentee_name: reportData.NAMA_MENTEE || null,
-        business_name: reportData.NAMA_BISNES || null,
-        business_location: reportData.LOKASI_BISNES || null,
-        product_service: reportData.PRODUK_SERVIS || null,
-        phone_number: reportData.NO_TELEFON || null,
+
+        // Mentee Info (use reports table column names!)
+        nama_mentee: reportData.NAMA_MENTEE || null,       // Maju uses 'nama_mentee'
+        nama_bisnes: reportData.NAMA_BISNES || null,
+        lokasi_bisnes: reportData.LOKASI_BISNES || null,
+        produk_servis: reportData.PRODUK_SERVIS || null,
+        no_telefon: reportData.NO_TELEFON || null,
 
         // Session Info
         session_date: reportData.TARIKH_SESI || null,
         session_number: reportData.SESI_NUMBER || null,
-        session_mode: reportData.MOD_SESI || null,
-        session_location_f2f: reportData.LOKASI_F2F || null,
-        session_start_time: reportData.MASA_MULA || null,
-        session_end_time: reportData.MASA_TAMAT || null,
+        mod_sesi: reportData.MOD_SESI || null,
+        lokasi_f2f: reportData.LOKASI_F2F || null,
+        masa_mula: reportData.MASA_MULA || null,
+        masa_tamat: reportData.MASA_TAMAT || null,
 
         // Business Information
-        entrepreneur_background: reportData.LATARBELAKANG_USAHAWAN || null,
-        business_overall_status: reportData.STATUS_PERNIAGAAN_KESELURUHAN || null,
-        summary_and_next_steps: reportData.RUMUSAN_DAN_LANGKAH_KEHADAPAN || null,
+        latarbelakang_usahawan: reportData.LATARBELAKANG_USAHAWAN || null,
+        status_perniagaan: reportData.STATUS_PERNIAGAAN_KESELURUHAN || null,
+        rumusan_langkah_kehadapan: reportData.RUMUSAN_DAN_LANGKAH_KEHADAPAN || null,
 
-        // Financial Data (JSON)
-        monthly_financial_data: reportData.DATA_KEWANGAN_BULANAN_JSON || [],
+        // Financial Data (JSONB array)
+        data_kewangan_bulanan: reportData.DATA_KEWANGAN_BULANAN_JSON || [],
 
-        // Mentoring Findings (JSON)
+        // Mentoring Findings (JSONB array)
         mentoring_findings: reportData.MENTORING_FINDINGS_JSON || [],
 
         // Reflection
-        reflection_feelings: reportData.REFLEKSI_MENTOR_PERASAAN || null,
-        reflection_commitment: reportData.REFLEKSI_MENTOR_KOMITMEN || null,
-        reflection_other: reportData.REFLEKSI_MENTOR_LAIN || null,
+        refleksi_mentor_perasaan: reportData.REFLEKSI_MENTOR_PERASAAN || null,
+        refleksi_mentor_komitmen: reportData.REFLEKSI_MENTOR_KOMITMEN || null,
+        refleksi_mentor_lain: reportData.REFLEKSI_MENTOR_LAIN || null,
 
-        // Images (JSON arrays/strings)
-        image_urls_premises: reportData.URL_GAMBAR_PREMIS_JSON || [],
-        image_urls_session: reportData.URL_GAMBAR_SESI_JSON || [],
-        image_url_growthwheel: reportData.URL_GAMBAR_GW360 || null,
+        // Images (JSONB object with nested structure)
+        image_urls: {
+          premis: reportData.URL_GAMBAR_PREMIS_JSON || [],
+          sesi: reportData.URL_GAMBAR_SESI_JSON || [],
+          growthwheel: reportData.URL_GAMBAR_GW360 || ''
+        },
 
         // Folder & Document IDs
         folder_id: reportData.Folder_ID || null,
+        doc_url: reportData.Laporan_Maju_Doc_ID || null,  // Maju has doc_url immediately
 
-        // MIA Status
-        mia_status: reportData.MIA_STATUS === 'MIA',
+        // MIA Status (TEXT field: 'Tidak MIA' or 'MIA', NOT boolean!)
+        mia_status: reportData.MIA_STATUS || 'Tidak MIA',
         mia_reason: reportData.MIA_REASON || null,
         mia_proof_url: reportData.MIA_PROOF_URL || null,
 
-        // Program type
-        program_type: 'maju'
+        // Payment fields (defaults)
+        payment_status: 'pending'
       };
 
       const { data: insertedData, error: supabaseInsertError } = await supabase
-        .from('maju_reports')
+        .from('reports')  // ✅ FIXED: Use existing 'reports' table (same for Bangkit & Maju)
         .insert(supabasePayload)
         .select();
 
@@ -167,7 +175,7 @@ export default async function handler(req, res) {
         source_system: 'google_sheets',
         target_system: 'supabase',
         operation_type: 'insert',
-        table_name: 'maju_reports',
+        table_name: 'reports',  // ✅ FIXED: Correct table name
         record_id: supabaseRecordId,
         google_sheets_row: newRowNumber,
         status: 'success',
@@ -189,7 +197,7 @@ export default async function handler(req, res) {
           source_system: 'google_sheets',
           target_system: 'supabase',
           operation_type: 'insert',
-          table_name: 'maju_reports',
+          table_name: 'reports',  // ✅ FIXED: Correct table name
           google_sheets_row: newRowNumber,
           status: 'failed',
           error_message: error.message,
