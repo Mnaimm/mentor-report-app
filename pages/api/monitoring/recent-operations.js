@@ -14,6 +14,7 @@
  */
 
 import { getRecentLogs } from '@/lib/monitoring/dual-write-logger';
+import { adaptMonitoringRecords } from '@/lib/monitoring/data-adapter';
 
 export default async function handler(req, res) {
   // Only allow GET
@@ -47,8 +48,11 @@ export default async function handler(req, res) {
     // Get logs
     const logs = await getRecentLogs(parsedLimit, filters);
 
+    // Adapt records to expected format
+    const adaptedLogs = adaptMonitoringRecords(logs);
+
     // Apply offset (simple pagination)
-    const paginatedLogs = logs.slice(parsedOffset, parsedOffset + parsedLimit);
+    const paginatedLogs = adaptedLogs.slice(parsedOffset, parsedOffset + parsedLimit);
 
     return res.status(200).json({
       operations: paginatedLogs,

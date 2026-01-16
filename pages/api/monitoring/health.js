@@ -79,7 +79,7 @@ async function checkSupabaseHealth() {
   try {
     // Simple query to check connectivity
     const { data, error } = await supabase
-      .from('dual_write_logs')
+      .from('dual_write_monitoring')
       .select('id')
       .limit(1);
 
