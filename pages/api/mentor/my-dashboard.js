@@ -243,16 +243,17 @@ export default async function handler(req, res) {
           // Build UM submission map
           for (const row of umRows) {
             const batch = row['Batch.'];
-            const menteeEmail = (row['Email Usahawan'] || row['Email Address Usahawan'] || '').toLowerCase().trim();
+            const menteeName = (row['Nama Penuh Usahawan.'] || '').trim();
             const sesiMentoring = row['Sesi Mentoring.'];
 
-            if (!batch || !sesiMentoring) continue;
+            if (!batch || !sesiMentoring || !menteeName) continue;
 
             const sessionNum = normalizeRoundNumber(sesiMentoring);
             if (!sessionNum) continue;
 
-            // Create composite key: batch-session-email
-            const key = `${batch}-${sessionNum}-${menteeEmail}`;
+            // CRITICAL FIX: Create composite key using NAME instead of email
+            // UM form doesn't collect entrepreneur email, only mentor's email
+            const key = `${batch}-${sessionNum}-${menteeName}`;
             umSubmissions.set(key, true);
           }
 
@@ -447,7 +448,10 @@ export default async function handler(req, res) {
 
         if (hasSubmittedThisRoundSession) {
           // Check if UM form submitted
-          const umKey = `${menteeBatch}-${currentRoundNumStr}-${entrepreneur.email.toLowerCase().trim()}`;
+          // CRITICAL FIX: Use entrepreneur NAME instead of email
+          // CRITICAL FIX 2: Use full batch name from batchInfo (e.g., "Batch 5 Bangkit") not cohort (e.g., "Batch 5")
+          const fullBatchName = batchInfo?.batch || menteeBatch;
+          const umKey = `${fullBatchName}-${currentRoundNumStr}-${entrepreneur.name.trim()}`;
           const hasSubmittedUM = umSubmissions.has(umKey);
 
           console.log(`🔍 UM Check for ${entrepreneur.name}: key="${umKey}", found=${hasSubmittedUM}`);
