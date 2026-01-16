@@ -1139,7 +1139,7 @@ const handleSubmit = async (e) => {
     // CONDITIONALLY BUILD dataToSend BASED ON MIA STATUS
     if (isMIA) {
       console.log('📋 Building MIA data to send...');
-      
+
       dataToSend = {
         NAMA_MENTOR: formData.NAMA_MENTOR,
         EMAIL_MENTOR: formData.EMAIL_MENTOR,
@@ -1167,10 +1167,39 @@ const handleSubmit = async (e) => {
         MIA_STATUS: 'MIA',
         MIA_REASON: miaReason,
         MIA_PROOF_URL: imageUrls.mia,
+        // UPWARD MOBILITY - Allow partial data for MIA submissions
+        UPWARD_MOBILITY_JSON: JSON.stringify({
+          UM_STATUS_PENGLIBATAN: formData.UPWARD_MOBILITY.UM_STATUS_PENGLIBATAN || '',
+          UM_STATUS: formData.UPWARD_MOBILITY.UM_STATUS || '',
+          UM_KRITERIA_IMPROVEMENT: formData.UPWARD_MOBILITY.UM_KRITERIA_IMPROVEMENT || '',
+          UM_TARIKH_LAWATAN_PREMIS: formData.UPWARD_MOBILITY.UM_TARIKH_LAWATAN_PREMIS || '',
+          UM_AKAUN_BIMB: formData.UPWARD_MOBILITY.UM_AKAUN_BIMB || '',
+          UM_BIMB_BIZ: formData.UPWARD_MOBILITY.UM_BIMB_BIZ || '',
+          UM_AL_AWFAR: formData.UPWARD_MOBILITY.UM_AL_AWFAR || '',
+          UM_MERCHANT_TERMINAL: formData.UPWARD_MOBILITY.UM_MERCHANT_TERMINAL || '',
+          UM_FASILITI_LAIN: formData.UPWARD_MOBILITY.UM_FASILITI_LAIN || '',
+          UM_MESINKIRA: formData.UPWARD_MOBILITY.UM_MESINKIRA || '',
+          UM_PENDAPATAN_SEMASA: formData.UPWARD_MOBILITY.UM_PENDAPATAN_SEMASA || '',
+          UM_ULASAN_PENDAPATAN: formData.UPWARD_MOBILITY.UM_ULASAN_PENDAPATAN || '',
+          UM_PEKERJA_SEMASA: formData.UPWARD_MOBILITY.UM_PEKERJA_SEMASA || '',
+          UM_ULASAN_PEKERJA: formData.UPWARD_MOBILITY.UM_ULASAN_PEKERJA || '',
+          UM_ASET_BUKAN_TUNAI_SEMASA: formData.UPWARD_MOBILITY.UM_ASET_BUKAN_TUNAI_SEMASA || '',
+          UM_ULASAN_ASET_BUKAN_TUNAI: formData.UPWARD_MOBILITY.UM_ULASAN_ASET_BUKAN_TUNAI || '',
+          UM_ASET_TUNAI_SEMASA: formData.UPWARD_MOBILITY.UM_ASET_TUNAI_SEMASA || '',
+          UM_ULASAN_ASET_TUNAI: formData.UPWARD_MOBILITY.UM_ULASAN_ASET_TUNAI || '',
+          UM_SIMPANAN_SEMASA: formData.UPWARD_MOBILITY.UM_SIMPANAN_SEMASA || '',
+          UM_ULASAN_SIMPANAN: formData.UPWARD_MOBILITY.UM_ULASAN_SIMPANAN || '',
+          UM_ZAKAT_SEMASA: formData.UPWARD_MOBILITY.UM_ZAKAT_SEMASA || '',
+          UM_ULASAN_ZAKAT: formData.UPWARD_MOBILITY.UM_ULASAN_ZAKAT || '',
+          UM_DIGITAL_SEMASA: (formData.UPWARD_MOBILITY.UM_DIGITAL_SEMASA || []).join(', '),
+          UM_ULASAN_DIGITAL: formData.UPWARD_MOBILITY.UM_ULASAN_DIGITAL || '',
+          UM_MARKETING_SEMASA: (formData.UPWARD_MOBILITY.UM_MARKETING_SEMASA || []).join(', '),
+          UM_ULASAN_MARKETING: formData.UPWARD_MOBILITY.UM_ULASAN_MARKETING || '',
+        }),
       };
     } else {
       console.log('📋 Building regular report data to send...');
-      
+
       dataToSend = {
         NAMA_MENTOR: formData.NAMA_MENTOR,
         EMAIL_MENTOR: formData.EMAIL_MENTOR,
@@ -1198,33 +1227,35 @@ const handleSubmit = async (e) => {
         MIA_STATUS: 'Tidak MIA',
         MIA_REASON: '',
         MIA_PROOF_URL: imageUrls.mia,
-        // UPWARD MOBILITY FIELDS (Sections 3-6)
-        UM_STATUS_PENGLIBATAN: formData.UPWARD_MOBILITY.UM_STATUS_PENGLIBATAN || '',
-        UM_STATUS: formData.UPWARD_MOBILITY.UM_STATUS || '',
-        UM_KRITERIA_IMPROVEMENT: formData.UPWARD_MOBILITY.UM_KRITERIA_IMPROVEMENT || '',
-        UM_TARIKH_LAWATAN_PREMIS: formData.UPWARD_MOBILITY.UM_TARIKH_LAWATAN_PREMIS || '',
-        UM_AKAUN_BIMB: formData.UPWARD_MOBILITY.UM_AKAUN_BIMB || '',
-        UM_BIMB_BIZ: formData.UPWARD_MOBILITY.UM_BIMB_BIZ || '',
-        UM_AL_AWFAR: formData.UPWARD_MOBILITY.UM_AL_AWFAR || '',
-        UM_MERCHANT_TERMINAL: formData.UPWARD_MOBILITY.UM_MERCHANT_TERMINAL || '',
-        UM_FASILITI_LAIN: formData.UPWARD_MOBILITY.UM_FASILITI_LAIN || '',
-        UM_MESINKIRA: formData.UPWARD_MOBILITY.UM_MESINKIRA || '',
-        UM_PENDAPATAN_SEMASA: formData.UPWARD_MOBILITY.UM_PENDAPATAN_SEMASA || '',
-        UM_ULASAN_PENDAPATAN: formData.UPWARD_MOBILITY.UM_ULASAN_PENDAPATAN || '',
-        UM_PEKERJA_SEMASA: formData.UPWARD_MOBILITY.UM_PEKERJA_SEMASA || '',
-        UM_ULASAN_PEKERJA: formData.UPWARD_MOBILITY.UM_ULASAN_PEKERJA || '',
-        UM_ASET_BUKAN_TUNAI_SEMASA: formData.UPWARD_MOBILITY.UM_ASET_BUKAN_TUNAI_SEMASA || '',
-        UM_ULASAN_ASET_BUKAN_TUNAI: formData.UPWARD_MOBILITY.UM_ULASAN_ASET_BUKAN_TUNAI || '',
-        UM_ASET_TUNAI_SEMASA: formData.UPWARD_MOBILITY.UM_ASET_TUNAI_SEMASA || '',
-        UM_ULASAN_ASET_TUNAI: formData.UPWARD_MOBILITY.UM_ULASAN_ASET_TUNAI || '',
-        UM_SIMPANAN_SEMASA: formData.UPWARD_MOBILITY.UM_SIMPANAN_SEMASA || '',
-        UM_ULASAN_SIMPANAN: formData.UPWARD_MOBILITY.UM_ULASAN_SIMPANAN || '',
-        UM_ZAKAT_SEMASA: formData.UPWARD_MOBILITY.UM_ZAKAT_SEMASA || '',
-        UM_ULASAN_ZAKAT: formData.UPWARD_MOBILITY.UM_ULASAN_ZAKAT || '',
-        UM_DIGITAL_SEMASA: (formData.UPWARD_MOBILITY.UM_DIGITAL_SEMASA || []).join(', '),
-        UM_ULASAN_DIGITAL: formData.UPWARD_MOBILITY.UM_ULASAN_DIGITAL || '',
-        UM_MARKETING_SEMASA: (formData.UPWARD_MOBILITY.UM_MARKETING_SEMASA || []).join(', '),
-        UM_ULASAN_MARKETING: formData.UPWARD_MOBILITY.UM_ULASAN_MARKETING || '',
+        // UPWARD MOBILITY - Store as JSON for MAJU AppScript
+        UPWARD_MOBILITY_JSON: JSON.stringify({
+          UM_STATUS_PENGLIBATAN: formData.UPWARD_MOBILITY.UM_STATUS_PENGLIBATAN || '',
+          UM_STATUS: formData.UPWARD_MOBILITY.UM_STATUS || '',
+          UM_KRITERIA_IMPROVEMENT: formData.UPWARD_MOBILITY.UM_KRITERIA_IMPROVEMENT || '',
+          UM_TARIKH_LAWATAN_PREMIS: formData.UPWARD_MOBILITY.UM_TARIKH_LAWATAN_PREMIS || '',
+          UM_AKAUN_BIMB: formData.UPWARD_MOBILITY.UM_AKAUN_BIMB || '',
+          UM_BIMB_BIZ: formData.UPWARD_MOBILITY.UM_BIMB_BIZ || '',
+          UM_AL_AWFAR: formData.UPWARD_MOBILITY.UM_AL_AWFAR || '',
+          UM_MERCHANT_TERMINAL: formData.UPWARD_MOBILITY.UM_MERCHANT_TERMINAL || '',
+          UM_FASILITI_LAIN: formData.UPWARD_MOBILITY.UM_FASILITI_LAIN || '',
+          UM_MESINKIRA: formData.UPWARD_MOBILITY.UM_MESINKIRA || '',
+          UM_PENDAPATAN_SEMASA: formData.UPWARD_MOBILITY.UM_PENDAPATAN_SEMASA || '',
+          UM_ULASAN_PENDAPATAN: formData.UPWARD_MOBILITY.UM_ULASAN_PENDAPATAN || '',
+          UM_PEKERJA_SEMASA: formData.UPWARD_MOBILITY.UM_PEKERJA_SEMASA || '',
+          UM_ULASAN_PEKERJA: formData.UPWARD_MOBILITY.UM_ULASAN_PEKERJA || '',
+          UM_ASET_BUKAN_TUNAI_SEMASA: formData.UPWARD_MOBILITY.UM_ASET_BUKAN_TUNAI_SEMASA || '',
+          UM_ULASAN_ASET_BUKAN_TUNAI: formData.UPWARD_MOBILITY.UM_ULASAN_ASET_BUKAN_TUNAI || '',
+          UM_ASET_TUNAI_SEMASA: formData.UPWARD_MOBILITY.UM_ASET_TUNAI_SEMASA || '',
+          UM_ULASAN_ASET_TUNAI: formData.UPWARD_MOBILITY.UM_ULASAN_ASET_TUNAI || '',
+          UM_SIMPANAN_SEMASA: formData.UPWARD_MOBILITY.UM_SIMPANAN_SEMASA || '',
+          UM_ULASAN_SIMPANAN: formData.UPWARD_MOBILITY.UM_ULASAN_SIMPANAN || '',
+          UM_ZAKAT_SEMASA: formData.UPWARD_MOBILITY.UM_ZAKAT_SEMASA || '',
+          UM_ULASAN_ZAKAT: formData.UPWARD_MOBILITY.UM_ULASAN_ZAKAT || '',
+          UM_DIGITAL_SEMASA: (formData.UPWARD_MOBILITY.UM_DIGITAL_SEMASA || []).join(', '),
+          UM_ULASAN_DIGITAL: formData.UPWARD_MOBILITY.UM_ULASAN_DIGITAL || '',
+          UM_MARKETING_SEMASA: (formData.UPWARD_MOBILITY.UM_MARKETING_SEMASA || []).join(', '),
+          UM_ULASAN_MARKETING: formData.UPWARD_MOBILITY.UM_ULASAN_MARKETING || '',
+        }),
       };
     }
 
@@ -1237,22 +1268,22 @@ const handleSubmit = async (e) => {
     console.log('  - Premis Images:', dataToSend.URL_GAMBAR_PREMIS_JSON?.length || 0);
     console.log('  - GW360 Image:', dataToSend.URL_GAMBAR_GW360 ? 'Present' : 'Missing');
     
-    console.log('🌐 Submitting to /api/submitMajuReport...');
+    console.log('🌐 Submitting to /api/submitMajuReportUM...');
 
     // Update stage: saving to database
     setSubmissionStage({
       stage: 'saving',
-      message: 'Saving report to Google Sheets...',
-      detail: 'This may take up to 30 seconds'
+      message: 'Saving report to Google Sheets & Upward Mobility...',
+      detail: 'Writing to MAJU and UM sheets. This may take up to 40 seconds'
     });
 
-    // Add frontend timeout protection (25 seconds)
+    // Add frontend timeout protection (35 seconds for dual AppScript calls)
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 25000);
+    const timeoutId = setTimeout(() => controller.abort(), 35000);
 
     let response;
     try {
-      response = await fetch('/api/submitMajuReport', {
+      response = await fetch('/api/submitMajuReportUM', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
