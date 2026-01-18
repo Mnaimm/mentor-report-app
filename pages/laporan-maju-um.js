@@ -949,9 +949,7 @@ const validateForm = () => {
     if (!formData.UPWARD_MOBILITY.UM_STATUS || formData.UPWARD_MOBILITY.UM_STATUS.trim() === '') {
       errors.push('Upward Mobility - Upward Mobility Status adalah wajib diisi');
     }
-    if (!formData.UPWARD_MOBILITY.UM_TARIKH_LAWATAN_PREMIS || formData.UPWARD_MOBILITY.UM_TARIKH_LAWATAN_PREMIS.trim() === '') {
-      errors.push('Upward Mobility - Tarikh Lawatan ke Premis adalah wajib diisi (tulis 0 jika belum)');
-    }
+    // Tarikh Lawatan is now optional - can be "Belum dilawat" or a date
 
     // Section 5: Situasi Kewangan - All ulasan fields are required
     if (!formData.UPWARD_MOBILITY.UM_ULASAN_PENDAPATAN || formData.UPWARD_MOBILITY.UM_ULASAN_PENDAPATAN.trim() === '') {
@@ -2282,15 +2280,52 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                     placeholder="Contoh: Grade 2 - Berjaya bayar balik pinjaman tepat pada masa, credit score meningkat dari C kepada B"
                   />
 
-                  <InputField
-                    label="Tarikh Lawatan ke Premis *"
-                    type="text"
-                    name="UM_TARIKH_LAWATAN_PREMIS"
-                    value={formData.UPWARD_MOBILITY.UM_TARIKH_LAWATAN_PREMIS}
-                    onChange={(e) => handleUMChange('UM_TARIKH_LAWATAN_PREMIS', e.target.value)}
-                    placeholder="Jika belum, tulis 0. Cth: 15/01/2025 atau 0"
-                    required
-                  />
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Tarikh Lawatan ke Premis
+                    </label>
+                    <div className="flex gap-4 mb-2">
+                      <label className="flex items-center cursor-pointer">
+                        <input
+                          type="radio"
+                          name="UM_TARIKH_LAWATAN_STATUS"
+                          value="sudah"
+                          checked={formData.UPWARD_MOBILITY.UM_TARIKH_LAWATAN_PREMIS !== 'Belum dilawat'}
+                          onChange={(e) => {
+                            if (e.target.checked && formData.UPWARD_MOBILITY.UM_TARIKH_LAWATAN_PREMIS === 'Belum dilawat') {
+                              handleUMChange('UM_TARIKH_LAWATAN_PREMIS', '');
+                            }
+                          }}
+                          className="mr-2"
+                        />
+                        <span>Sudah dilawat</span>
+                      </label>
+                      <label className="flex items-center cursor-pointer">
+                        <input
+                          type="radio"
+                          name="UM_TARIKH_LAWATAN_STATUS"
+                          value="belum"
+                          checked={formData.UPWARD_MOBILITY.UM_TARIKH_LAWATAN_PREMIS === 'Belum dilawat'}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              handleUMChange('UM_TARIKH_LAWATAN_PREMIS', 'Belum dilawat');
+                            }
+                          }}
+                          className="mr-2"
+                        />
+                        <span>Belum dilawat</span>
+                      </label>
+                    </div>
+                    {formData.UPWARD_MOBILITY.UM_TARIKH_LAWATAN_PREMIS !== 'Belum dilawat' && (
+                      <input
+                        type="date"
+                        name="UM_TARIKH_LAWATAN_PREMIS"
+                        value={formData.UPWARD_MOBILITY.UM_TARIKH_LAWATAN_PREMIS}
+                        onChange={(e) => handleUMChange('UM_TARIKH_LAWATAN_PREMIS', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    )}
+                  </div>
                 </Section>
               </div>
 
@@ -2306,7 +2341,11 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                 }>
                   <div className="space-y-4">
                     <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                      <div className="font-semibold text-gray-700 mb-3">1. Akaun Simpanan atau Akaun Semasa BIMB</div>
+                      <div className="font-semibold text-gray-700 mb-2">1. Penggunaan Akaun Semasa BIMB (Current Account)</div>
+                      <div className="text-sm text-gray-600 mb-3">
+                        <p className="mb-1"><strong>Klik Yes</strong> - Jika usahawan menggunakan secara aktif untuk transaksi bisnes.</p>
+                        <p><strong>Klik No</strong> - Jika usahawan hanya menggunakan untuk membayar pembiayaan atau tidak aktif.</p>
+                      </div>
                       <div className="flex gap-4">
                         <label className="flex items-center cursor-pointer">
                           <input
@@ -2317,7 +2356,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                             onChange={(e) => handleUMChange('UM_AKAUN_BIMB', e.target.value)}
                             className="mr-2"
                           />
-                          <span>Ya</span>
+                          <span>Yes</span>
                         </label>
                         <label className="flex items-center cursor-pointer">
                           <input
@@ -2328,13 +2367,16 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                             onChange={(e) => handleUMChange('UM_AKAUN_BIMB', e.target.value)}
                             className="mr-2"
                           />
-                          <span>Tidak</span>
+                          <span>No</span>
                         </label>
                       </div>
                     </div>
 
                     <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                      <div className="font-semibold text-gray-700 mb-3">2. Bisnes dengan BIMB BizApp</div>
+                      <div className="font-semibold text-gray-700 mb-2">2. Penggunaan BIMB Biz</div>
+                      <div className="text-sm text-gray-600 mb-3">
+                        <p>Aplikasi perbankan mudah alih yang membolehkan usahawan mengurus perniagaan harian mereka dengan cepat dan selamat.</p>
+                      </div>
                       <div className="flex gap-4">
                         <label className="flex items-center cursor-pointer">
                           <input
@@ -2345,7 +2387,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                             onChange={(e) => handleUMChange('UM_BIMB_BIZ', e.target.value)}
                             className="mr-2"
                           />
-                          <span>Ya</span>
+                          <span>Yes</span>
                         </label>
                         <label className="flex items-center cursor-pointer">
                           <input
@@ -2356,13 +2398,17 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                             onChange={(e) => handleUMChange('UM_BIMB_BIZ', e.target.value)}
                             className="mr-2"
                           />
-                          <span>Tidak</span>
+                          <span>No</span>
                         </label>
                       </div>
                     </div>
 
                     <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                      <div className="font-semibold text-gray-700 mb-3">3. Al-Awfar (BIMB)</div>
+                      <div className="font-semibold text-gray-700 mb-2">3. Buka akaun Al-Awfar (Opened Al-Awfar Account)</div>
+                      <div className="text-sm text-gray-600 mb-3">
+                        <p className="mb-1"><strong>Klik Yes</strong> - Jika usahawan membuka akaun Al-Awfar.</p>
+                        <p><strong>Klik No</strong> - Jika usahawan tidak membuka akaun Al-Awfar.</p>
+                      </div>
                       <div className="flex gap-4">
                         <label className="flex items-center cursor-pointer">
                           <input
@@ -2373,7 +2419,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                             onChange={(e) => handleUMChange('UM_AL_AWFAR', e.target.value)}
                             className="mr-2"
                           />
-                          <span>Ya</span>
+                          <span>Yes</span>
                         </label>
                         <label className="flex items-center cursor-pointer">
                           <input
@@ -2384,13 +2430,18 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                             onChange={(e) => handleUMChange('UM_AL_AWFAR', e.target.value)}
                             className="mr-2"
                           />
-                          <span>Tidak</span>
+                          <span>No</span>
                         </label>
                       </div>
                     </div>
 
                     <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                      <div className="font-semibold text-gray-700 mb-3">4. Merchant Terminal BIMB atau MPAY atau SPEEDPAY</div>
+                      <div className="font-semibold text-gray-700 mb-2">4. Penggunaan BIMB Merchant Terminal/ Pay2phone</div>
+                      <div className="text-sm text-gray-600 mb-3">
+                        <p className="mb-1">Aplikasi Bank Islam yang membenarkan usahawan menerima pembayaran tanpa sentuh kad kredit & kad debit melalui telefon bimbit android usahawan yang menggunakan Teknologi NFC.</p>
+                        <p className="mb-1"><strong>Klik Yes</strong> - Jika usahawan ada menggunakan walaupun jarang-jarang.</p>
+                        <p><strong>Klik No</strong> - Jika usahawan tidak pernah menggunakan / tidak tersedia.</p>
+                      </div>
                       <div className="flex gap-4">
                         <label className="flex items-center cursor-pointer">
                           <input
@@ -2401,7 +2452,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                             onChange={(e) => handleUMChange('UM_MERCHANT_TERMINAL', e.target.value)}
                             className="mr-2"
                           />
-                          <span>Ya</span>
+                          <span>Yes</span>
                         </label>
                         <label className="flex items-center cursor-pointer">
                           <input
@@ -2412,13 +2463,18 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                             onChange={(e) => handleUMChange('UM_MERCHANT_TERMINAL', e.target.value)}
                             className="mr-2"
                           />
-                          <span>Tidak</span>
+                          <span>No</span>
                         </label>
                       </div>
                     </div>
 
                     <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                      <div className="font-semibold text-gray-700 mb-3">5. Kemudahan lain BIMB atau STARTUPCURATE</div>
+                      <div className="font-semibold text-gray-700 mb-2">5. Lain-lain Fasiliti BIMB (Other BIMB Facilities)</div>
+                      <div className="text-sm text-gray-600 mb-3">
+                        <p className="mb-1">Fasiliti yang ditawarkan oleh BIMB untuk bisnes sahaja seperti kad kredit bisnes dan lain-lain.</p>
+                        <p className="mb-1"><strong>Klik Yes</strong> - Jika ada menggunakan fasiliti BIMB yang lain untuk bisnes usahawan SAHAJA SELEPAS mendapat pembiayaan daripada BIMB (contoh kad kredit perniagaan dan lain-lain yang melibatkan BISNES SAHAJA, bukan peribadi).</p>
+                        <p><strong>Klik No</strong> - Jika tidak menggunakan mana-mana servis / fasiliti BIMB SELEPAS mendapat pembiayaan.</p>
+                      </div>
                       <div className="flex gap-4">
                         <label className="flex items-center cursor-pointer">
                           <input
@@ -2429,7 +2485,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                             onChange={(e) => handleUMChange('UM_FASILITI_LAIN', e.target.value)}
                             className="mr-2"
                           />
-                          <span>Ya</span>
+                          <span>Yes</span>
                         </label>
                         <label className="flex items-center cursor-pointer">
                           <input
@@ -2440,13 +2496,17 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                             onChange={(e) => handleUMChange('UM_FASILITI_LAIN', e.target.value)}
                             className="mr-2"
                           />
-                          <span>Tidak</span>
+                          <span>No</span>
                         </label>
                       </div>
                     </div>
 
                     <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                      <div className="font-semibold text-gray-700 mb-3">6. Mesinkira (untuk urusan pembiayaan/tawwarruq)</div>
+                      <div className="font-semibold text-gray-700 mb-2">6. Melanggan aplikasi MesinKira (Subscribed Mesinkira Apps)</div>
+                      <div className="text-sm text-gray-600 mb-3">
+                        <p className="mb-1"><strong>Klik Yes</strong> - Jika ada melanggan aplikasi MesinKira walaupun tidak pernah atau jarang digunakan.</p>
+                        <p><strong>Klik No</strong> - Tidak pernah subscribe aplikasi MesinKira.</p>
+                      </div>
                       <div className="flex gap-4">
                         <label className="flex items-center cursor-pointer">
                           <input
@@ -2457,7 +2517,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                             onChange={(e) => handleUMChange('UM_MESINKIRA', e.target.value)}
                             className="mr-2"
                           />
-                          <span>Ya</span>
+                          <span>Yes</span>
                         </label>
                         <label className="flex items-center cursor-pointer">
                           <input
@@ -2468,7 +2528,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                             onChange={(e) => handleUMChange('UM_MESINKIRA', e.target.value)}
                             className="mr-2"
                           />
-                          <span>Tidak</span>
+                          <span>No</span>
                         </label>
                       </div>
                     </div>
