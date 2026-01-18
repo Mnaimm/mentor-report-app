@@ -502,6 +502,74 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
       return;
     }
 
+    // ============== UPWARD MOBILITY VALIDATION (ALWAYS REQUIRED) ==============
+    // UM data is MANDATORY for ALL Bangkit sessions - no conditional logic
+    const umErrors = [];
+
+    // Section 1: Engagement Status
+    if (!formState.upwardMobility.UM_STATUS_PENGLIBATAN || formState.upwardMobility.UM_STATUS_PENGLIBATAN.trim() === '') {
+      umErrors.push('Upward Mobility - Status Penglibatan Usahawan adalah wajib diisi');
+    }
+    if (!formState.upwardMobility.UM_STATUS || formState.upwardMobility.UM_STATUS.trim() === '') {
+      umErrors.push('Upward Mobility - Upward Mobility Status adalah wajib diisi');
+    }
+
+    // Section 2: BIMB Channels (all 6 required)
+    if (!formState.upwardMobility.UM_AKAUN_BIMB || formState.upwardMobility.UM_AKAUN_BIMB.trim() === '') {
+      umErrors.push('Upward Mobility - Akaun Semasa BIMB adalah wajib diisi');
+    }
+    if (!formState.upwardMobility.UM_BIMB_BIZ || formState.upwardMobility.UM_BIMB_BIZ.trim() === '') {
+      umErrors.push('Upward Mobility - BIMB Biz adalah wajib diisi');
+    }
+    if (!formState.upwardMobility.UM_AL_AWFAR || formState.upwardMobility.UM_AL_AWFAR.trim() === '') {
+      umErrors.push('Upward Mobility - Al-Awfar adalah wajib diisi');
+    }
+    if (!formState.upwardMobility.UM_MERCHANT_TERMINAL || formState.upwardMobility.UM_MERCHANT_TERMINAL.trim() === '') {
+      umErrors.push('Upward Mobility - Merchant Terminal adalah wajib diisi');
+    }
+    if (!formState.upwardMobility.UM_FASILITI_LAIN || formState.upwardMobility.UM_FASILITI_LAIN.trim() === '') {
+      umErrors.push('Upward Mobility - Fasiliti Lain BIMB adalah wajib diisi');
+    }
+    if (!formState.upwardMobility.UM_MESINKIRA || formState.upwardMobility.UM_MESINKIRA.trim() === '') {
+      umErrors.push('Upward Mobility - MesinKira adalah wajib diisi');
+    }
+
+    // Section 3: Financial Metrics (all ulasan fields required)
+    if (!formState.upwardMobility.UM_ULASAN_PENDAPATAN || formState.upwardMobility.UM_ULASAN_PENDAPATAN.trim() === '') {
+      umErrors.push('Upward Mobility - Ulasan Mentor untuk Pendapatan adalah wajib diisi');
+    }
+    if (!formState.upwardMobility.UM_ULASAN_PEKERJA || formState.upwardMobility.UM_ULASAN_PEKERJA.trim() === '') {
+      umErrors.push('Upward Mobility - Ulasan Mentor untuk Bilangan Pekerja adalah wajib diisi');
+    }
+    if (!formState.upwardMobility.UM_ULASAN_ASET_BUKAN_TUNAI || formState.upwardMobility.UM_ULASAN_ASET_BUKAN_TUNAI.trim() === '') {
+      umErrors.push('Upward Mobility - Ulasan Mentor untuk Aset Bukan Tunai adalah wajib diisi');
+    }
+    if (!formState.upwardMobility.UM_ULASAN_ASET_TUNAI || formState.upwardMobility.UM_ULASAN_ASET_TUNAI.trim() === '') {
+      umErrors.push('Upward Mobility - Ulasan Mentor untuk Aset Tunai adalah wajib diisi');
+    }
+    if (!formState.upwardMobility.UM_ULASAN_SIMPANAN || formState.upwardMobility.UM_ULASAN_SIMPANAN.trim() === '') {
+      umErrors.push('Upward Mobility - Ulasan Mentor untuk Simpanan adalah wajib diisi');
+    }
+    if (!formState.upwardMobility.UM_ULASAN_ZAKAT || formState.upwardMobility.UM_ULASAN_ZAKAT.trim() === '') {
+      umErrors.push('Upward Mobility - Ulasan Mentor untuk Zakat adalah wajib diisi');
+    }
+
+    // Section 4: Digital & Section 5: Marketing (ulasan required)
+    if (!formState.upwardMobility.UM_ULASAN_DIGITAL || formState.upwardMobility.UM_ULASAN_DIGITAL.trim() === '') {
+      umErrors.push('Upward Mobility - Ulasan Mentor untuk Penggunaan Digital adalah wajib diisi');
+    }
+    if (!formState.upwardMobility.UM_ULASAN_MARKETING || formState.upwardMobility.UM_ULASAN_MARKETING.trim() === '') {
+      umErrors.push('Upward Mobility - Ulasan Mentor untuk Jualan dan Pemasaran adalah wajib diisi');
+    }
+
+    // If there are UM validation errors, display them and stop submission
+    if (umErrors.length > 0) {
+      setError(`Sila lengkapkan medan Upward Mobility yang diperlukan:\n\n${umErrors.join('\n')}`);
+      setIsSubmitting(false);
+      return;
+    }
+    // ============== END UPWARD MOBILITY VALIDATION ==============
+
     setError('');
     setSuccess('');
     setSubmissionStage({ stage: 'preparing', message: 'Preparing submission...', detail: '' });
@@ -758,6 +826,39 @@ const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async 
         imageUrls,
         premisDilawatChecked: !!formState.sesi?.premisDilawat,
         programType: 'bangkit', // Added programType
+        // UPWARD MOBILITY - Store as JSON (ALWAYS REQUIRED for Bangkit)
+        UPWARD_MOBILITY_JSON: JSON.stringify({
+          UM_STATUS_PENGLIBATAN: formState.upwardMobility.UM_STATUS_PENGLIBATAN || '',
+          UM_STATUS: formState.upwardMobility.UM_STATUS || '',
+          UM_KRITERIA_IMPROVEMENT: formState.upwardMobility.UM_KRITERIA_IMPROVEMENT || '',
+          UM_AKAUN_BIMB: formState.upwardMobility.UM_AKAUN_BIMB || '',
+          UM_BIMB_BIZ: formState.upwardMobility.UM_BIMB_BIZ || '',
+          UM_AL_AWFAR: formState.upwardMobility.UM_AL_AWFAR || '',
+          UM_MERCHANT_TERMINAL: formState.upwardMobility.UM_MERCHANT_TERMINAL || '',
+          UM_FASILITI_LAIN: formState.upwardMobility.UM_FASILITI_LAIN || '',
+          UM_MESINKIRA: formState.upwardMobility.UM_MESINKIRA || '',
+          UM_PENDAPATAN_SEMASA: formState.upwardMobility.UM_PENDAPATAN_SEMASA || '',
+          UM_ULASAN_PENDAPATAN: formState.upwardMobility.UM_ULASAN_PENDAPATAN || '',
+          UM_PEKERJA_SEMASA: formState.upwardMobility.UM_PEKERJA_SEMASA || '',
+          UM_ULASAN_PEKERJA: formState.upwardMobility.UM_ULASAN_PEKERJA || '',
+          UM_ASET_BUKAN_TUNAI_SEMASA: formState.upwardMobility.UM_ASET_BUKAN_TUNAI_SEMASA || '',
+          UM_ULASAN_ASET_BUKAN_TUNAI: formState.upwardMobility.UM_ULASAN_ASET_BUKAN_TUNAI || '',
+          UM_ASET_TUNAI_SEMASA: formState.upwardMobility.UM_ASET_TUNAI_SEMASA || '',
+          UM_ULASAN_ASET_TUNAI: formState.upwardMobility.UM_ULASAN_ASET_TUNAI || '',
+          UM_SIMPANAN_SEMASA: formState.upwardMobility.UM_SIMPANAN_SEMASA || '',
+          UM_ULASAN_SIMPANAN: formState.upwardMobility.UM_ULASAN_SIMPANAN || '',
+          UM_ZAKAT_SEMASA: formState.upwardMobility.UM_ZAKAT_SEMASA || '',
+          UM_ULASAN_ZAKAT: formState.upwardMobility.UM_ULASAN_ZAKAT || '',
+          UM_DIGITAL_SEMASA: Array.isArray(formState.upwardMobility.UM_DIGITAL_SEMASA)
+            ? formState.upwardMobility.UM_DIGITAL_SEMASA.join(', ')
+            : (formState.upwardMobility.UM_DIGITAL_SEMASA || ''),
+          UM_ULASAN_DIGITAL: formState.upwardMobility.UM_ULASAN_DIGITAL || '',
+          UM_MARKETING_SEMASA: Array.isArray(formState.upwardMobility.UM_MARKETING_SEMASA)
+            ? formState.upwardMobility.UM_MARKETING_SEMASA.join(', ')
+            : (formState.upwardMobility.UM_MARKETING_SEMASA || ''),
+          UM_ULASAN_MARKETING: formState.upwardMobility.UM_ULASAN_MARKETING || '',
+          UM_TARIKH_LAWATAN_PREMIS: formState.upwardMobility.UM_TARIKH_LAWATAN_PREMIS || '',
+        }),
       };
 
       // Update stage: saving to database
@@ -772,7 +873,7 @@ const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async 
       const timeoutId = setTimeout(() => controller.abort(), 25000);
 
       try {
-        const response = await fetch('/api/submitReport', {
+        const response = await fetch('/api/submitBangkit', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(reportData),
@@ -841,7 +942,7 @@ const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async 
         detail: ''
       });
 
-      setSuccess('✅ Laporan berjaya dihantar! Borang sedang direset...');
+      setSuccess('✅ Laporan Bangkit dan Upward Mobility berjaya dihantar! Borang sedang direset...');
       window.scrollTo(0, 0);
       // Reduced timeout and immediate feedback
       setTimeout(() => {
