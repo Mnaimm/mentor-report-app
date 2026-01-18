@@ -11,90 +11,137 @@ function getRowNumberFromUpdatedRange(updatedRange) {
 
 /**
  * Maps data from laporan-bangkit.js (Bangkit program) to its Google Sheet row.
- * Ensure this matches your 'Bangkit' sheet column headers (0-83).
+ * Ensure this matches your 'Bangkit' sheet column headers.
+ * Columns A-AZ (0-51): Session data
+ * Columns BA-BB (52-53): Apps Script fills these
+ * Columns BC-CB (54-81): Upward Mobility data (28 columns)
  */
 const mapBangkitDataToSheetRow = (data) => {
-  const row = Array(84).fill(''); // Columns 0-83 (84 total columns including UM data)
+  const row = Array(82).fill(''); // Columns 0-81 (82 total)
 
-  // A–J
-  row[0] = new Date().toISOString();                     // 0  Timestamp
-  row[1] = data?.mentorEmail || '';                      // 1  Email Mentor
-  row[2] = data?.status || 'Selesai';                    // 2  Status Sesi
-  row[3] = `Sesi #${data?.sesiLaporan ?? ''}`;           // 3  Sesi Laporan
-  row[4] = data?.sesi?.date || '';                       // 4  Tarikh Sesi
-  row[5] = data?.sesi?.time || '';                       // 5  Masa Sesi
-  row[6] = data?.sesi?.platform || '';                   // 6  Mod Sesi
-  row[7] = data?.usahawan || '';                         // 7  Nama Usahawan
-  row[8] = data?.namaSyarikat || '';                     // 8  Nama Bisnes
-  row[9] = data?.namaMentor || '';                       // 9  Nama Mentor
+  // A–J (0-9): Basic session info
+  row[0] = new Date().toISOString();                     // A  Timestamp
+  row[1] = data?.mentorEmail || '';                      // B  Email
+  row[2] = data?.status || 'Selesai';                    // C  Status Sesi
+  row[3] = `Sesi #${data?.sesiLaporan ?? ''}`;           // D  Sesi Laporan
+  row[4] = data?.sesi?.date || '';                       // E  Tarikh Sesi
+  row[5] = data?.sesi?.time || '';                       // F  Masa Sesi
+  row[6] = data?.sesi?.platform || '';                   // G  Mod Sesi
+  row[7] = data?.usahawan || '';                         // H  Nama Usahawan
+  row[8] = data?.namaSyarikat || '';                     // I  Nama Bisnes
+  row[9] = data?.namaMentor || '';                       // J  Nama Mentor
 
-  // K: Kemaskini Inisiatif Sesi Lepas (textarea for sesi 2–4)
+  // K (10): Kemaskini Inisiatif Sesi Lepas
   const kemaskiniText = (data?.kemaskiniInisiatif || [])
     .map((t, i) => `Kemaskini Inisiatif #${i + 1}:\n${t}`)
     .join('\n\n');
-  row[10] = kemaskiniText;                               // 10 Update Keputusan Terdahulu 1
+  row[10] = kemaskiniText;                               // K  Update Keputusan Terdahulu 1
 
-  // L: Ringkasan Sesi
-  row[11] = data?.rumusan || '';                         // 11 Ringkasan Sesi
+  // L (11): Ringkasan Sesi
+  row[11] = data?.rumusan || '';                         // L  Ringkasan Sesi
 
-  // M–X: Fokus/Keputusan/Cadangan 1..4
+  // M–X (12-23): Fokus/Keputusan/Cadangan 1..4 (4 initiatives × 3 fields = 12 columns)
   for (let i = 0; i < 4; i++) {
     const ini = data?.inisiatif?.[i];
-    const base = 12 + i * 3; // 12,15,18,21
+    const base = 12 + i * 3;
     if (ini) {
-      row[base + 0] = ini?.focusArea || '';              // 12/15/18/21 Fokus Area n
-      row[base + 1] = ini?.keputusan || '';              // 13/16/19/22 Keputusan n
-      row[base + 2] = ini?.pelanTindakan || '';          // 14/17/20/23 Cadangan Tindakan n
+      row[base + 0] = ini?.focusArea || '';              // M/P/S/V Fokus Area n
+      row[base + 1] = ini?.keputusan || '';              // N/Q/T/W Keputusan n
+      row[base + 2] = ini?.pelanTindakan || '';          // O/R/U/X Cadangan Tindakan n
     }
   }
 
-  // Y–AJ: Jualan 12 bulan (24..35)
+  // Y–AJ (24-35): Jualan 12 bulan
   (data?.jualanTerkini || []).forEach((v, i) => {
     if (i < 12) row[24 + i] = v ?? '0';
   });
 
-  // AK: Link Gambar (session; JSON array format like Laporan Maju)
+  // AK (36): Link Gambar
   row[36] = JSON.stringify(data?.imageUrls?.sesi || []);
 
-  // AL–AM
-  row[37] = data?.tambahan?.produkServis || '';         // 37 Produk/Servis
-  row[38] = data?.tambahan?.pautanMediaSosial || '';    // 38 Pautan Media Sosial
+  // AL–AM (37-38): Business info
+  row[37] = data?.tambahan?.produkServis || '';         // AL Produk/Servis
+  row[38] = data?.tambahan?.pautanMediaSosial || '';    // AM Pautan Media Sosial
 
-  // AN: GrowthWheel chart
-  row[39] = data?.imageUrls?.growthwheel || '';         // 39 Link_Carta_GrowthWheel
+  // AN (39): GrowthWheel chart
+  row[39] = data?.imageUrls?.growthwheel || '';         // AN Link_Carta_GrowthWheel
 
-  // AO: Bukti MIA (only if status === 'MIA') - This is `imageUrls.mia` from laporan-sesi.js
-  row[40] = data?.status === 'MIA' ? (data?.imageUrls?.mia || '') : ''; // 40 Link_Bukti_MIA
+  // AO (40): Bukti MIA
+  row[40] = data?.status === 'MIA' ? (data?.imageUrls?.mia || '') : ''; // AO Link_Bukti_MIA
 
-  // AP–AW: Sesi 1 extras (safe blank for 2–4)
-  row[41] = data?.pemerhatian || '';                    // 41 Panduan_Pemerhatian_Mentor
-  row[42] = data?.refleksi?.perasaan || '';             // 42 Refleksi_Perasaan
-  row[43] = data?.refleksi?.skor || '';                 // 43 Refleksi_Skor
-  row[44] = data?.refleksi?.alasan || '';               // 44 Refleksi_Alasan_Skor
-  row[45] = data?.refleksi?.eliminate || '';            // 45 Refleksi_Eliminate
-  row[46] = data?.refleksi?.raise || '';                // 46 Refleksi_Raise
-  row[47] = data?.refleksi?.reduce || '';               // 47 Refleksi_Reduce
-  row[48] = data?.refleksi?.create || '';               // 48 Refleksi_Create
+  // AP–AW (41-48): Sesi 1 reflection fields
+  row[41] = data?.pemerhatian || '';                    // AP Panduan_Pemerhatian_Mentor
+  row[42] = data?.refleksi?.perasaan || '';             // AQ Refleksi_Perasaan
+  row[43] = data?.refleksi?.skor || '';                 // AR Refleksi_Skor
+  row[44] = data?.refleksi?.alasan || '';               // AS Refleksi_Alasan_Skor
+  row[45] = data?.refleksi?.eliminate || '';            // AT Refleksi_Eliminate
+  row[46] = data?.refleksi?.raise || '';                // AU Refleksi_Raise
+  row[47] = data?.refleksi?.reduce || '';               // AV Refleksi_Reduce
+  row[48] = data?.refleksi?.create || '';               // AW Refleksi_Create
 
-  // AX–AY: Profile & Premis photos
-  row[49] = data?.imageUrls?.profil || '';              // 49 Link_Gambar_Profil
-  row[50] = JSON.stringify(data?.imageUrls?.premis || []); // 50 Link_Gambar_Premis (JSON array format like Laporan Maju)
+  // AX–AY (49-50): Profile & Premis photos
+  row[49] = data?.imageUrls?.profil || '';              // AX Link_Gambar_Profil
+  row[50] = JSON.stringify(data?.imageUrls?.premis || []); // AY Link_Gambar_Premis
 
-  // AZ: Premis checkbox
-  row[51] = !!data?.premisDilawatChecked;               // 51 Premis_Dilawat_Checked
+  // AZ (51): Premis checkbox
+  row[51] = !!data?.premisDilawatChecked;               // AZ Premis_Dilawat_Checked
 
-  // BA–BB left blank — Apps Script fills "Status" & "DOC_URL"
-  // row[52] = ''; // Status
-  // row[53] = ''; // DOC_URL
+  // BA–BB (52-53): Apps Script fills "Status" & "DOC_URL" - leave blank
+  // row[52] = ''; // BA Status (Apps Script)
+  // row[53] = ''; // BB DOC_URL (Apps Script)
 
-  // BC.. GW scores if you capture them
-  (data?.gwSkor || []).slice(0, 20).forEach((v, i) => {
-    row[54 + i] = v ?? '';
-  });
+  // BC-CB (54-81): UPWARD MOBILITY DATA - ALWAYS POPULATED (28 columns)
+  // Parse UM data if available
+  let umData = {};
+  if (data?.status !== 'MIA' && data?.UPWARD_MOBILITY_JSON) {
+    try {
+      umData = JSON.parse(data.UPWARD_MOBILITY_JSON);
+    } catch (e) {
+      console.error('Failed to parse UPWARD_MOBILITY_JSON:', e);
+    }
+  }
 
-  // UPWARD MOBILITY JSON (column 83 - last column)
-  // Only include if NOT MIA submission
-  row[83] = data?.status !== 'MIA' ? (data?.UPWARD_MOBILITY_JSON || '{}') : '';
+  // Section 1: Engagement Status (3 fields)
+  row[54] = umData.UM_STATUS_PENGLIBATAN || '';         // BC UM_STATUS_PENGLIBATAN
+  row[55] = umData.UM_STATUS || '';                     // BD UM_STATUS
+  row[56] = umData.UM_KRITERIA_IMPROVEMENT || '';       // BE UM_KRITERIA_IMPROVEMENT
+
+  // Section 2: BIMB Channels & Fintech (6 fields)
+  row[57] = umData.UM_AKAUN_BIMB || '';                 // BF UM_AKAUN_BIMB
+  row[58] = umData.UM_BIMB_BIZ || '';                   // BG UM_BIMB_BIZ
+  row[59] = umData.UM_AL_AWFAR || '';                   // BH UM_AL_AWFAR
+  row[60] = umData.UM_MERCHANT_TERMINAL || '';          // BI UM_MERCHANT_TERMINAL
+  row[61] = umData.UM_FASILITI_LAIN || '';              // BJ UM_FASILITI_LAIN
+  row[62] = umData.UM_MESINKIRA || '';                  // BK UM_MESINKIRA
+
+  // Section 3: Financial & Employment Metrics (12 fields: 6 values + 6 ulasan)
+  row[63] = umData.UM_PENDAPATAN_SEMASA || '';          // BL UM_PENDAPATAN_SEMASA
+  row[64] = umData.UM_ULASAN_PENDAPATAN || '';          // BM UM_ULASAN_PENDAPATAN
+  row[65] = umData.UM_PEKERJA_SEMASA || '';             // BN UM_PEKERJA_SEMASA
+  row[66] = umData.UM_ULASAN_PEKERJA || '';             // BO UM_ULASAN_PEKERJA
+  row[67] = umData.UM_ASET_BUKAN_TUNAI_SEMASA || '';    // BP UM_ASET_BUKAN_TUNAI_SEMASA
+  row[68] = umData.UM_ULASAN_ASET_BUKAN_TUNAI || '';    // BQ UM_ULASAN_ASET_BUKAN_TUNAI
+  row[69] = umData.UM_ASET_TUNAI_SEMASA || '';          // BR UM_ASET_TUNAI_SEMASA
+  row[70] = umData.UM_ULASAN_ASET_TUNAI || '';          // BS UM_ULASAN_ASET_TUNAI
+  row[71] = umData.UM_SIMPANAN_SEMASA || '';            // BT UM_SIMPANAN_SEMASA
+  row[72] = umData.UM_ULASAN_SIMPANAN || '';            // BU UM_ULASAN_SIMPANAN
+  row[73] = umData.UM_ZAKAT_SEMASA || '';               // BV UM_ZAKAT_SEMASA
+  row[74] = umData.UM_ULASAN_ZAKAT || '';               // BW UM_ULASAN_ZAKAT
+
+  // Section 4: Digitalization (2 fields)
+  row[75] = umData.UM_DIGITAL_SEMASA || '';             // BX UM_DIGITAL_SEMASA
+  row[76] = umData.UM_ULASAN_DIGITAL || '';             // BY UM_ULASAN_DIGITAL
+
+  // Section 5: Marketing (2 fields)
+  row[77] = umData.UM_MARKETING_SEMASA || '';           // BZ UM_MARKETING_SEMASA
+  row[78] = umData.UM_ULASAN_MARKETING || '';           // CA UM_ULASAN_MARKETING
+
+  // Section 6: Premises Visit Date (1 field)
+  row[79] = umData.UM_TARIKH_LAWATAN_PREMIS || '';      // CB UM_TARIKH_LAWATAN_PREMIS
+
+  // Columns 80-81 reserved for future use
+  // row[80] = ''; // CC (reserved)
+  // row[81] = ''; // CD (reserved)
 
   return row;
 };
@@ -136,7 +183,7 @@ export default async function handler(req, res) {
     // Maju has its own dedicated endpoint: /api/submitMajuReport
     if (programType === 'bangkit') {
       spreadsheetId = process.env.GOOGLE_SHEETS_REPORT_ID;
-      range = 'Bangkit!A1'; // Bangkit tab (columns 0-83)
+      range = 'Bangkit!A1'; // Bangkit tab (columns A-CB: 0-81)
       rowData = mapBangkitDataToSheetRow(reportData);
       if (!spreadsheetId) {
           throw new Error('Missing GOOGLE_SHEETS_REPORT_ID environment variable for Bangkit program.');
