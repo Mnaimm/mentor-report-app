@@ -10,11 +10,11 @@ function getRowNumberFromUpdatedRange(updatedRange) {
 }
 
 /**
- * Maps data from laporan-sesi.js (Bangkit program) to its Google Sheet row.
- * Ensure this matches your 'V8' sheet column headers.
+ * Maps data from laporan-bangkit.js (Bangkit program) to its Google Sheet row.
+ * Ensure this matches your 'Bangkit' sheet column headers (0-83).
  */
 const mapBangkitDataToSheetRow = (data) => {
-  const row = Array(100).fill(''); // Adjust size if needed
+  const row = Array(84).fill(''); // Columns 0-83 (84 total columns including UM data)
 
   // A–J
   row[0] = new Date().toISOString();                     // 0  Timestamp
@@ -92,9 +92,9 @@ const mapBangkitDataToSheetRow = (data) => {
     row[54 + i] = v ?? '';
   });
 
-  // UPWARD MOBILITY JSON (ALWAYS REQUIRED for Bangkit)
-  // Add this at the next available index after GW scores (54+20 = 74)
-  row[74] = data?.UPWARD_MOBILITY_JSON || '{}';
+  // UPWARD MOBILITY JSON (column 83 - last column)
+  // Only include if NOT MIA submission
+  row[83] = data?.status !== 'MIA' ? (data?.UPWARD_MOBILITY_JSON || '{}') : '';
 
   return row;
 };
@@ -136,7 +136,7 @@ export default async function handler(req, res) {
     // Maju has its own dedicated endpoint: /api/submitMajuReport
     if (programType === 'bangkit') {
       spreadsheetId = process.env.GOOGLE_SHEETS_REPORT_ID;
-      range = 'V8!A1';
+      range = 'Bangkit!A1'; // Bangkit tab (columns 0-83)
       rowData = mapBangkitDataToSheetRow(reportData);
       if (!spreadsheetId) {
           throw new Error('Missing GOOGLE_SHEETS_REPORT_ID environment variable for Bangkit program.');
@@ -314,8 +314,8 @@ export default async function handler(req, res) {
     let umError = null;
     let umRecordId = null;
 
-    // For Bangkit, UM data is ALWAYS REQUIRED (not conditional on MIA)
-    if (reportData.UPWARD_MOBILITY_JSON && supabaseRecordId) {
+    // For Bangkit, UM data is required EXCEPT for MIA submissions
+    if (reportData.status !== 'MIA' && reportData.UPWARD_MOBILITY_JSON && supabaseRecordId) {
       try {
         console.log('📊 Starting Upward Mobility dual-write for BANGKIT...');
 
@@ -451,7 +451,7 @@ export default async function handler(req, res) {
         }
       }
     } else {
-      console.log(`ℹ️ Skipping UM write. Has UM Data: ${!!reportData.UPWARD_MOBILITY_JSON}, Has Reports ID: ${!!supabaseRecordId}`);
+      console.log(`ℹ️ Skipping UM write. MIA: ${reportData.status === 'MIA'}, Has UM Data: ${!!reportData.UPWARD_MOBILITY_JSON}, Has Reports ID: ${!!supabaseRecordId}`);
     }
     // ============================================================
     // END UPWARD MOBILITY DUAL-WRITE
@@ -487,7 +487,7 @@ export default async function handler(req, res) {
           success: umSuccess,
           recordId: umRecordId,
           error: umError,
-          skipped: !reportData.UPWARD_MOBILITY_JSON
+          skipped: reportData.status === 'MIA' || !reportData.UPWARD_MOBILITY_JSON
         }
       }
     });

@@ -502,9 +502,12 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
       return;
     }
 
-    // ============== UPWARD MOBILITY VALIDATION (ALWAYS REQUIRED) ==============
-    // UM data is MANDATORY for ALL Bangkit sessions - no conditional logic
+    // ============== UPWARD MOBILITY VALIDATION ==============
+    // UM data is MANDATORY for ALL Bangkit sessions EXCEPT MIA submissions
     const umErrors = [];
+
+    // Skip UM validation for MIA submissions
+    if (!isMIA) {
 
     // Section 1: Engagement Status
     if (!formState.upwardMobility.UM_STATUS_PENGLIBATAN || formState.upwardMobility.UM_STATUS_PENGLIBATAN.trim() === '') {
@@ -562,12 +565,13 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
       umErrors.push('Upward Mobility - Ulasan Mentor untuk Jualan dan Pemasaran adalah wajib diisi');
     }
 
-    // If there are UM validation errors, display them and stop submission
-    if (umErrors.length > 0) {
-      setError(`Sila lengkapkan medan Upward Mobility yang diperlukan:\n\n${umErrors.join('\n')}`);
-      setIsSubmitting(false);
-      return;
-    }
+      // If there are UM validation errors, display them and stop submission
+      if (umErrors.length > 0) {
+        setError(`Sila lengkapkan medan Upward Mobility yang diperlukan:\n\n${umErrors.join('\n')}`);
+        setIsSubmitting(false);
+        return;
+      }
+    } // End of !isMIA check
     // ============== END UPWARD MOBILITY VALIDATION ==============
 
     setError('');
@@ -826,8 +830,11 @@ const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async 
         imageUrls,
         premisDilawatChecked: !!formState.sesi?.premisDilawat,
         programType: 'bangkit', // Added programType
-        // UPWARD MOBILITY - Store as JSON (ALWAYS REQUIRED for Bangkit)
-        UPWARD_MOBILITY_JSON: JSON.stringify({
+      };
+
+      // UPWARD MOBILITY - Only include for non-MIA submissions
+      if (!isMIA) {
+        reportData.UPWARD_MOBILITY_JSON = JSON.stringify({
           UM_STATUS_PENGLIBATAN: formState.upwardMobility.UM_STATUS_PENGLIBATAN || '',
           UM_STATUS: formState.upwardMobility.UM_STATUS || '',
           UM_KRITERIA_IMPROVEMENT: formState.upwardMobility.UM_KRITERIA_IMPROVEMENT || '',
@@ -858,8 +865,8 @@ const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async 
             : (formState.upwardMobility.UM_MARKETING_SEMASA || ''),
           UM_ULASAN_MARKETING: formState.upwardMobility.UM_ULASAN_MARKETING || '',
           UM_TARIKH_LAWATAN_PREMIS: formState.upwardMobility.UM_TARIKH_LAWATAN_PREMIS || '',
-        }),
-      };
+        });
+      }
 
       // Update stage: saving to database
       setSubmissionStage({
