@@ -739,11 +739,11 @@ const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async 
           console.log('📤 Uploading via proxy...');
           const response = await fetch('/api/upload-proxy', {
             method: 'POST',
-            headers: { 
+            headers: {
               'Content-Type': 'application/json',
               'Accept': 'application/json'
             },
-            body: JSON.stringify({ ...imageData, reportType: 'sesi' }),
+            body: JSON.stringify({ ...imageData, reportType: 'bangkit' }),
           });
           
           if (!response.ok) {

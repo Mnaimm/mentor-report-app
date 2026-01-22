@@ -39,12 +39,23 @@ export default async function handler(req, res) {
     const reportType = req.body.reportType;
     let url;
 
-    if (reportType === 'maju') {
+    if (reportType === 'maju-um') {
+      // NEW: MAJU UM with Upward Mobility support (uses different spreadsheet)
+      url = process.env.NEXT_PUBLIC_APPS_SCRIPT_LAPORAN_MAJU_UM_URL;
+      if (!url) return res.status(500).json({ error: 'NEXT_PUBLIC_APPS_SCRIPT_LAPORAN_MAJU_UM_URL not set' });
+      console.log('🎯 Using MAJU UM Apps Script URL for reportType:', reportType);
+    } else if (reportType === 'maju') {
+      // OLD: Original MAJU without UM support
       url = process.env.NEXT_PUBLIC_APPS_SCRIPT_LAPORAN_MAJU_URL;
       if (!url) return res.status(500).json({ error: 'NEXT_PUBLIC_APPS_SCRIPT_LAPORAN_MAJU_URL not set' });
       console.log('🎯 Using MAJU Apps Script URL for reportType:', reportType);
+    } else if (reportType === 'bangkit') {
+      // NEW: Bangkit with uploadImage support (separate from prod SESI)
+      url = process.env.NEXT_PUBLIC_APPS_SCRIPT_BANGKIT_URL;
+      if (!url) return res.status(500).json({ error: 'NEXT_PUBLIC_APPS_SCRIPT_BANGKIT_URL not set' });
+      console.log('🎯 Using BANGKIT Apps Script URL for reportType:', reportType);
     } else {
-      // Default to sesi URL for backward compatibility
+      // Default to sesi URL for backward compatibility (laporan-sesi.js in production)
       url = process.env.NEXT_PUBLIC_APPS_SCRIPT_URL;
       if (!url) return res.status(500).json({ error: 'NEXT_PUBLIC_APPS_SCRIPT_URL not set' });
       console.log('🎯 Using SESI Apps Script URL for reportType:', reportType || 'default');

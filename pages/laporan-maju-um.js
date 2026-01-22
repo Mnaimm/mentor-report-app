@@ -702,7 +702,7 @@ const LaporanMajuPage = () => {
               'Content-Type': 'application/json',
               'Accept': 'application/json'
             },
-            body: JSON.stringify({ ...imageData, reportType: 'maju' }),
+            body: JSON.stringify({ ...imageData, reportType: 'maju-um' }),
           });
 
           if (!response.ok) {
@@ -788,7 +788,7 @@ const LaporanMajuPage = () => {
           const response = await fetch('/api/upload-proxy', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...imageData, reportType: 'maju' }),
+            body: JSON.stringify({ ...imageData, reportType: 'maju-um' }),
           });
 
           if (!response.ok) {
