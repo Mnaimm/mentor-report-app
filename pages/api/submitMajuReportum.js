@@ -25,14 +25,23 @@ export default async function handler(req, res) {
     });
     const sheets = google.sheets({ version: 'v4', auth });
 
-    // Environment variables
-    const spreadsheetId = process.env.GOOGLE_SHEETS_MAJU_REPORT_ID || process.env.GOOGLE_SHEETS_REPORT_ID;
-    const range = 'LaporanMaju!A1';
+    // Environment variables - TWO spreadsheets for MAJU UM
+    // 1. V8 Sheet for LaporanMajuUM tab (main report data)
+    const v8SpreadsheetId = process.env.GOOGLE_SHEETS_MAJU_REPORT_ID || process.env.GOOGLE_SHEETS_REPORT_ID;
+    const laporanMajuRange = 'LaporanMajuUM!A1';
 
-    console.log('🔗 Using spreadsheet ID:', spreadsheetId);
+    // 2. Upward Mobility Sheet for UM tab (UM tracking data)
+    const umSpreadsheetId = process.env.UPWARD_MOBILITY_SPREADSHEET_ID;
+    const umRange = 'UM!A1';
 
-    if (!spreadsheetId) {
+    console.log('🔗 V8 Sheet ID (LaporanMajuUM):', v8SpreadsheetId);
+    console.log('🔗 UM Sheet ID (UM tab):', umSpreadsheetId);
+
+    if (!v8SpreadsheetId) {
       throw new Error('Missing GOOGLE_SHEETS_MAJU_REPORT_ID environment variable.');
+    }
+    if (!umSpreadsheetId) {
+      throw new Error('Missing UPWARD_MOBILITY_SPREADSHEET_ID environment variable.');
     }
 
     // DEBUG: Verify all critical fields are populated
@@ -54,12 +63,12 @@ export default async function handler(req, res) {
     console.log('📊 Prepared row data (first 5 values):', rowData.slice(0, 5));
     console.log('📊 Folder_ID in row data (index 25):', rowData[25]);
 
-    // Append data to Google Sheet with 8s timeout
-    console.log('📊 Appending data to Google Sheets...');
+    // Append data to V8 Sheet / LaporanMajuUM tab
+    console.log('📊 Appending data to V8 Sheet / LaporanMajuUM tab...');
     const appendRes = await Promise.race([
       sheets.spreadsheets.values.append({
-        spreadsheetId: spreadsheetId,
-        range: range,
+        spreadsheetId: v8SpreadsheetId,
+        range: laporanMajuRange,
         valueInputOption: 'USER_ENTERED',
         insertDataOption: 'INSERT_ROWS',
         requestBody: { values: [rowData] },
@@ -68,13 +77,13 @@ export default async function handler(req, res) {
         setTimeout(() => reject(new Error('Google Sheets API timeout after 10 seconds')), 10000)
       )
     ]);
-    console.log('✅ Sheet append successful');
+    console.log('✅ V8 Sheet / LaporanMajuUM tab append successful');
 
     // Extract the row number where data was appended
     const updatedRange = appendRes.data?.updates?.updatedRange || '';
     console.log('📊 Updated range:', updatedRange);
-    
-    // Parse row number from something like "LaporanMaju!A3:AC3"
+
+    // Parse row number from something like "LaporanMajuUM!A3:AC3"
     const newRowNumber = updatedRange.match(/!A(\d+):/)?.[1];
     console.log('🔢 Extracted row number:', newRowNumber);
 
@@ -82,8 +91,38 @@ export default async function handler(req, res) {
       throw new Error('Could not determine the row number where data was inserted.');
     }
 
+    // Now append UM data to Upward Mobility Sheet / UM tab if not MIA
+    let umRowNumber = null;
+    if (reportData.MIA_STATUS !== 'MIA' && reportData.UPWARD_MOBILITY_JSON) {
+      try {
+        console.log('📊 Appending UM data to Upward Mobility Sheet / UM tab...');
+        const umData = JSON.parse(reportData.UPWARD_MOBILITY_JSON);
+        const umRowData = mapUMDataToSheetRow(reportData, umData);
+
+        const umAppendRes = await Promise.race([
+          sheets.spreadsheets.values.append({
+            spreadsheetId: umSpreadsheetId,  // DIFFERENT spreadsheet for UM data
+            range: umRange,
+            valueInputOption: 'USER_ENTERED',
+            insertDataOption: 'INSERT_ROWS',
+            requestBody: { values: [umRowData] },
+          }),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('UM Sheet API timeout after 10 seconds')), 10000)
+          )
+        ]);
+
+        const umUpdatedRange = umAppendRes.data?.updates?.updatedRange || '';
+        umRowNumber = umUpdatedRange.match(/!A(\d+):/)?.[1];
+        console.log('✅ Upward Mobility Sheet / UM tab append successful, row:', umRowNumber);
+      } catch (umSheetError) {
+        console.error('⚠️ Failed to write to UM tab:', umSheetError);
+        // Non-blocking, continue with Supabase writes
+      }
+    }
+
     // Document will be generated automatically by Apps Script time-driven trigger
-    console.log(`✅ Data saved to row ${newRowNumber}. Document will be generated automatically.`);
+    console.log(`✅ Data saved to LaporanMajuUM row ${newRowNumber}. Document will be generated automatically.`);
 
     // ============================================================
     // DUAL-WRITE TO SUPABASE (NON-BLOCKING)
@@ -383,15 +422,27 @@ export default async function handler(req, res) {
     }
 
     // Build comprehensive response including UM status
-    const responseMessage = umSuccess
+    const responseMessage = umRowNumber
       ? 'Laporan MAJU & Upward Mobility berjaya dihantar! Dokumen akan dicipta secara automatik dalam masa 1-2 minit.'
       : 'Laporan MAJU berjaya dihantar! Dokumen akan dicipta secara automatik dalam masa 1-2 minit.' +
-        (umError ? ` (Nota: UM data tidak berjaya disimpan - ${umError})` : '');
+        (reportData.MIA_STATUS !== 'MIA' && reportData.UPWARD_MOBILITY_JSON ? ' (Nota: UM data tidak berjaya disimpan ke UM tab)' : '');
 
     return res.status(200).json({
       success: true,
       message: responseMessage,
-      rowNumber: newRowNumber,
+      sheets: {
+        v8Sheet: {
+          spreadsheetId: v8SpreadsheetId,
+          tab: 'LaporanMajuUM',
+          rowNumber: newRowNumber
+        },
+        umSheet: {
+          spreadsheetId: umSpreadsheetId,
+          tab: 'UM',
+          rowNumber: umRowNumber,
+          written: !!umRowNumber
+        }
+      },
       supabase: {
         reports: {
           success: supabaseSuccess,
@@ -468,5 +519,57 @@ function mapMajuDataToSheetRow(data) {
     data.MIA_REASON || '',                       // MIA_REASON
     data.MIA_PROOF_URL || '',                    // MIA_PROOF_URL
     data.UPWARD_MOBILITY_JSON || '{}'            // UPWARD_MOBILITY_JSON (NEW for UM data)
+  ];
+}
+
+// Helper function to map UM data to UM sheet row
+function mapUMDataToSheetRow(reportData, umData) {
+  const timestamp = new Date().toLocaleString('en-MY', { timeZone: 'Asia/Kuala_Lumpur' });
+
+  // Map to UM tab columns - should match the UM sheet structure
+  return [
+    timestamp,                                           // Timestamp
+    reportData.NAMA_MENTOR || '',                       // NAMA_MENTOR
+    reportData.EMAIL_MENTOR || '',                      // EMAIL_MENTOR
+    reportData.NAMA_MENTEE || '',                       // NAMA_MENTEE
+    reportData.NAMA_BISNES || '',                       // NAMA_BISNES
+    reportData.TARIKH_SESI || '',                       // TARIKH_SESI
+    reportData.SESI_NUMBER || '',                       // SESI_NUMBER
+    'MAJU',                                             // PROGRAM
+    reportData.Folder_ID || '',                         // Folder_ID
+    // Section 3: Status & Mobiliti
+    umData.UM_STATUS_PENGLIBATAN || '',                 // UM_STATUS_PENGLIBATAN
+    umData.UM_STATUS || '',                             // UM_STATUS
+    umData.UM_KRITERIA_IMPROVEMENT || '',               // UM_KRITERIA_IMPROVEMENT
+    umData.UM_TARIKH_LAWATAN_PREMIS || '',              // UM_TARIKH_LAWATAN_PREMIS
+    // Section 4: Bank Islam & Fintech (6 fields)
+    umData.UM_AKAUN_BIMB || '',                         // UM_AKAUN_BIMB
+    umData.UM_BIMB_BIZ || '',                           // UM_BIMB_BIZ
+    umData.UM_AL_AWFAR || '',                           // UM_AL_AWFAR
+    umData.UM_MERCHANT_TERMINAL || '',                  // UM_MERCHANT_TERMINAL
+    umData.UM_FASILITI_LAIN || '',                      // UM_FASILITI_LAIN
+    umData.UM_MESINKIRA || '',                          // UM_MESINKIRA
+    // Section 5: Situasi Kewangan (Semasa + Ulasan pairs)
+    umData.UM_PENDAPATAN_SEMASA || '',                  // UM_PENDAPATAN_SEMASA
+    umData.UM_ULASAN_PENDAPATAN || '',                  // UM_ULASAN_PENDAPATAN
+    umData.UM_PEKERJA_SEMASA || '',                     // UM_PEKERJA_SEMASA
+    umData.UM_ULASAN_PEKERJA || '',                     // UM_ULASAN_PEKERJA
+    umData.UM_ASET_BUKAN_TUNAI_SEMASA || '',            // UM_ASET_BUKAN_TUNAI_SEMASA
+    umData.UM_ULASAN_ASET_BUKAN_TUNAI || '',            // UM_ULASAN_ASET_BUKAN_TUNAI
+    umData.UM_ASET_TUNAI_SEMASA || '',                  // UM_ASET_TUNAI_SEMASA
+    umData.UM_ULASAN_ASET_TUNAI || '',                  // UM_ULASAN_ASET_TUNAI
+    umData.UM_SIMPANAN_SEMASA || '',                    // UM_SIMPANAN_SEMASA
+    umData.UM_ULASAN_SIMPANAN || '',                    // UM_ULASAN_SIMPANAN
+    umData.UM_ZAKAT_SEMASA || '',                       // UM_ZAKAT_SEMASA
+    umData.UM_ULASAN_ZAKAT || '',                       // UM_ULASAN_ZAKAT
+    // Section 6: Digital & Marketing
+    Array.isArray(umData.UM_DIGITAL_SEMASA)
+      ? umData.UM_DIGITAL_SEMASA.join(', ')
+      : (umData.UM_DIGITAL_SEMASA || ''),               // UM_DIGITAL_SEMASA (array to comma-separated)
+    umData.UM_ULASAN_DIGITAL || '',                     // UM_ULASAN_DIGITAL
+    Array.isArray(umData.UM_MARKETING_SEMASA)
+      ? umData.UM_MARKETING_SEMASA.join(', ')
+      : (umData.UM_MARKETING_SEMASA || ''),             // UM_MARKETING_SEMASA (array to comma-separated)
+    umData.UM_ULASAN_MARKETING || '',                   // UM_ULASAN_MARKETING
   ];
 }

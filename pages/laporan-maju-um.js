@@ -1266,7 +1266,7 @@ const handleSubmit = async (e) => {
     console.log('  - Premis Images:', dataToSend.URL_GAMBAR_PREMIS_JSON?.length || 0);
     console.log('  - GW360 Image:', dataToSend.URL_GAMBAR_GW360 ? 'Present' : 'Missing');
     
-    console.log('🌐 Submitting to /api/submitMajuReportUM...');
+    console.log('🌐 Submitting to /api/submitMajuReportum...');
 
     // Update stage: saving to database
     setSubmissionStage({
@@ -1281,7 +1281,7 @@ const handleSubmit = async (e) => {
 
     let response;
     try {
-      response = await fetch('/api/submitMajuReportUM', {
+      response = await fetch('/api/submitMajuReportum', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

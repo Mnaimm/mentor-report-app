@@ -1,6 +1,9 @@
 // pages/api/upload-proxy.js
 // Updated to handle both laporan-sesi and laporan-maju URLs with size limits
 
+import https from 'https';
+import { URL } from 'url';
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -62,17 +65,90 @@ export default async function handler(req, res) {
 
     const cleanBodyString = JSON.stringify(cleanBody);
     const cleanBodySize = Buffer.byteLength(cleanBodyString, 'utf8');
-    
+
     console.log('🧹 Cleaned body size:', Math.round(cleanBodySize / 1024), 'KB');
 
-    const upstream = await fetch(url, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Content-Length': cleanBodySize.toString()
-      },
-      body: cleanBodyString,
-    });
+    // Use native Node.js https module instead of fetch to avoid undici DNS issues
+    const makeHttpsRequest = (url, body) => {
+      return new Promise((resolve, reject) => {
+        const parsedUrl = new URL(url);
+        const options = {
+          hostname: parsedUrl.hostname,
+          path: parsedUrl.pathname + parsedUrl.search,
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(body)
+          },
+          timeout: 30000 // 30 second timeout
+        };
+
+        const req = https.request(options, (res) => {
+          let data = '';
+          res.on('data', (chunk) => { data += chunk; });
+          res.on('end', () => {
+            resolve({
+              ok: res.statusCode >= 200 && res.statusCode < 300,
+              status: res.statusCode,
+              text: () => Promise.resolve(data)
+            });
+          });
+        });
+
+        req.on('error', (err) => {
+          console.error('❌ HTTPS request error:', err.code, err.message);
+          reject(err);
+        });
+
+        req.on('timeout', () => {
+          req.destroy();
+          reject(new Error('Request timeout after 30 seconds'));
+        });
+
+        req.write(body);
+        req.end();
+      });
+    };
+
+    // Retry logic for network/DNS issues
+    let upstream;
+    let lastError;
+    const maxRetries = 3;
+    const retryDelay = 2000; // 2 seconds
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`📡 Attempt ${attempt}/${maxRetries} connecting to Apps Script...`);
+
+        upstream = await makeHttpsRequest(url, cleanBodyString);
+
+        console.log(`✅ Connection successful on attempt ${attempt}`);
+        break; // Success - exit retry loop
+
+      } catch (fetchError) {
+        lastError = fetchError;
+        console.error(`❌ Attempt ${attempt}/${maxRetries} failed:`, fetchError.message);
+
+        // Check for DNS/network errors
+        if (fetchError.code === 'ENOTFOUND') {
+          console.error('   🔍 DNS Resolution Failed - Cannot find script.google.com');
+          console.error('   💡 Possible causes:');
+          console.error('      1. No internet connection');
+          console.error('      2. DNS server not responding');
+          console.error('      3. Firewall/Antivirus blocking Node.js');
+          console.error('      4. VPN/Proxy issues');
+        }
+
+        // If not the last attempt, wait and retry
+        if (attempt < maxRetries) {
+          console.log(`   ⏳ Waiting ${retryDelay/1000}s before retry...`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+        } else {
+          // Last attempt failed - throw the error
+          throw lastError;
+        }
+      }
+    }
 
     const text = await upstream.text();
 
