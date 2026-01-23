@@ -130,7 +130,7 @@ export default function LaporanSesiPage() {
   const [previousData, setPreviousData] = useState({ sales: [], inisiatif: [], premisDilawat: false });
 
   const initialFormState = {
-    inisiatif: [{ focusArea: '', keputusan: '', pelanTindakan: '' }],
+    inisiatif: [{ focusArea: '', keputusan: '', keputusanCustom: undefined, pelanTindakan: '' }],
     kemaskiniInisiatif: [],
     teknologi: [{ sistem: '', tujuan: '' }],
     jualanTahunSebelum: { tahun: new Date().getFullYear() - 1, setahun: '', bulananMin: '', bulananMaks: '' },
@@ -398,13 +398,16 @@ export default function LaporanSesiPage() {
     setFormState((p) => {
       const l = [...(p.inisiatif || [])];
       const u = { ...l[index], [field]: value };
-      if (field === 'focusArea') u.keputusan = '';
+      if (field === 'focusArea') {
+        u.keputusan = '';
+        u.keputusanCustom = undefined;
+      }
       l[index] = u;
       return { ...p, inisiatif: l };
     });
   const addInisiatif = () => {
     if ((formState.inisiatif || []).length < 4)
-      addDynamicListItem('inisiatif', { focusArea: '', keputusan: '', pelanTindakan: '' });
+      addDynamicListItem('inisiatif', { focusArea: '', keputusan: '', keputusanCustom: undefined, pelanTindakan: '' });
   };
   const handleFileChange = (type, fileList, multiple = false) =>
     setFiles((prev) => ({ ...prev, [type]: multiple ? Array.from(fileList) : fileList[0] }));
@@ -801,8 +804,21 @@ const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async 
         localStorage.removeItem(k);
       } catch {}
 
+      // Transform inisiatif: merge keputusanCustom into keputusan if CUSTOM is selected
+      const transformedInisiatif = (formState.inisiatif || []).map(item => {
+        if (item.keputusan === 'CUSTOM' && item.keputusanCustom) {
+          return {
+            ...item,
+            keputusan: item.keputusanCustom,
+            keputusanCustom: undefined
+          };
+        }
+        return item;
+      });
+
       const reportData = {
         ...formState,
+        inisiatif: transformedInisiatif,
         status: isMIA ? 'MIA' : 'Selesai',
         sesiLaporan: currentSession,
         usahawan: selectedMentee.Usahawan,
@@ -1066,12 +1082,25 @@ Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun la
                       <option key={opt} value={opt}>{opt}</option>
                     ))}
                   </SelectField>
-                  <SelectField label="Keputusan" value={inisiatifItem.keputusan} onChange={(e) => handleInisiatifChange(index, 'keputusan', e.target.value)} disabled={!inisiatifItem.focusArea} required>
-                    <option value="">-- Pilih Keputusan --</option>
-                    {keputusanOptions.map((opt) => (
-                      <option key={opt.Keputusan} value={opt.Keputusan}>{opt.Keputusan}</option>
-                    ))}
-                  </SelectField>
+                  <div>
+                    <SelectField label="Keputusan" value={inisiatifItem.keputusan} onChange={(e) => handleInisiatifChange(index, 'keputusan', e.target.value)} disabled={!inisiatifItem.focusArea} required>
+                      <option value="">-- Pilih Keputusan --</option>
+                      {keputusanOptions.map((opt) => (
+                        <option key={opt.Keputusan} value={opt.Keputusan}>{opt.Keputusan}</option>
+                      ))}
+                      <option value="CUSTOM">Lain-lain (Custom)</option>
+                    </SelectField>
+                    {inisiatifItem.keputusan === 'CUSTOM' && (
+                      <input
+                        type="text"
+                        className="mt-2 w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="Masukkan keputusan custom"
+                        value={inisiatifItem.keputusanCustom || ''}
+                        onChange={(e) => handleInisiatifChange(index, 'keputusanCustom', e.target.value)}
+                        required
+                      />
+                    )}
+                  </div>
                 </div>
                 {cadangan && (
                   <div className="bg-yellow-50 p-3 rounded-lg text-sm text-gray-800 border border-yellow-200">
@@ -1546,10 +1575,23 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                     <option value="">-- Pilih Fokus Area --</option>
                     {focusAreaOptions.map((opt) => (<option key={opt} value={opt}>{opt}</option>))}
                   </SelectField>
-                  <SelectField label="Keputusan" value={inisiatifItem.keputusan} onChange={(e) => handleInisiatifChange(index, 'keputusan', e.target.value)} disabled={!inisiatifItem.focusArea} required>
-                    <option value="">-- Pilih Keputusan --</option>
-                    {keputusanOptions.map((opt) => (<option key={opt.Keputusan} value={opt.Keputusan}>{opt.Keputusan}</option>))}
-                  </SelectField>
+                  <div>
+                    <SelectField label="Keputusan" value={inisiatifItem.keputusan} onChange={(e) => handleInisiatifChange(index, 'keputusan', e.target.value)} disabled={!inisiatifItem.focusArea} required>
+                      <option value="">-- Pilih Keputusan --</option>
+                      {keputusanOptions.map((opt) => (<option key={opt.Keputusan} value={opt.Keputusan}>{opt.Keputusan}</option>))}
+                      <option value="CUSTOM">Lain-lain (Custom)</option>
+                    </SelectField>
+                    {inisiatifItem.keputusan === 'CUSTOM' && (
+                      <input
+                        type="text"
+                        className="mt-2 w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="Masukkan keputusan custom"
+                        value={inisiatifItem.keputusanCustom || ''}
+                        onChange={(e) => handleInisiatifChange(index, 'keputusanCustom', e.target.value)}
+                        required
+                      />
+                    )}
+                  </div>
                 </div>
                 {cadangan && (
                   <div className="bg-yellow-50 p-3 rounded-lg text-sm text-gray-800 border border-yellow-200">
