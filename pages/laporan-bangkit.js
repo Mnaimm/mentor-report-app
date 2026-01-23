@@ -68,16 +68,21 @@ const SelectField = ({
     </select>
   </div>
 );
-const TextArea = ({ label, value, onChange, placeholder, rows = 4, required = true }) => (
+const TextArea = ({ label, value, onChange, placeholder, helperText, rows = 4, required = true }) => (
   <div>
     <label className="block text-sm font-medium text-gray-700 mb-1">
       {label}
       {required && <span className="text-red-500">*</span>}
     </label>
+    {helperText && (
+      <div className="mb-2 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-gray-700 whitespace-pre-line">
+        {helperText}
+      </div>
+    )}
     <textarea
       value={value}
       onChange={onChange}
-      placeholder={placeholder}
+      placeholder={placeholder || 'Taip respons anda di sini...'}
       rows={rows}
       required={required}
       className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
@@ -130,31 +135,8 @@ export default function LaporanSesiPage() {
     teknologi: [{ sistem: '', tujuan: '' }],
     jualanTahunSebelum: { tahun: new Date().getFullYear() - 1, setahun: '', bulananMin: '', bulananMaks: '' },
     jualanTerkini: Array(12).fill(''),
-    pemerhatian: `Panduan:
-
-Latarbelakang usahawan.
-Penerangan produk/perkhidmatan.
-Situasi bisnes ketika ini:
-- Sistem bisnes
-- Sejauh mana usahawan jelas dengan segmen pelanggan dan nilai yang ditawarkan
-- Aktiviti pemasaran dan jualan
-- Perekodan maklumat akaun, sistem yang digunakan
-Apa yang usahawan mahu capai kedepan.
-Pemerhatian Mentor/Coach (apa yang bagus, apa yang kurang dan boleh ditambahbaik oleh usahawan)
-Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun lalui program:
-- Pendapatan
-- Keuntungan
-- Penambahan pekerja
-- Adaptasi teknologi
-- Peningkatan skil/pengetahuan`,
-    rumusan: `Nota:
-Pastikan peserta pulang dengan Keputusan dan Tindakan yang perlu diusahakan, siapa dan bila. (Kongsikan/pastika usahawan juga jelas)
-Apakah ada homework untuk peserta.
-Sebaiknya, tetapkan masa pertemuan sesi akan datang, dan mod perbincangan.
-Apakah bantuan, latihan yang mahu dicadangkan kepada HQ untuk membantu usahawan.
-Apakah mentor ada bahan tambahan yang dapat membantu usahawan.
-Apakah mentor perlukan bahan tambahan/banuan dari mentor mentor lain atau HQ.
-Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berkaitan bisnes mahupun tingkahlaku atau komitmen peserta.`,
+    pemerhatian: '',
+    rumusan: '',
     rumusanSesi2Plus: '',
     refleksi: { perasaan: '', skor: '', alasan: '', eliminate: '', raise: '', reduce: '', create: '' },
     sesi: { date: new Date().toISOString().split('T')[0], time: '', platform: 'Face to Face', lokasiF2F: '', premisDilawat: false },
@@ -1044,7 +1026,30 @@ const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async 
         </Section>
 
         <Section title="Status Perniagaan Keseluruhan" description="Pemerhatian Mentor/Coach berdasarkan panduan.">
-          <TextArea rows={10} value={formState.pemerhatian || ''} onChange={(e) => setFormState((p) => ({ ...p, pemerhatian: e.target.value }))} />
+          <TextArea
+            label="Status Perniagaan Keseluruhan"
+            rows={10}
+            value={formState.pemerhatian || ''}
+            onChange={(e) => setFormState((p) => ({ ...p, pemerhatian: e.target.value }))}
+            required={true}
+            helperText={`Panduan:
+
+Latarbelakang usahawan.
+Penerangan produk/perkhidmatan.
+Situasi bisnes ketika ini:
+- Sistem bisnes
+- Sejauh mana usahawan jelas dengan segmen pelanggan dan nilai yang ditawarkan
+- Aktiviti pemasaran dan jualan
+- Perekodan maklumat akaun, sistem yang digunakan
+Apa yang usahawan mahu capai kedepan.
+Pemerhatian Mentor/Coach (apa yang bagus, apa yang kurang dan boleh ditambahbaik oleh usahawan)
+Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun lalui program:
+- Pendapatan
+- Keuntungan
+- Penambahan pekerja
+- Adaptasi teknologi
+- Peningkatan skil/pengetahuan`}
+          />
         </Section>
 
         <Section title="Keputusan Mentee - Inisiatif yang mahu diambil" description="Berdasarkan pemerhatian, pilih Fokus Area dan Keputusan yang perlu diambil.">
@@ -1088,7 +1093,21 @@ const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async 
         </Section>
 
         <Section title="Rumusan Keseluruhan dan Langkah Kehadapan">
-          <TextArea rows={6} value={formState.rumusan || ''} onChange={(e) => setFormState((p) => ({ ...p, rumusan: e.target.value }))} />
+          <TextArea
+            label="Rumusan Keseluruhan dan Langkah Kehadapan"
+            rows={6}
+            value={formState.rumusan || ''}
+            onChange={(e) => setFormState((p) => ({ ...p, rumusan: e.target.value }))}
+            required={true}
+            helperText={`Nota:
+Pastikan peserta pulang dengan Keputusan dan Tindakan yang perlu diusahakan, siapa dan bila. (Kongsikan/pastika usahawan juga jelas)
+Apakah ada homework untuk peserta.
+Sebaiknya, tetapkan masa pertemuan sesi akan datang, dan mod perbincangan.
+Apakah bantuan, latihan yang mahu dicadangkan kepada HQ untuk membantu usahawan.
+Apakah mentor ada bahan tambahan yang dapat membantu usahawan.
+Apakah mentor perlukan bahan tambahan/banuan dari mentor mentor lain atau HQ.
+Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berkaitan bisnes mahupun tingkahlaku atau komitmen peserta.`}
+          />
         </Section>
 
         {/* ============== UPWARD MOBILITY SECTION (WAJIB) ============== */}
@@ -1552,7 +1571,21 @@ const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async 
         </Section>
 
         <Section title="Rumusan Sesi">
-          <TextArea rows={6} value={formState.rumusan || ''} onChange={(e) => setFormState((p) => ({ ...p, rumusan: e.target.value }))} />
+          <TextArea
+            label="Rumusan Sesi"
+            rows={6}
+            value={formState.rumusan || ''}
+            onChange={(e) => setFormState((p) => ({ ...p, rumusan: e.target.value }))}
+            required={true}
+            helperText={`Nota:
+Pastikan peserta pulang dengan Keputusan dan Tindakan yang perlu diusahakan, siapa dan bila. (Kongsikan/pastika usahawan juga jelas)
+Apakah ada homework untuk peserta.
+Sebaiknya, tetapkan masa pertemuan sesi akan datang, dan mod perbincangan.
+Apakah bantuan, latihan yang mahu dicadangkan kepada HQ untuk membantu usahawan.
+Apakah mentor ada bahan tambahan yang dapat membantu usahawan.
+Apakah mentor perlukan bahan tambahan/banuan dari mentor mentor lain atau HQ.
+Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berkaitan bisnes mahupun tingkahlaku atau komitmen peserta.`}
+          />
         </Section>
 
         {/* ============== UPWARD MOBILITY SECTION (WAJIB) ============== */}

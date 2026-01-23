@@ -23,77 +23,30 @@ const safeJSONParse = (str) => {
   }
 };
 
-// Enhanced TextArea component with removable placeholder
-const EnhancedTextArea = ({ label, name, value, onChange, placeholder, rows = 5, required = false, disabled = false }) => {
-  const [showPlaceholder, setShowPlaceholder] = useState(true);
-  const [textValue, setTextValue] = useState(value || '');
-
-  useEffect(() => {
-    setTextValue(value || '');
-    setShowPlaceholder(!value || value.trim() === '');
-  }, [value]);
-
-  const handleTextChange = (e) => {
-    const newValue = e.target.value;
-    setTextValue(newValue);
-    setShowPlaceholder(false);
-
-    if (onChange) {
-      onChange(e);
-    }
-  };
-
-  const handleClearPlaceholder = () => {
-    setShowPlaceholder(false);
-    setTextValue('');
-
-    const syntheticEvent = {
-      target: {
-        name: name,
-        value: ''
-      }
-    };
-    if (onChange) {
-      onChange(syntheticEvent);
-    }
-  };
-
-  const displayValue = showPlaceholder ? placeholder : textValue;
-
+// Enhanced TextArea component with helper text (guidance always visible, never submitted)
+const EnhancedTextArea = ({ label, name, value, onChange, helperText, rows = 5, required = false, disabled = false }) => {
   return (
     <div className="mb-4">
       <label className="block text-sm font-medium text-gray-700 mb-2">
         {label} {required && <span className="text-red-500">*</span>}
       </label>
-      <div className="relative">
-        <textarea
-          name={name}
-          value={displayValue}
-          onChange={handleTextChange}
-          onClick={() => {
-            if (showPlaceholder) {
-              setShowPlaceholder(false);
-              setTextValue('');
-            }
-          }}
-          className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-vertical ${
-            showPlaceholder ? 'text-gray-400 italic' : 'text-gray-900'
-          } ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-          rows={rows}
-          required={required}
-          disabled={disabled}
-        />
-        {showPlaceholder && !disabled && (
-          <button
-            type="button"
-            onClick={handleClearPlaceholder}
-            className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 text-sm bg-white px-2 py-1 rounded border border-gray-300"
-            title="Clear placeholder and start writing"
-          >
-            ✕ Clear
-          </button>
-        )}
-      </div>
+      {helperText && (
+        <div className="mb-2 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-gray-700 whitespace-pre-line">
+          {helperText}
+        </div>
+      )}
+      <textarea
+        name={name}
+        value={value || ''}
+        onChange={onChange}
+        className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-vertical text-gray-900 ${
+          disabled ? 'bg-gray-100 cursor-not-allowed' : ''
+        }`}
+        rows={rows}
+        required={required}
+        disabled={disabled}
+        placeholder={disabled ? '' : 'Taip respons anda di sini...'}
+      />
     </div>
   );
 };
@@ -1791,7 +1744,7 @@ const handleSubmit = async (e) => {
                       onChange={handleChange}
                       required={true}
                       rows={8}
-                      placeholder={`Panduan:
+                      helperText={`Panduan:
 Latarbelakang usahawan.
 Penerangan produk/perkhidmatan.
 Situasi bisnes ketika ini:
@@ -2128,7 +2081,7 @@ Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun la
                       onChange={handleChange}
                       required={false}
                       rows={6}
-                      placeholder={`Panduan:
+                      helperText={`Panduan:
 - Aktiviti pemasaran dan jualan
 - Perekodan maklumat akaun, sistem yang digunakan
 Apa yang usahawan mahu capai kedepan.
@@ -2148,7 +2101,7 @@ Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun la
                       onChange={handleChange}
                       required={currentSessionNumber >= 2}
                       rows={8}
-                      placeholder={`Nota:
+                      helperText={`Nota:
 Pastikan peserta pulang dengan Keputusan dan Tindakan yang perlu diusahakan, siapa dan bila. (Kongsikan/pastika usahawan juga jelas)
 Apakah ada homework untuk peserta.
 Sebaiknya, tetapkan masa pertemuan sesi akan datang, dan mod perbincangan.
