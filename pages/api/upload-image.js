@@ -73,6 +73,12 @@ export default async function handler(req, res) {
     const drive = google.drive({ version: 'v3', auth: authClient });
 
     console.log('☁️ Uploading file to Google Drive...');
+// ✅ PRE-FLIGHT CHECK: ensure folder exists & is accessible (Shared Drive safe)
+await drive.files.get({
+  fileId: folderId,
+  fields: 'id, name',
+  supportsAllDrives: true,
+});
 
     // Upload file to Google Drive
     const fileMetadata = {
@@ -89,6 +95,7 @@ export default async function handler(req, res) {
       requestBody: fileMetadata,
       media: media,
       fields: 'id, webViewLink, webContentLink',
+      supportsAllDrives: true, // ✅ REQUIRED for Shared Drive
     });
 
     console.log('✅ File uploaded successfully:', {
@@ -105,6 +112,7 @@ export default async function handler(req, res) {
         role: 'reader',
         type: 'anyone',
       },
+      supportsAllDrives: true, // ✅ REQUIRED for Shared Drive
     });
 
     console.log('🧹 Cleaning up temporary file...');
@@ -140,4 +148,6 @@ export default async function handler(req, res) {
       code: error.code
     });
   }
+
+
 }

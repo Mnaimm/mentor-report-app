@@ -28,14 +28,16 @@ export default async function handler(req, res) {
     // Environment variables - TWO spreadsheets for MAJU UM
     // 1. V8 Sheet for LaporanMajuUM tab (main report data)
     const v8SpreadsheetId = process.env.GOOGLE_SHEETS_MAJU_REPORT_ID || process.env.GOOGLE_SHEETS_REPORT_ID;
-    const laporanMajuRange = 'LaporanMajuUM!A1';
+    const laporanMajuTab = process.env.LAPORAN_MAJU_UM_TAB || 'LaporanMajuUM';
+    const laporanMajuRange = `${laporanMajuTab}!A1`;
 
     // 2. Upward Mobility Sheet for UM tab (UM tracking data)
     const umSpreadsheetId = process.env.UPWARD_MOBILITY_SPREADSHEET_ID;
-    const umRange = 'UM!A1';
+    const umTab = process.env.UPWARD_MOBILITY_TAB || 'UM';
+    const umRange = `${umTab}!A1`;
 
-    console.log('🔗 V8 Sheet ID (LaporanMajuUM):', v8SpreadsheetId);
-    console.log('🔗 UM Sheet ID (UM tab):', umSpreadsheetId);
+    console.log('🔗 V8 Sheet ID:', v8SpreadsheetId, '- Tab:', laporanMajuTab);
+    console.log('🔗 UM Sheet ID:', umSpreadsheetId, '- Tab:', umTab);
 
     if (!v8SpreadsheetId) {
       throw new Error('Missing GOOGLE_SHEETS_MAJU_REPORT_ID environment variable.');
@@ -64,7 +66,7 @@ export default async function handler(req, res) {
     console.log('📊 Folder_ID in row data (index 25):', rowData[25]);
 
     // Append data to V8 Sheet / LaporanMajuUM tab
-    console.log('📊 Appending data to V8 Sheet / LaporanMajuUM tab...');
+    console.log(`📊 Appending data to V8 Sheet / ${laporanMajuTab} tab...`);
     const appendRes = await Promise.race([
       sheets.spreadsheets.values.append({
         spreadsheetId: v8SpreadsheetId,
@@ -77,13 +79,13 @@ export default async function handler(req, res) {
         setTimeout(() => reject(new Error('Google Sheets API timeout after 10 seconds')), 10000)
       )
     ]);
-    console.log('✅ V8 Sheet / LaporanMajuUM tab append successful');
+    console.log(`✅ V8 Sheet / ${laporanMajuTab} tab append successful`);
 
     // Extract the row number where data was appended
     const updatedRange = appendRes.data?.updates?.updatedRange || '';
     console.log('📊 Updated range:', updatedRange);
 
-    // Parse row number from something like "LaporanMajuUM!A3:AC3"
+    // Parse row number from something like "LaporanMajuUM!A3:AC3" or "LaporanMaju!A3:AC3"
     const newRowNumber = updatedRange.match(/!A(\d+):/)?.[1];
     console.log('🔢 Extracted row number:', newRowNumber);
 
@@ -95,7 +97,7 @@ export default async function handler(req, res) {
     let umRowNumber = null;
     if (reportData.MIA_STATUS !== 'MIA' && reportData.UPWARD_MOBILITY_JSON) {
       try {
-        console.log('📊 Appending UM data to Upward Mobility Sheet / UM tab...');
+        console.log(`📊 Appending UM data to Upward Mobility Sheet / ${umTab} tab...`);
         const umData = JSON.parse(reportData.UPWARD_MOBILITY_JSON);
         const umRowData = mapUMDataToSheetRow(reportData, umData);
 
@@ -114,7 +116,7 @@ export default async function handler(req, res) {
 
         const umUpdatedRange = umAppendRes.data?.updates?.updatedRange || '';
         umRowNumber = umUpdatedRange.match(/!A(\d+):/)?.[1];
-        console.log('✅ Upward Mobility Sheet / UM tab append successful, row:', umRowNumber);
+        console.log(`✅ Upward Mobility Sheet / ${umTab} tab append successful, row:`, umRowNumber);
       } catch (umSheetError) {
         console.error('⚠️ Failed to write to UM tab:', umSheetError);
         // Non-blocking, continue with Supabase writes
@@ -122,7 +124,7 @@ export default async function handler(req, res) {
     }
 
     // Document will be generated automatically by Apps Script time-driven trigger
-    console.log(`✅ Data saved to LaporanMajuUM row ${newRowNumber}. Document will be generated automatically.`);
+    console.log(`✅ Data saved to ${laporanMajuTab} row ${newRowNumber}. Document will be generated automatically.`);
 
     // ============================================================
     // DUAL-WRITE TO SUPABASE (NON-BLOCKING)
@@ -433,12 +435,12 @@ export default async function handler(req, res) {
       sheets: {
         v8Sheet: {
           spreadsheetId: v8SpreadsheetId,
-          tab: 'LaporanMajuUM',
+          tab: laporanMajuTab,
           rowNumber: newRowNumber
         },
         umSheet: {
           spreadsheetId: umSpreadsheetId,
-          tab: 'UM',
+          tab: umTab,
           rowNumber: umRowNumber,
           written: !!umRowNumber
         }

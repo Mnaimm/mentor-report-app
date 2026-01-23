@@ -183,11 +183,13 @@ export default async function handler(req, res) {
     // Maju has its own dedicated endpoint: /api/submitMajuReport
     if (programType === 'bangkit') {
       spreadsheetId = process.env.GOOGLE_SHEETS_REPORT_ID;
-      range = 'Bangkit!A1'; // Bangkit tab (columns A-CB: 0-81)
+      const bangkitTab = process.env.Bangkit_TAB || 'Bangkit';
+      range = `${bangkitTab}!A1`; // Bangkit tab (columns A-CB: 0-81)
       rowData = mapBangkitDataToSheetRow(reportData);
       if (!spreadsheetId) {
           throw new Error('Missing GOOGLE_SHEETS_REPORT_ID environment variable for Bangkit program.');
       }
+      console.log('🔗 Bangkit Sheet ID:', spreadsheetId, '- Tab:', bangkitTab);
     } else {
       return res.status(400).json({
         error: 'Invalid programType. This endpoint only handles "bangkit". Use /api/submitMajuReport for Maju reports.'

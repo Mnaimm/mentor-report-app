@@ -720,16 +720,38 @@ const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async 
             throw new Error(`Image still too large: ${finalSizeKB.toFixed(0)}KB. Please use a smaller image.`);
           }
           
-          // Always use proxy - no direct connection
-          console.log('📤 Uploading via proxy...');
-          const response = await fetch('/api/upload-proxy', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            },
-            body: JSON.stringify({ ...imageData, reportType: 'bangkit' }),
-          });
+          // Always use proxy - no direct connection disable 24012026
+          //console.log('📤 Uploading via proxy...');
+          //const response = await fetch('/api/upload-proxy', {
+            //method: 'POST',
+            //headers: {
+              //'Content-Type': 'application/json',
+              //'Accept': 'application/json'
+            //},
+            //body: JSON.stringify({ ...imageData, reportType: 'bangkit' }),
+          //});
+          console.log('📤 Uploading via upload-image...');
+const formData = new FormData();
+formData.append('file', file);
+formData.append('folderId', fId);
+
+const response = await fetch('/api/upload-image', {
+  method: 'POST',
+  body: formData,
+});
+reader.readAsDataURL(file);
+
+await fetch('/api/upload-proxy', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    action: 'uploadImage',   // ✅ REQUIRED
+    reportType: 'bangkit',
+    ...imageData
+  }),
+});
+
+
           
           if (!response.ok) {
             const errorText = await response.text();

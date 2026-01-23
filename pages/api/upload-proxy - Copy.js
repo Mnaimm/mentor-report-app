@@ -74,13 +74,7 @@ export default async function handler(req, res) {
     delete cleanBody.imageType;  // This is only for logging, not for Apps Script
 
     // IMPORTANT: Add 'action: uploadImage' for Apps Script routing
-  // IMPORTANT: Preserve action if already set (processRow, uploadImage, etc) remove cleanBody.action = 'uploadImage';
-// ✅ PROD-SAFE GUARD: upload-proxy must NOT handle uploads
-if (req.body?.action === 'uploadImage') {
-  return res.status(400).json({
-    error: 'uploadImage is not allowed via upload-proxy. Use /api/upload-image.'
-  });
-}
+    cleanBody.action = 'uploadImage';
 
     console.log('📤 Sending to Apps Script with action:', cleanBody.action);
 
