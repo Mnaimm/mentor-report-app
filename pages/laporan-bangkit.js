@@ -681,106 +681,33 @@ const compressImageForProxy = (base64String, targetSizeKB = 800, onProgress = nu
 const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async (resolve, reject) => {
     try {
       const originalSizeMB = (file.size / 1024 / 1024).toFixed(2);
-      console.log(`📸 Processing ${file.name} (${originalSizeMB}MB)`);
+      console.log(`📸 Uploading ${file.name} (${originalSizeMB}MB) to Google Drive...`);
 
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
+      // Upload directly to Google Drive via /api/upload-image (not Apps Script)
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('folderId', fId);
 
-      reader.onloadend = async () => {
-        try {
-          // Progress callback for React state updates
-          const onCompressionProgress = (current, total, message) => {
-            setCompressionProgress({
-              show: true,
-              current,
-              total,
-              message,
-              fileName: file.name
-            });
-          };
-
-          // Always compress aggressively for proxy with progress
-          console.log('🔄 Compressing image for proxy upload...');
-          const compressedBase64 = await compressImageForProxy(reader.result, 800, onCompressionProgress); // Increased to 800KB target
-          
-          const imageData = {
-            fileData: compressedBase64.split(',')[1], 
-            fileName: file.name, 
-            fileType: 'image/jpeg',
-            folderId: fId, 
-            menteeName, 
-            sessionNumber
-          };
-          
-          // Check final size
-          const finalSizeKB = (compressedBase64.length * 0.75) / 1024;
-          console.log(`📊 Final size: ${finalSizeKB.toFixed(0)}KB (original: ${originalSizeMB}MB)`);
-          
-          if (finalSizeKB > 800) {
-            throw new Error(`Image still too large: ${finalSizeKB.toFixed(0)}KB. Please use a smaller image.`);
-          }
-          
-          // Always use proxy - no direct connection disable 24012026
-          //console.log('📤 Uploading via proxy...');
-          //const response = await fetch('/api/upload-proxy', {
-            //method: 'POST',
-            //headers: {
-              //'Content-Type': 'application/json',
-              //'Accept': 'application/json'
-            //},
-            //body: JSON.stringify({ ...imageData, reportType: 'bangkit' }),
-          //});
-          console.log('📤 Uploading via upload-image...');
-const formData = new FormData();
-formData.append('file', file);
-formData.append('folderId', fId);
-
-const response = await fetch('/api/upload-image', {
-  method: 'POST',
-  body: formData,
-});
-reader.readAsDataURL(file);
-
-await fetch('/api/upload-proxy', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    action: 'uploadImage',   // ✅ REQUIRED
-    reportType: 'bangkit',
-    ...imageData
-  }),
-});
+      const response = await fetch('/api/upload-image', {
+        method: 'POST',
+        body: formData,
+      });
 
 
-          
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.error('❌ Proxy error response:', errorText.substring(0, 200));
-            throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
-          }
-          
-          const result = await response.json();
-          
-          if (result.error) {
-            throw new Error(`Server error: ${result.error}`);
-          }
-          
-          console.log('✅ Upload successful');
-          // Clear compression progress
-          setCompressionProgress({ show: false, current: 0, total: 0, message: '', fileName: '' });
-          resolve(result.url);
-          
-        } catch (error) {
-          console.error('❌ Upload processing failed:', error);
-          // Clear compression progress on error
-          setCompressionProgress({ show: false, current: 0, total: 0, message: '', fileName: '' });
-          reject(error);
-        }
-      };
-      
-      reader.onerror = () => {
-        reject(new Error('Failed to read image file'));
-      };
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Upload error response:', errorText.substring(0, 200));
+        throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      if (result.error) {
+        throw new Error(`Server error: ${result.error}`);
+      }
+
+      console.log('✅ Upload successful:', result.url);
+      resolve(result.url);
       
     } catch (error) {
       console.error('❌ Upload setup failed:', error);
@@ -816,9 +743,6 @@ await fetch('/api/upload-proxy', {
       });
 
       await Promise.all(uploadPromises);
-
-      // Clear compression progress immediately when uploads complete
-      setCompressionProgress({ show: false, current: 0, total: 0, message: '', fileName: '' });
 
       // Clear saved draft BEFORE resetting
       try {

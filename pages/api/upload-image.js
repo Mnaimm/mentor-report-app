@@ -2,6 +2,7 @@
 import { google } from 'googleapis';
 import { IncomingForm } from 'formidable';
 import fs from 'fs';
+import { Readable } from 'stream';
 
 // Disable bodyParser to handle file uploads
 export const config = {
@@ -66,7 +67,7 @@ export default async function handler(req, res) {
 
     const auth = new google.auth.GoogleAuth({
       credentials,
-      scopes: ['https://www.googleapis.com/auth/drive.file'],
+      scopes: ['https://www.googleapis.com/auth/drive'],
     });
 
     const authClient = await auth.getClient();
@@ -80,6 +81,12 @@ await drive.files.get({
   supportsAllDrives: true,
 });
 
+    // Read file buffer
+    const fileBuffer = fs.readFileSync(uploadedFile.filepath);
+
+    // Convert buffer to stream
+    const bufferStream = Readable.from(fileBuffer);
+
     // Upload file to Google Drive
     const fileMetadata = {
       name: uploadedFile.originalFilename,
@@ -88,7 +95,7 @@ await drive.files.get({
 
     const media = {
       mimeType: uploadedFile.mimetype,
-      body: fs.createReadStream(uploadedFile.filepath),
+      body: bufferStream,
     };
 
     const response = await drive.files.create({
