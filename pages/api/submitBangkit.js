@@ -146,6 +146,75 @@ const mapBangkitDataToSheetRow = (data) => {
   return row;
 };
 
+/**
+ * Maps data from laporan-bangkit.js to the Upward Mobility Google Sheet row.
+ * Columns A-K: Basic info
+ * Columns L-AR: Legacy fields (leave empty)
+ * Columns AS-BT: UM-specific fields
+ */
+const mapUMToUpwardMobilitySheetRow = (reportData, umData) => {
+  const row = Array(72).fill(''); // Columns 0-71 (A-BT: 72 total)
+
+  // ✅ Columns A-K (0-10): Basic session info
+  row[0] = new Date().toISOString();                     // A  Timestamp
+  row[1] = reportData?.mentorEmail || '';                // B  Email Address
+  row[2] = 'Bangkit';                                    // C  Program
+  row[3] = reportData?.batch || '';                      // D  Batch
+  row[4] = `Sesi ${reportData?.sesiLaporan ?? ''}`;      // E  Sesi Mentoring
+  row[5] = reportData?.namaMentor || '';                 // F  Nama Mentor
+  row[6] = reportData?.usahawan || '';                   // G  Nama Penuh Usahawan
+  row[7] = reportData?.namaSyarikat || '';               // H  Nama Perniagaan
+  row[8] = reportData?.tambahan?.produkServis || '';     // I  Jenis Perniagaan / Produk
+  row[9] = reportData?.tambahan?.alamatPerniagaan || ''; // J  Alamat Perniagaan
+  row[10] = reportData?.tambahan?.nomorTelefon || '';    // K  Nombor Telefon
+
+  // 🚫 Columns L-AR (11-43): Legacy fields - LEAVE EMPTY (33 columns)
+  // These are from the standalone UM form and must not be overwritten
+
+  // ✅ Columns AS-BT (44-71): UM-specific fields (28 columns)
+  // Section 1: Engagement Status (3 fields)
+  row[44] = umData.UM_STATUS_PENGLIBATAN || '';         // AS UM_STATUS_PENGLIBATAN
+  row[45] = umData.UM_STATUS || '';                     // AT UM_STATUS
+  row[46] = umData.UM_KRITERIA_IMPROVEMENT || '';       // AU UM_KRITERIA_IMPROVEMENT
+
+  // Section 2: BIMB Channels & Fintech (6 fields)
+  row[47] = umData.UM_AKAUN_BIMB || '';                 // AV UM_AKAUN_BIMB
+  row[48] = umData.UM_BIMB_BIZ || '';                   // AW UM_BIMB_BIZ
+  row[49] = umData.UM_AL_AWFAR || '';                   // AX UM_AL_AWFAR
+  row[50] = umData.UM_MERCHANT_TERMINAL || '';          // AY UM_MERCHANT_TERMINAL
+  row[51] = umData.UM_FASILITI_LAIN || '';              // AZ UM_FASILITI_LAIN
+  row[52] = umData.UM_MESINKIRA || '';                  // BA UM_MESINKIRA
+
+  // Section 3: Financial & Employment Metrics (12 fields: 6 values + 6 ulasan)
+  row[53] = umData.UM_PENDAPATAN_SEMASA || '';          // BB UM_PENDAPATAN_SEMASA
+  row[54] = umData.UM_ULASAN_PENDAPATAN || '';          // BC UM_ULASAN_PENDAPATAN
+  row[55] = umData.UM_PEKERJA_SEMASA || '';             // BD UM_PEKERJA_SEMASA
+  row[56] = umData.UM_ULASAN_PEKERJA || '';             // BE UM_ULASAN_PEKERJA
+  row[57] = umData.UM_ASET_BUKAN_TUNAI_SEMASA || '';    // BF UM_ASET_BUKAN_TUNAI_SEMASA
+  row[58] = umData.UM_ULASAN_ASET_BUKAN_TUNAI || '';    // BG UM_ULASAN_ASET_BUKAN_TUNAI
+  row[59] = umData.UM_ASET_TUNAI_SEMASA || '';          // BH UM_ASET_TUNAI_SEMASA
+  row[60] = umData.UM_ULASAN_ASET_TUNAI || '';          // BI UM_ULASAN_ASET_TUNAI
+  row[61] = umData.UM_SIMPANAN_SEMASA || '';            // BJ UM_SIMPANAN_SEMASA
+  row[62] = umData.UM_ULASAN_SIMPANAN || '';            // BK UM_ULASAN_SIMPANAN
+  row[63] = umData.UM_ZAKAT_SEMASA || '';               // BL UM_ZAKAT_SEMASA
+  row[64] = umData.UM_ULASAN_ZAKAT || '';               // BM UM_ULASAN_ZAKAT
+
+  // Section 4: Digitalization (2 fields)
+  row[65] = umData.UM_DIGITAL_SEMASA || '';             // BN UM_DIGITAL_SEMASA
+  row[66] = umData.UM_ULASAN_DIGITAL || '';             // BO UM_ULASAN_DIGITAL
+
+  // Section 5: Marketing (2 fields)
+  row[67] = umData.UM_MARKETING_SEMASA || '';           // BP UM_MARKETING_SEMASA
+  row[68] = umData.UM_ULASAN_MARKETING || '';           // BQ UM_ULASAN_MARKETING
+
+  // Section 6: Premises Visit Date (1 field)
+  row[69] = umData.UM_TARIKH_LAWATAN_PREMIS || '';      // BR UM_TARIKH_LAWATAN_PREMIS
+
+  // Remaining columns BS-BT (70-71) are reserved/future use - leave empty
+
+  return row;
+};
+
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -218,6 +287,64 @@ export default async function handler(req, res) {
 
     // Document will be generated automatically by Apps Script time-driven trigger
     console.log(`✅ Data saved to row ${newRowNumber}. Document will be generated automatically.`);
+
+    // ============================================================
+    // DUAL-WRITE TO UPWARD MOBILITY GOOGLE SHEET (NON-BLOCKING)
+    // ============================================================
+    let umSheetSuccess = false;
+    let umSheetError = null;
+    let umSheetRowNumber = null;
+
+    // Only write to UM sheet if NOT MIA and UM data exists
+    if (reportData.status !== 'MIA' && reportData.UPWARD_MOBILITY_JSON) {
+      try {
+        console.log('📊 Starting dual-write to Upward Mobility Google Sheet...');
+
+        // Parse UM data
+        const umData = JSON.parse(reportData.UPWARD_MOBILITY_JSON);
+
+        // Get UM sheet configuration
+        const umSpreadsheetId = process.env.GOOGLE_SHEET_ID_UM;
+        const umRange = 'UM!A1';
+
+        if (!umSpreadsheetId) {
+          throw new Error('Missing GOOGLE_SHEET_ID_UM environment variable');
+        }
+
+        // Map data to UM sheet row
+        const umRowData = mapUMToUpwardMobilitySheetRow(reportData, umData);
+
+        // Append to UM sheet with 8s timeout
+        const umAppendRes = await Promise.race([
+          sheets.spreadsheets.values.append({
+            spreadsheetId: umSpreadsheetId,
+            range: umRange,
+            valueInputOption: 'USER_ENTERED',
+            insertDataOption: 'INSERT_ROWS',
+            requestBody: { values: [umRowData] },
+          }),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Upward Mobility Sheet API timeout after 8 seconds')), 8000)
+          )
+        ]);
+
+        const umUpdatedRange = umAppendRes.data?.updates?.updatedRange || '';
+        umSheetRowNumber = getRowNumberFromUpdatedRange(umUpdatedRange);
+        umSheetSuccess = true;
+
+        console.log(`✅ Upward Mobility sheet write successful. Row: ${umSheetRowNumber}`);
+
+      } catch (error) {
+        umSheetError = error.message;
+        console.error('⚠️ Upward Mobility sheet write failed (non-blocking):', error);
+        // This failure does NOT fail the main Bangkit submission
+      }
+    } else {
+      console.log(`ℹ️ Skipping UM sheet write. MIA: ${reportData.status === 'MIA'}, Has UM Data: ${!!reportData.UPWARD_MOBILITY_JSON}`);
+    }
+    // ============================================================
+    // END UPWARD MOBILITY GOOGLE SHEET DUAL-WRITE
+    // ============================================================
 
     // ============================================================
     // DUAL-WRITE TO SUPABASE (NON-BLOCKING)
@@ -389,19 +516,31 @@ export default async function handler(req, res) {
 
         if (mentorError) throw new Error(`Mentor not found: ${mentorError.message}`);
 
-        // Fetch entrepreneur ID
-        const { data: entrepreneurData, error: entrepreneurError } = await supabase
+        // Fetch entrepreneur ID (email-based lookup)
+        const entrepreneurEmail =
+          reportData.emailUsahawan ||
+          reportData.entrepreneurEmail ||
+          reportData.email ||
+          reportRecord?.email;
+
+        if (!entrepreneurEmail) {
+          throw new Error('Entrepreneur email not found in report data');
+        }
+
+        const { data: entrepreneur, error: entrepreneurError } = await supabase
           .from('entrepreneurs')
           .select('id')
-          .eq('nama', reportRecord.nama_mentee)
+          .eq('email', entrepreneurEmail.toLowerCase().trim())
           .single();
 
-        if (entrepreneurError) throw new Error(`Entrepreneur not found: ${entrepreneurError.message}`);
+        if (entrepreneurError || !entrepreneur) {
+          throw new Error(`Entrepreneur not found: ${entrepreneurEmail}`);
+        }
 
         // Prepare UM payload matching upward_mobility_reports schema
         const umPayload = {
           report_id: supabaseRecordId,
-          entrepreneur_id: entrepreneurData.id,
+          entrepreneur_id: entrepreneur.id,
           mentor_id: mentorData.id,
           program: 'BANGKIT',
           sesi_mentoring: `Sesi ${reportData.sesiLaporan}`,
@@ -527,12 +666,22 @@ export default async function handler(req, res) {
       message: 'Laporan Bangkit dan Upward Mobility berjaya dihantar! Dokumen akan dicipta secara automatik dalam masa 1-2 minit.',
       rowNumber: newRowNumber,
       dualWrite: {
-        reports: {
+        bangkitSheet: {
+          success: true,
+          rowNumber: newRowNumber
+        },
+        upwardMobilitySheet: {
+          success: umSheetSuccess,
+          rowNumber: umSheetRowNumber,
+          error: umSheetError,
+          skipped: reportData.status === 'MIA' || !reportData.UPWARD_MOBILITY_JSON
+        },
+        supabaseReports: {
           success: supabaseSuccess,
           recordId: supabaseRecordId,
           error: supabaseError
         },
-        upwardMobility: {
+        supabaseUpwardMobility: {
           success: umSuccess,
           recordId: umRecordId,
           error: umError,
