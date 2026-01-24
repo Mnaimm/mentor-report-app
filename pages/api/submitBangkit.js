@@ -356,6 +356,28 @@ export default async function handler(req, res) {
     try {
       console.log('📊 Starting Supabase dual-write for Bangkit session report...');
 
+      // Resolve entrepreneur ID BEFORE inserting into reports
+      const entrepreneurEmail =
+        reportData.emailUsahawan ||
+        reportData.entrepreneurEmail ||
+        reportData.email;
+
+      if (!entrepreneurEmail) {
+        throw new Error('Entrepreneur email not found in report data');
+      }
+
+      const { data: entrepreneur, error: entrepreneurError } = await supabase
+        .from('entrepreneurs')
+        .select('id')
+        .eq('email', entrepreneurEmail.toLowerCase().trim())
+        .single();
+
+      if (entrepreneurError || !entrepreneur) {
+        throw new Error(`Entrepreneur not found: ${entrepreneurEmail}`);
+      }
+
+      console.log(`✅ Entrepreneur resolved: ${entrepreneur.id}`);
+
       // Prepare Supabase payload - MUST match 'reports' table schema
       const supabasePayload = {
         // Program & Metadata
@@ -364,6 +386,9 @@ export default async function handler(req, res) {
         status: 'submitted',
         submission_date: new Date().toISOString(),
         sheets_row_number: newRowNumber,
+
+        // Foreign Keys
+        entrepreneur_id: entrepreneur.id,
 
         // Mentor Info
         mentor_email: reportData?.mentorEmail || null,
@@ -537,55 +562,83 @@ export default async function handler(req, res) {
           throw new Error(`Entrepreneur not found: ${entrepreneurEmail}`);
         }
 
-        // Prepare UM payload matching upward_mobility_reports schema
-        const umPayload = {
-          report_id: supabaseRecordId,
-          entrepreneur_id: entrepreneur.id,
-          mentor_id: mentorData.id,
-          program: 'BANGKIT',
-          sesi_mentoring: `Sesi ${reportData.sesiLaporan}`,
+        // Build schema-whitelisted UM payload (aligned with upward_mobility_reports table)
+        const umSupabasePayload = {};
 
-          // Section 1: Status & Mobiliti
-          status_penglibatan: umData.UM_STATUS_PENGLIBATAN || null,
-          um_status: umData.UM_STATUS || null,
-          kriteria_improvement: umData.UM_KRITERIA_IMPROVEMENT || null,
-          tarikh_lawatan: umData.UM_TARIKH_LAWATAN_PREMIS || null,
+        // Required foreign keys
+        umSupabasePayload.entrepreneur_id = entrepreneur.id;
+        umSupabasePayload.mentor_id = mentorData.id;
 
-          // Section 2: Bank Islam & Fintech
-          bank_akaun_semasa: umData.UM_AKAUN_BIMB || null,
-          bank_bizapp: umData.UM_BIMB_BIZ || null,
-          bank_al_awfar: umData.UM_AL_AWFAR || null,
-          bank_merchant_terminal: umData.UM_MERCHANT_TERMINAL || null,
-          bank_fasiliti_lain: umData.UM_FASILITI_LAIN || null,
-          bank_mesinkira: umData.UM_MESINKIRA || null,
+        // Program & Session
+        if (reportData.sesiLaporan) umSupabasePayload.sesi_mentoring = `Sesi ${reportData.sesiLaporan}`;
+        umSupabasePayload.program = 'BANGKIT';
 
-          // Section 3: Situasi Kewangan (Semasa + Ulasan)
-          pendapatan_semasa: umData.UM_PENDAPATAN_SEMASA ? parseFloat(umData.UM_PENDAPATAN_SEMASA) : null,
-          ulasan_pendapatan: umData.UM_ULASAN_PENDAPATAN || null,
-          pekerja_semasa: umData.UM_PEKERJA_SEMASA ? parseInt(umData.UM_PEKERJA_SEMASA) : null,
-          ulasan_pekerja: umData.UM_ULASAN_PEKERJA || null,
-          aset_bukan_tunai_semasa: umData.UM_ASET_BUKAN_TUNAI_SEMASA ? parseFloat(umData.UM_ASET_BUKAN_TUNAI_SEMASA) : null,
-          ulasan_aset_bukan_tunai: umData.UM_ULASAN_ASET_BUKAN_TUNAI || null,
-          aset_tunai_semasa: umData.UM_ASET_TUNAI_SEMASA ? parseFloat(umData.UM_ASET_TUNAI_SEMASA) : null,
-          ulasan_aset_tunai: umData.UM_ULASAN_ASET_TUNAI || null,
-          simpanan_semasa: umData.UM_SIMPANAN_SEMASA ? parseFloat(umData.UM_SIMPANAN_SEMASA) : null,
-          ulasan_simpanan: umData.UM_ULASAN_SIMPANAN || null,
-          zakat_semasa: umData.UM_ZAKAT_SEMASA || null,
-          ulasan_zakat: umData.UM_ULASAN_ZAKAT || null,
+        // Section 1: Status & Mobiliti
+        if (umData.UM_STATUS_PENGLIBATAN) umSupabasePayload.status_penglibatan = umData.UM_STATUS_PENGLIBATAN;
+        if (umData.UM_STATUS) umSupabasePayload.um_status = umData.UM_STATUS;
+        if (umData.UM_KRITERIA_IMPROVEMENT) umSupabasePayload.kriteria_improvement = umData.UM_KRITERIA_IMPROVEMENT;
+        if (umData.UM_TARIKH_LAWATAN_PREMIS) umSupabasePayload.tarikh_lawatan = umData.UM_TARIKH_LAWATAN_PREMIS;
 
-          // Section 4 & 5: Digital & Marketing (comma-separated strings)
-          digital_semasa: umData.UM_DIGITAL_SEMASA || null,
-          ulasan_digital: umData.UM_ULASAN_DIGITAL || null,
-          marketing_semasa: umData.UM_MARKETING_SEMASA || null,
-          ulasan_marketing: umData.UM_ULASAN_MARKETING || null,
+        // Section 2: Bank Islam & Fintech
+        if (umData.UM_AKAUN_BIMB) umSupabasePayload.bank_akaun_semasa = umData.UM_AKAUN_BIMB;
+        if (umData.UM_BIMB_BIZ) umSupabasePayload.bank_bizapp = umData.UM_BIMB_BIZ;
+        if (umData.UM_AL_AWFAR) umSupabasePayload.bank_al_awfar = umData.UM_AL_AWFAR;
+        if (umData.UM_MERCHANT_TERMINAL) umSupabasePayload.bank_merchant_terminal = umData.UM_MERCHANT_TERMINAL;
+        if (umData.UM_FASILITI_LAIN) umSupabasePayload.bank_fasiliti_lain = umData.UM_FASILITI_LAIN;
+        if (umData.UM_MESINKIRA) umSupabasePayload.bank_mesinkira = umData.UM_MESINKIRA;
 
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
+        // Section 3: Financial & Employment Metrics
+        if (umData.UM_PENDAPATAN_SEMASA) {
+          const parsed = parseFloat(umData.UM_PENDAPATAN_SEMASA);
+          if (!isNaN(parsed)) umSupabasePayload.pendapatan_semasa = parsed;
+        }
+        if (umData.UM_ULASAN_PENDAPATAN) umSupabasePayload.ulasan_pendapatan = umData.UM_ULASAN_PENDAPATAN;
+
+        if (umData.UM_PEKERJA_SEMASA) {
+          const parsed = parseInt(umData.UM_PEKERJA_SEMASA);
+          if (!isNaN(parsed)) umSupabasePayload.pekerja_semasa = parsed;
+        }
+        if (umData.UM_ULASAN_PEKERJA) umSupabasePayload.ulasan_pekerja = umData.UM_ULASAN_PEKERJA;
+
+        if (umData.UM_ASET_BUKAN_TUNAI_SEMASA) {
+          const parsed = parseFloat(umData.UM_ASET_BUKAN_TUNAI_SEMASA);
+          if (!isNaN(parsed)) umSupabasePayload.aset_bukan_tunai_semasa = parsed;
+        }
+        if (umData.UM_ULASAN_ASET_BUKAN_TUNAI) umSupabasePayload.ulasan_aset_bukan_tunai = umData.UM_ULASAN_ASET_BUKAN_TUNAI;
+
+        if (umData.UM_ASET_TUNAI_SEMASA) {
+          const parsed = parseFloat(umData.UM_ASET_TUNAI_SEMASA);
+          if (!isNaN(parsed)) umSupabasePayload.aset_tunai_semasa = parsed;
+        }
+        if (umData.UM_ULASAN_ASET_TUNAI) umSupabasePayload.ulasan_aset_tunai = umData.UM_ULASAN_ASET_TUNAI;
+
+        if (umData.UM_SIMPANAN_SEMASA) {
+          const parsed = parseFloat(umData.UM_SIMPANAN_SEMASA);
+          if (!isNaN(parsed)) umSupabasePayload.simpanan_semasa = parsed;
+        }
+        if (umData.UM_ULASAN_SIMPANAN) umSupabasePayload.ulasan_simpanan = umData.UM_ULASAN_SIMPANAN;
+
+        if (umData.UM_ZAKAT_SEMASA) umSupabasePayload.zakat_semasa = umData.UM_ZAKAT_SEMASA;
+        if (umData.UM_ULASAN_ZAKAT) umSupabasePayload.ulasan_zakat = umData.UM_ULASAN_ZAKAT;
+
+        // Section 4: Digitalization
+        if (umData.UM_DIGITAL_SEMASA) umSupabasePayload.digital_semasa = umData.UM_DIGITAL_SEMASA;
+        if (umData.UM_ULASAN_DIGITAL) umSupabasePayload.ulasan_digital = umData.UM_ULASAN_DIGITAL;
+
+        // Section 5: Marketing
+        if (umData.UM_MARKETING_SEMASA) umSupabasePayload.marketing_semasa = umData.UM_MARKETING_SEMASA;
+        if (umData.UM_ULASAN_MARKETING) umSupabasePayload.ulasan_marketing = umData.UM_ULASAN_MARKETING;
+
+        // Timestamps
+        const now = new Date().toISOString();
+        umSupabasePayload.created_at = now;
+        umSupabasePayload.updated_at = now;
+
+        console.log(`📋 UM payload keys: ${Object.keys(umSupabasePayload).length} fields`);
 
         const { data: insertedUM, error: umInsertError } = await supabase
           .from('upward_mobility_reports')
-          .insert(umPayload)
+          .insert(umSupabasePayload)
           .select();
 
         if (umInsertError) throw umInsertError;

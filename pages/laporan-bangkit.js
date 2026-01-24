@@ -771,6 +771,7 @@ const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async 
         namaSyarikat: selectedMentee.Nama_Syarikat,
         namaMentor: session.user.name,
         mentorEmail: session.user.email,
+        emailUsahawan: selectedMentee?.Emel || '', // Use 'Emel' (transformed key from backend)
         imageUrls,
         premisDilawatChecked: !!formState.sesi?.premisDilawat,
         programType: 'bangkit', // Added programType
