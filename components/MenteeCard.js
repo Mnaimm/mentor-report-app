@@ -5,28 +5,17 @@ import { useRouter } from 'next/router';
 export default function MenteeCard({ mentee, selected, onSelect, onAssign, onViewDetails, isReadOnly, onSubmitReport, onContact }) {
   const router = useRouter();
 
-  // Enhanced status priority with UM tracking
+  // Status priority for card display
   const getCardPriority = (mentee) => {
     if (mentee.status === 'overdue') return 1;
     if (mentee.status === 'due_soon') return 2;
-    if (mentee.umStatus?.status === 'pending') return 3;
-    if (mentee.status === 'on_track') return 4;
-    if (mentee.status === 'pending_first_session') return 5;
-    return 6;
+    if (mentee.status === 'on_track') return 3;
+    if (mentee.status === 'pending_first_session') return 4;
+    return 5;
   };
 
-  // Enhanced status colors and border styles
+  // Status colors and border styles
   const getStatusStyles = (mentee) => {
-    // UM pending has priority if also has other issues
-    if (mentee.umStatus?.status === 'pending' && (mentee.status === 'overdue' || mentee.status === 'due_soon')) {
-      return {
-        border: 'border-l-4 border-red-500',
-        badge: 'bg-red-100 text-red-800',
-        badgeText: '🔴 OVERDUE',
-        showUM: true
-      };
-    }
-
     if (mentee.status === 'overdue') {
       return {
         border: 'border-l-4 border-red-500',
@@ -40,14 +29,6 @@ export default function MenteeCard({ mentee, selected, onSelect, onAssign, onVie
         border: 'border-l-4 border-yellow-500',
         badge: 'bg-yellow-100 text-yellow-800',
         badgeText: '🟡 DUE SOON'
-      };
-    }
-
-    if (mentee.umStatus?.status === 'pending') {
-      return {
-        border: 'border-l-4 border-purple-500',
-        badge: 'bg-purple-100 text-purple-800',
-        badgeText: '🟣 UM PENDING'
       };
     }
 
@@ -110,12 +91,6 @@ export default function MenteeCard({ mentee, selected, onSelect, onAssign, onVie
     if (onSubmitReport) {
       onSubmitReport(mentee);
     }
-  };
-
-  const handleSubmitUM = () => {
-    // Navigate to UM form with pre-filled data
-    const isBangkit = mentee.program?.toLowerCase().includes('bangkit');
-    router.push(`/upward-mobility?mentee=${mentee.id}&name=${encodeURIComponent(mentee.name)}&session=${mentee.umStatus.session}&program=${isBangkit ? 'bangkit' : 'maju'}`);
   };
 
   const handleContact = (method) => {
@@ -198,31 +173,6 @@ export default function MenteeCard({ mentee, selected, onSelect, onAssign, onVie
         </div>
       )}
 
-      {/* UM Status Section */}
-      {mentee.umStatus && (
-        <div className={`mb-3 p-3 rounded-lg border ${
-          mentee.umStatus.status === 'pending'
-            ? 'bg-purple-50 border-purple-200'
-            : 'bg-green-50 border-green-200'
-        }`}>
-          <div className="flex items-center gap-2">
-            <span className="text-lg">
-              {mentee.umStatus.status === 'pending' ? '⚠️' : '✅'}
-            </span>
-            <div className="flex-1">
-              <div className={`text-xs font-semibold ${
-                mentee.umStatus.status === 'pending' ? 'text-purple-700' : 'text-green-700'
-              }`}>
-                Upward Mobility Form
-              </div>
-              <div className="text-xs text-gray-600">
-                Session {mentee.umStatus.session}: {mentee.umStatus.status === 'pending' ? 'Not Submitted' : 'Submitted'}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Session Details */}
       <div className="space-y-2 text-sm mb-4">
         {mentee.totalSessions !== undefined && (
@@ -250,16 +200,6 @@ export default function MenteeCard({ mentee, selected, onSelect, onAssign, onVie
             className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors text-sm"
           >
             📝 Submit Session Report
-          </button>
-        )}
-
-        {/* UM Form Button - Show if pending */}
-        {mentee.umStatus?.status === 'pending' && !isReadOnly && (
-          <button
-            onClick={handleSubmitUM}
-            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors text-sm"
-          >
-            📋 Submit UM Form (Session {mentee.umStatus.session})
           </button>
         )}
 

@@ -81,12 +81,11 @@ export default function MentorDashboard() {
     const sorted = [...filtered].sort((a, b) => {
       switch (sortBy) {
         case 'urgency':
-          // Enhanced urgency-based sort with UM tracking
+          // Urgency-based sort by status and due date
           const getUrgencyScore = (mentee) => {
             // Higher score = more urgent
             if (mentee.status === 'overdue') return 1000;
             if (mentee.status === 'due_soon') return 500;
-            if (mentee.umStatus?.status === 'pending') return 300;
             if (mentee.status === 'on_track') return 10;
             if (mentee.status === 'pending_first_session') return 5;
             return 0;
@@ -153,7 +152,7 @@ export default function MentorDashboard() {
   const handleSubmitReport = (mentee) => {
     // Determine which form based on program
     const isBangkit = mentee.program?.toLowerCase().includes('bangkit');
-    const formUrl = isBangkit ? '/laporan-sesi' : '/laporan-maju';
+    const formUrl = isBangkit ? '/laporan-bangkit' : '/laporan-maju-um';
     
     // Navigate to form with mentee ID as query param
     router.push(`${formUrl}?mentee=${mentee.id}&name=${encodeURIComponent(mentee.name)}`);
@@ -274,10 +273,6 @@ export default function MentorDashboard() {
                   <div className="text-2xl font-bold text-orange-600">{dashboardData.stats?.needsAction || 0}</div>
                   <div className="text-xs text-gray-600">⚠️ Need Action</div>
                 </div>
-                <div className="bg-white rounded-lg p-3 shadow-sm">
-                  <div className="text-2xl font-bold text-purple-600">{dashboardData.stats?.umPending || 0}</div>
-                  <div className="text-xs text-gray-600">UM Pending</div>
-                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
@@ -288,10 +283,6 @@ export default function MentorDashboard() {
                 <div className="flex items-center gap-2">
                   <span className="text-lg">🟡</span>
                   <span><span className="font-semibold text-yellow-600">{dashboardData.stats?.dueSoon || 0}</span> Due Soon</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">🟣</span>
-                  <span><span className="font-semibold text-purple-600">{dashboardData.stats?.umPending || 0}</span> UM Forms Pending</span>
                 </div>
               </div>
             </div>

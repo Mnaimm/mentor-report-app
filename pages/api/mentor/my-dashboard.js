@@ -214,57 +214,7 @@ export default async function handler(req, res) {
       console.warn('Payment requests table not found, skipping');
     }
 
-    // 3b. Read Upward Mobility forms from Google Sheets
-    console.log('📋 Reading Upward Mobility forms...');
-    let umSubmissions = new Map(); // Format: Map<batch-session-menteeId, true>
-    try {
-      const umSheetId = process.env.GOOGLE_SHEET_ID_UM;
-      if (umSheetId) {
-        const client = await getSheetsClient();
-        const { sheets } = client;
-        const umData = await sheets.spreadsheets.values.get({
-          spreadsheetId: umSheetId,
-          range: 'UM!A:Z',
-        });
-
-        const umRawRows = umData.data.values || [];
-        if (umRawRows.length > 1) {
-          const umHeaders = umRawRows[0];
-          const umRows = umRawRows.slice(1).map(row => {
-            const obj = {};
-            umHeaders.forEach((header, idx) => {
-              obj[header] = row[idx] || '';
-            });
-            return obj;
-          });
-
-          console.log(`✅ Loaded ${umRows.length} UM form submissions`);
-
-          // Build UM submission map
-          for (const row of umRows) {
-            const batch = row['Batch.'];
-            const menteeName = (row['Nama Penuh Usahawan.'] || '').trim();
-            const sesiMentoring = row['Sesi Mentoring.'];
-
-            if (!batch || !sesiMentoring || !menteeName) continue;
-
-            const sessionNum = normalizeRoundNumber(sesiMentoring);
-            if (!sessionNum) continue;
-
-            // CRITICAL FIX: Create composite key using NAME instead of email
-            // UM form doesn't collect entrepreneur email, only mentor's email
-            const key = `${batch}-${sessionNum}-${menteeName}`;
-            umSubmissions.set(key, true);
-          }
-
-          console.log(`📊 UM submissions indexed: ${umSubmissions.size} entries`);
-        }
-      } else {
-        console.warn('⚠️ UM sheet ID not configured (GOOGLE_SHEET_ID_UM)');
-      }
-    } catch (error) {
-      console.error('❌ Error reading UM sheet:', error.message);
-    }
+    // UM tracking removed from mentor dashboard (remains in admin overview)
 
     // 4. Process mentees with their session data
     const mentees = assignments?.map(assignment => {
@@ -437,42 +387,7 @@ export default async function handler(req, res) {
         status = 'pending';
       }
 
-      // Check UM form submission status
-      let umStatus = null;
-      const currentRoundNumStr = normalizeRoundNumber(batchInfo?.roundNumber || currentRound);
-
-      // Only check UM for Session 2 and 4
-      if (currentRoundNumStr === '2' || currentRoundNumStr === '4') {
-        // CRITICAL FIX: Only check UM if THIS ROUND'S session has been submitted
-        const hasSubmittedThisRoundSession = currentRoundSession !== undefined;
-
-        if (hasSubmittedThisRoundSession) {
-          // Check if UM form submitted
-          // CRITICAL FIX: Use entrepreneur NAME instead of email
-          // CRITICAL FIX 2: Use full batch name from batchInfo (e.g., "Batch 5 Bangkit") not cohort (e.g., "Batch 5")
-          const fullBatchName = batchInfo?.batch || menteeBatch;
-          const umKey = `${fullBatchName}-${currentRoundNumStr}-${entrepreneur.name.trim()}`;
-          const hasSubmittedUM = umSubmissions.has(umKey);
-
-          console.log(`🔍 UM Check for ${entrepreneur.name}: key="${umKey}", found=${hasSubmittedUM}`);
-
-          if (!hasSubmittedUM) {
-            umStatus = {
-              session: currentRoundNumStr,
-              status: 'pending',
-              message: `UM Pending (Session ${currentRoundNumStr})`
-            };
-          } else {
-            umStatus = {
-              session: currentRoundNumStr,
-              status: 'submitted',
-              message: `UM Submitted (Session ${currentRoundNumStr})`
-            };
-          }
-        } else {
-          console.log(`⚠️ ${entrepreneur.name}: Session ${currentRoundNumStr} not yet submitted, UM check skipped`);
-        }
-      }
+      // UM tracking removed from mentor dashboard
 
       return {
         id: entrepreneur.id,
@@ -494,14 +409,11 @@ export default async function handler(req, res) {
         roundDueDate: dueDate?.toISOString().split('T')[0],
         daysUntilDue: daysUntilDue,
         assignedAt: assignment.assigned_at,
-        batchPeriod: batchInfo?.period || '',
-        umStatus: umStatus // NEW: UM form tracking
+        batchPeriod: batchInfo?.period || ''
       };
     }).filter(m => m !== null) || [];
 
     // 5. Calculate summary stats
-    const umPendingCount = mentees.filter(m => m.umStatus?.status === 'pending').length;
-
     const stats = {
       totalMentees: mentees.length,
       onTrack: mentees.filter(m => m.status === 'on_track').length,
@@ -509,11 +421,9 @@ export default async function handler(req, res) {
       overdue: mentees.filter(m => m.status === 'overdue').length,
       mia: mentees.filter(m => m.status === 'mia').length,
       pendingFirstSession: mentees.filter(m => m.status === 'pending_first_session').length,
-      umPending: umPendingCount, // NEW: UM forms pending
       needsAction: mentees.filter(m =>
         m.status === 'overdue' ||
-        m.status === 'due_soon' ||
-        m.umStatus?.status === 'pending'
+        m.status === 'due_soon'
       ).length,
       totalSessions: mentees.reduce((sum, m) => sum + m.totalSessions, 0),
       completedSessions: mentees.reduce((sum, m) => sum + m.completedSessions, 0),
