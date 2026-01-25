@@ -57,27 +57,19 @@ export default function MenteeCard({ mentee, selected, onSelect, onAssign, onVie
 
   const styles = getStatusStyles(mentee);
 
-  // Extract program from batch name
-  const getProgram = (batch) => {
-    if (!batch) return 'Unknown';
-    const batchLower = batch.toLowerCase();
-    if (batchLower.includes('bangkit')) return 'Bangkit';
-    if (batchLower.includes('maju')) return 'Maju';
-    if (batchLower.includes('tubf')) return 'TUBF';
-    return 'Other';
-  };
-
+  // COSMETIC ONLY: Display program badge color
+  // Note: Card behavior, status, and button visibility are program-agnostic
   const getProgramColor = (program) => {
-    const colors = {
-      'Bangkit': 'bg-blue-100 text-blue-800',
-      'Maju': 'bg-green-100 text-green-800',
-      'TUBF': 'bg-purple-100 text-purple-800',
-      'Other': 'bg-gray-100 text-gray-800'
-    };
-    return colors[program] || colors['Other'];
+    const programLower = (program || '').toLowerCase();
+    if (programLower.includes('bangkit')) return 'bg-blue-100 text-blue-800';
+    if (programLower.includes('maju')) return 'bg-green-100 text-green-800';
+    if (programLower.includes('tubf')) return 'bg-purple-100 text-purple-800';
+    return 'bg-gray-100 text-gray-800';
   };
 
-  const program = getProgram(mentee.batch);
+  // Use mentee.program directly from API response (more reliable than batch name parsing)
+  const programLabel = mentee.program || 'Unknown';
+  const programColor = getProgramColor(programLabel);
 
   const handleViewDetails = () => {
     if (onViewDetails) {
@@ -132,15 +124,14 @@ export default function MenteeCard({ mentee, selected, onSelect, onAssign, onVie
           <p className="text-sm text-gray-600 mb-2">{mentee.businessName}</p>
         )}
         <div className="flex gap-2 flex-wrap">
+          {/* Program badge - visual indicator only, behavior is program-agnostic */}
+          <span className={`px-2 py-0.5 rounded text-xs font-semibold ${programColor}`}>
+            {programLabel}
+          </span>
           {mentee.batch && (
-            <>
-              <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getProgramColor(program)}`}>
-                {program}
-              </span>
-              <span className="px-2 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-700">
-                {mentee.batch}
-              </span>
-            </>
+            <span className="px-2 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-700">
+              {mentee.batch}
+            </span>
           )}
         </div>
       </div>
@@ -193,8 +184,8 @@ export default function MenteeCard({ mentee, selected, onSelect, onAssign, onVie
 
       {/* Action Buttons */}
       <div className="space-y-2">
-        {/* Primary Action - Context Aware */}
-        {(mentee.status === 'overdue' || mentee.status === 'due_soon' || mentee.status === 'pending_first_session') && !isReadOnly && (
+        {/* Primary Action - Show if current round not completed */}
+        {(mentee.reportsThisRound < mentee.expectedReportsThisRound) && !isReadOnly && (
           <button
             onClick={handleSubmitReport}
             className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors text-sm"
