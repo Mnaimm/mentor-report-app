@@ -1107,87 +1107,21 @@ const handleSubmit = async (e) => {
       }
 
       // ============================================================
-      // 3. WRITE TO STANDALONE UM SHEET (NON-BLOCKING)
+      // ⚠️ REMOVED: STANDALONE UM SHEET WRITE (NOW HANDLED BY BACKEND)
       // ============================================================
-      console.log('📊 [PHASE 6] Starting UM sheet write...');
-
-      const umPayload = {
-        email: formData.EMAIL_MENTOR,
-        program: 'MAJU',
-        batch: 'Batch X MAJU', // Default batch for MAJU program
-        sesiMentoring: `Sesi ${currentSessionNumber}`,
-        namaMentor: formData.NAMA_MENTOR,
-        namaUsahawan: formData.NAMA_MENTEE,
-        namaPerniagaan: formData.NAMA_BISNES,
-        jenisPerniagaan: formData.PRODUK_SERVIS,
-        alamatPerniagaan: formData.LOKASI_BISNES,
-        nomborTelefon: formData.NO_TELEFON,
-
-        // Status & Mobility
-        statusPenglibatan: formData.UPWARD_MOBILITY.UM_STATUS_PENGLIBATAN || '',
-        upwardMobilityStatus: formData.UPWARD_MOBILITY.UM_STATUS || '',
-        kriteriaImprovement: formData.UPWARD_MOBILITY.UM_KRITERIA_IMPROVEMENT || '',
-        tarikhLawatan: formData.UPWARD_MOBILITY.UM_TARIKH_LAWATAN_PREMIS || '',
-
-        // Bank fields
-        penggunaanAkaunSemasa: formData.UPWARD_MOBILITY.UM_AKAUN_BIMB || '',
-        penggunaanBimbBiz: formData.UPWARD_MOBILITY.UM_BIMB_BIZ || '',
-        bukaAkaunAlAwfar: formData.UPWARD_MOBILITY.UM_AL_AWFAR || '',
-        penggunaanBimbMerchant: formData.UPWARD_MOBILITY.UM_MERCHANT_TERMINAL || '',
-        lainLainFasiliti: formData.UPWARD_MOBILITY.UM_FASILITI_LAIN || '',
-        langganMesinKira: formData.UPWARD_MOBILITY.UM_MESINKIRA || '',
-
-        // Kewangan (map SEMASA → SELEPAS, leave SEBELUM empty)
-        pendapatanSebelum: '',
-        pendapatanSelepas: formData.UPWARD_MOBILITY.UM_PENDAPATAN_SEMASA || '',
-        ulasanPendapatan: formData.UPWARD_MOBILITY.UM_ULASAN_PENDAPATAN || '',
-        pekerjaanSebelum: '',
-        pekerjaanSelepas: formData.UPWARD_MOBILITY.UM_PEKERJA_SEMASA || '',
-        ulasanPekerjaan: formData.UPWARD_MOBILITY.UM_ULASAN_PEKERJA || '',
-        asetBukanTunaiSebelum: '',
-        asetBukanTunaiSelepas: formData.UPWARD_MOBILITY.UM_ASET_BUKAN_TUNAI_SEMASA || '',
-        asetTunaiSebelum: '',
-        asetTunaiSelepas: formData.UPWARD_MOBILITY.UM_ASET_TUNAI_SEMASA || '',
-        ulasanAset: `${formData.UPWARD_MOBILITY.UM_ULASAN_ASET_BUKAN_TUNAI || ''}. ${formData.UPWARD_MOBILITY.UM_ULASAN_ASET_TUNAI || ''}`.trim(),
-        simpananSebelum: '',
-        simpananSelepas: formData.UPWARD_MOBILITY.UM_SIMPANAN_SEMASA || '',
-        ulasanSimpanan: formData.UPWARD_MOBILITY.UM_ULASAN_SIMPANAN || '',
-        zakatSebelum: '',
-        zakatSelepas: formData.UPWARD_MOBILITY.UM_ZAKAT_SEMASA === 'Ya' ? 1 : 0,
-        ulasanZakat: formData.UPWARD_MOBILITY.UM_ULASAN_ZAKAT || '',
-
-        // Digital & Marketing (convert array to array, or split string if needed)
-        digitalSebelum: [],
-        digitalSelepas: Array.isArray(formData.UPWARD_MOBILITY.UM_DIGITAL_SEMASA)
-          ? formData.UPWARD_MOBILITY.UM_DIGITAL_SEMASA
-          : (formData.UPWARD_MOBILITY.UM_DIGITAL_SEMASA || '').split(',').map(s => s.trim()).filter(Boolean),
-        ulasanDigital: formData.UPWARD_MOBILITY.UM_ULASAN_DIGITAL || '',
-        onlineSalesSebelum: [],
-        onlineSalesSelepas: Array.isArray(formData.UPWARD_MOBILITY.UM_MARKETING_SEMASA)
-          ? formData.UPWARD_MOBILITY.UM_MARKETING_SEMASA
-          : (formData.UPWARD_MOBILITY.UM_MARKETING_SEMASA || '').split(',').map(s => s.trim()).filter(Boolean),
-        ulasanOnlineSales: formData.UPWARD_MOBILITY.UM_ULASAN_MARKETING || '',
-      };
-
-      try {
-        const umResponse = await fetch('/api/submit-upward-mobility', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(umPayload)
-        });
-
-        if (!umResponse.ok) {
-          console.error('⚠️ [PHASE 6] Failed to write to UM sheet (non-blocking)');
-        } else {
-          console.log('✅ [PHASE 6] UM sheet write successful');
-        }
-      } catch (umError) {
-        console.error('⚠️ [PHASE 6] UM sheet write error (non-blocking):', umError);
-        // Don't fail entire submission
-      }
+      // The backend submitMajuReportum.js already writes to UM sheet
+      // as part of the main submission flow (matching Bangkit implementation).
+      // This frontend call to /api/submit-upward-mobility was causing
+      // duplicate entries in the UM tab.
+      //
+      // For parity with Bangkit:
+      // ✅ UM write happens INSIDE submitMajuReportum.js
+      // ❌ No separate call to /api/submit-upward-mobility
+      //
+      // Note: /api/submit-upward-mobility is a STANDALONE endpoint
+      // for optional UM-only submissions (not linked to session reports).
       // ============================================================
-      // END UM SHEET WRITE
-      // ============================================================
+      console.log('ℹ️ [PHASE 6] UM write handled by backend (no duplicate call)');
 
       // Update stage: complete
       setSubmissionStage({
