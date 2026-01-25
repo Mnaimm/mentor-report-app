@@ -497,280 +497,77 @@ const LaporanMajuPage = () => {
     setMiaProofFile(file);
   };
 
-  // Smart compression with upfront calculations and progress callbacks
-  const compressImageForProxy = (base64String, targetSizeKB = 800, onProgress = null) => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        // Phase 1: Calculate optimal settings upfront
-        const calculateOptimalSettings = () => {
-          if (onProgress) onProgress(1, 4, 'Calculating optimal settings...');
-
-          const { width: origWidth, height: origHeight } = img;
-          const originalSizeEstimateKB = (base64String.length * 0.75) / 1024;
-
-          // Smart dimension calculation - single upfront calculation
-          const maxDimension = 900; // Slightly larger starting point
-          let width = origWidth;
-          let height = origHeight;
-
-          if (width > height && width > maxDimension) {
-            height = (height * maxDimension) / width;
-            width = maxDimension;
-          } else if (height > maxDimension) {
-            width = (width * maxDimension) / height;
-            height = maxDimension;
-          }
-
-          // Smart quality estimation based on compression ratio needed
-          const compressionRatioNeeded = targetSizeKB / originalSizeEstimateKB;
-          let startingQuality = Math.max(0.3, Math.min(0.8, compressionRatioNeeded * 1.2));
-
-          console.log(`📊 Original: ${origWidth}x${origHeight} (~${originalSizeEstimateKB.toFixed(0)}KB)`);
-          console.log(`📐 Target dimensions: ${Math.floor(width)}x${Math.floor(height)}`);
-          console.log(`🎯 Target size: ${targetSizeKB}KB, starting quality: ${(startingQuality * 100).toFixed(0)}%`);
-
-          return { width: Math.floor(width), height: Math.floor(height), startingQuality };
-        };
-
-        // Phase 2: Setup canvas once
-        const settings = calculateOptimalSettings();
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-
-        canvas.width = settings.width;
-        canvas.height = settings.height;
-        ctx.drawImage(img, 0, 0, settings.width, settings.height);
-
-        if (onProgress) onProgress(2, 4, `Resized to ${settings.width}x${settings.height}`);
-
-        // Phase 3: Smart compression with non-blocking attempts
-        const performSmartCompression = () => {
-          let quality = settings.startingQuality;
-          let attempts = 0;
-          const maxAttempts = 5; // Reduced from 15 to 5
-
-          const tryCompression = () => {
-            if (attempts >= maxAttempts) {
-              console.log('⚠️ Max attempts reached, using last result');
-              const finalResult = canvas.toDataURL('image/jpeg', quality);
-              if (onProgress) onProgress(4, 4, '✅ Compression completed');
-              resolve(finalResult);
-              return;
-            }
-
-            const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
-            const estimatedSizeKB = (compressedDataUrl.length * 0.75) / 1024;
-
-            attempts++;
-            const progressMsg = `Attempt ${attempts}: ${estimatedSizeKB.toFixed(0)}KB @ ${(quality * 100).toFixed(0)}%`;
-            console.log(`🔄 ${progressMsg}`);
-
-            if (onProgress) onProgress(3, 4, progressMsg);
-
-            if (estimatedSizeKB <= targetSizeKB) {
-              console.log(`✅ Compressed to ${estimatedSizeKB.toFixed(0)}KB in ${attempts} attempts`);
-              if (onProgress) onProgress(4, 4, `✅ Compressed to ${estimatedSizeKB.toFixed(0)}KB`);
-              resolve(compressedDataUrl);
-              return;
-            }
-
-            // Intelligent quality stepping - larger reductions initially
-            if (attempts <= 2) {
-              quality -= 0.15; // Aggressive initial reduction
-            } else {
-              quality -= 0.08; // Smaller fine-tuning
-            }
-
-            // Ensure minimum quality
-            if (quality < 0.2) {
-              quality = 0.2;
-            }
-
-            // Use requestAnimationFrame for non-blocking execution
-            requestAnimationFrame(tryCompression);
-          };
-
-          // Start compression on next frame
-          requestAnimationFrame(tryCompression);
-        };
-
-        // Phase 4: Start compression
-        requestAnimationFrame(performSmartCompression);
-      };
-
-      img.src = base64String;
-    });
-  };
-
-  // Batch upload function with compression
+  // Batch upload function
   const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async (resolve, reject) => {
     try {
       const originalSizeMB = (file.size / 1024 / 1024).toFixed(2);
-      console.log(`📸 Processing ${file.name} (${originalSizeMB}MB)`);
+      console.log(`📸 Uploading ${file.name} (${originalSizeMB}MB) to Google Drive...`);
 
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
+      // Upload directly to Google Drive via /api/upload-image (not Apps Script)
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('folderId', fId);
 
-      reader.onloadend = async () => {
-        try {
-          // Progress callback for React state updates
-          const onCompressionProgress = (current, total, message) => {
-            setCompressionProgress({
-              show: true,
-              current,
-              total,
-              message,
-              fileName: file.name
-            });
-          };
+      const response = await fetch('/api/upload-image', {
+        method: 'POST',
+        body: formData,
+      });
 
-          // Always compress aggressively for proxy with progress
-          console.log('🔄 Compressing image for proxy upload...');
-          const compressedBase64 = await compressImageForProxy(reader.result, 800, onCompressionProgress); // 800KB target
 
-          const imageData = {
-            fileData: compressedBase64.split(',')[1],
-            fileName: file.name,
-            fileType: 'image/jpeg',
-            folderId: fId,
-            menteeName,
-            sessionNumber,
-            isMIAProof: false
-          };
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Upload error response:', errorText.substring(0, 200));
+        throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+      }
 
-          // Check final size
-          const finalSizeKB = (compressedBase64.length * 0.75) / 1024;
-          console.log(`📊 Final size: ${finalSizeKB.toFixed(0)}KB (original: ${originalSizeMB}MB)`);
+      const result = await response.json();
 
-          if (finalSizeKB > 800) {
-            throw new Error(`Image still too large: ${finalSizeKB.toFixed(0)}KB. Please use a smaller image.`);
-          }
+      if (result.error) {
+        throw new Error(`Server error: ${result.error}`);
+      }
 
-          // Always use proxy - no direct connection
-          console.log('📤 Uploading via proxy...');
-          const response = await fetch('/api/upload-proxy', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            },
-            body: JSON.stringify({ ...imageData, reportType: 'maju-um' }),
-          });
-
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.error('❌ Proxy error response:', errorText.substring(0, 200));
-            throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
-          }
-
-          const result = await response.json();
-
-          if (result.error) {
-            throw new Error(`Server error: ${result.error}`);
-          }
-
-          if (!result.success || !result.url) {
-            console.error('❌ Apps Script returned:', result);
-            throw new Error(result.message || 'Apps Script upload failed - check MajuExecutionLogs');
-          }
-
-          console.log('✅ Upload successful');
-          // Clear compression progress
-          setCompressionProgress({ show: false, current: 0, total: 0, message: '', fileName: '' });
-          resolve(result.url);
-
-        } catch (error) {
-          console.error('❌ Upload processing failed:', error);
-          // Clear compression progress on error
-          setCompressionProgress({ show: false, current: 0, total: 0, message: '', fileName: '' });
-          reject(error);
-        }
-      };
-
-      reader.onerror = () => {
-        reject(new Error('Failed to read image file'));
-      };
-
+      console.log('✅ Upload successful:', result.url);
+      resolve(result.url);
+      
     } catch (error) {
       console.error('❌ Upload setup failed:', error);
       reject(error);
     }
   });
 
-  // MIA proof upload function with compression
+  // MIA proof upload function - uses same FormData approach as uploadImage
   const uploadMiaProof = (file, fId, menteeName, sessionNumber) => new Promise(async (resolve, reject) => {
     try {
       const originalSizeMB = (file.size / 1024 / 1024).toFixed(2);
-      console.log(`📸 Processing MIA proof ${file.name} (${originalSizeMB}MB)`);
+      console.log(`📸 Uploading MIA proof ${file.name} (${originalSizeMB}MB) to Google Drive...`);
 
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
+      // Upload directly to Google Drive via /api/upload-image (not Apps Script)
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('folderId', fId);
 
-      reader.onloadend = async () => {
-        try {
-          // Progress callback for React state updates
-          const onCompressionProgress = (current, total, message) => {
-            setCompressionProgress({
-              show: true,
-              current,
-              total,
-              message,
-              fileName: file.name
-            });
-          };
+      const response = await fetch('/api/upload-image', {
+        method: 'POST',
+        body: formData,
+      });
 
-          // Compress MIA proof image
-          console.log('🔄 Compressing MIA proof image...');
-          const compressedBase64 = await compressImageForProxy(reader.result, 800, onCompressionProgress);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ MIA upload error response:', errorText.substring(0, 200));
+        throw new Error(`MIA upload failed: ${response.status} ${response.statusText}`);
+      }
 
-          const imageData = {
-            fileData: compressedBase64.split(',')[1],
-            fileName: file.name,
-            fileType: 'image/jpeg',
-            folderId: fId,
-            menteeName,
-            sessionNumber,
-            isMIAProof: true
-          };
+      const result = await response.json();
 
-          // Check final size
-          const finalSizeKB = (compressedBase64.length * 0.75) / 1024;
-          console.log(`📊 MIA proof final size: ${finalSizeKB.toFixed(0)}KB (original: ${originalSizeMB}MB)`);
+      if (result.error) {
+        throw new Error(`Server error: ${result.error}`);
+      }
 
-          const response = await fetch('/api/upload-proxy', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...imageData, reportType: 'maju-um' }),
-          });
-
-          if (!response.ok) {
-            throw new Error(`MIA upload failed: ${response.status}`);
-          }
-
-          const result = await response.json();
-
-          console.log('📦 MIA Apps Script response:', result);
-
-          if (result.error || !result.success || !result.url) {
-            console.error('❌ MIA Apps Script returned:', result);
-            throw new Error(result.message || 'MIA Apps Script upload failed - check MajuExecutionLogs');
-          }
-
-          console.log('✅ MIA proof upload successful');
-          // Clear compression progress
-          setCompressionProgress({ show: false, current: 0, total: 0, message: '', fileName: '' });
-          resolve(result.url);
-        } catch (error) {
-          console.error('❌ MIA proof upload failed:', error);
-          // Clear compression progress on error
-          setCompressionProgress({ show: false, current: 0, total: 0, message: '', fileName: '' });
-          reject(error);
-        }
-      };
-
-      reader.onerror = () => reject(new Error('Failed to read MIA file'));
+      console.log('✅ MIA proof upload successful:', result.url);
+      resolve(result.url);
+      
     } catch (error) {
+      console.error('❌ MIA proof upload failed:', error);
       reject(error);
     }
   });
