@@ -166,6 +166,34 @@ export default async function handler(req, res) {
     try {
       console.log('📊 Starting Supabase dual-write for MAJU report...');
 
+      // ============================================================
+      // RESOLVE ENTREPRENEUR_ID (required NOT NULL foreign key)
+      // ============================================================
+      const entrepreneurEmail = 
+        reportData.emel ||
+        reportData.emailUsahawan ||
+        reportData.entrepreneurEmail;
+
+      if (!entrepreneurEmail) {
+        throw new Error('Entrepreneur email not found in MAJU report data (missing emel field)');
+      }
+
+      console.log(`🔍 Looking up entrepreneur by email: ${entrepreneurEmail}`);
+
+      const { data: entrepreneur, error: entrepreneurError } = await supabase
+        .from('entrepreneurs')
+        .select('id')
+        .eq('email', entrepreneurEmail.toLowerCase().trim())
+        .single();
+
+      if (entrepreneurError || !entrepreneur) {
+        throw new Error(`Entrepreneur not found for email: ${entrepreneurEmail}. Error: ${entrepreneurError?.message || 'No match'}`);
+      }
+
+      const entrepreneurId = entrepreneur.id;
+      console.log(`✅ Entrepreneur resolved: ${entrepreneurId}`);
+      // ============================================================
+
       // Prepare Supabase payload - MUST match 'reports' table schema
       const supabasePayload = {
         // Program & Metadata
@@ -180,6 +208,7 @@ export default async function handler(req, res) {
         mentor_email: reportData.EMAIL_MENTOR || null,
 
         // Mentee Info (use reports table column names!)
+        entrepreneur_id: entrepreneurId,                   // ✅ REQUIRED foreign key
         nama_mentee: reportData.NAMA_MENTEE || null,       // Maju uses 'nama_mentee'
         nama_bisnes: reportData.NAMA_BISNES || null,
         lokasi_bisnes: reportData.LOKASI_BISNES || null,
@@ -279,7 +308,7 @@ export default async function handler(req, res) {
 
     } catch (error) {
       supabaseError = error.message;
-      console.error('⚠️ Supabase dual-write failed (non-blocking):', error);
+      console.error('⚠️ Supabase reports dual-write failed (non-blocking):', error);
 
       // Log failure to dual_write_monitoring (best effort)
       try {
@@ -287,7 +316,7 @@ export default async function handler(req, res) {
           source_system: 'google_sheets',
           target_system: 'supabase',
           operation_type: 'insert',
-          table_name: 'reports',  // ✅ FIXED: Correct table name
+          table_name: 'reports',
           google_sheets_row: newRowNumber,
           status: 'failed',
           error_message: error.message,
@@ -295,7 +324,8 @@ export default async function handler(req, res) {
           metadata: {
             mentor_email: reportData.EMAIL_MENTOR,
             mentee_name: reportData.NAMA_MENTEE,
-            session_number: reportData.SESI_NUMBER
+            session_number: reportData.SESI_NUMBER,
+            entrepreneur_email: reportData.emel || reportData.emailUsahawan || 'unknown'
           }
         });
       } catch (monitoringError) {
@@ -330,14 +360,14 @@ export default async function handler(req, res) {
 
         if (mentorError) throw new Error(`Mentor not found: ${mentorError.message}`);
 
-        // Fetch entrepreneur ID using email mapping (same strategy as Bangkit)
+        // Fetch entrepreneur ID (reuse same email used for reports table)
         const entrepreneurEmail =
-          reportData.EMAIL_MENTEE ||
-          reportData.email_mentee ||
-          reportData.mentee_email;
+          reportData.emel ||
+          reportData.emailUsahawan ||
+          reportData.entrepreneurEmail;
 
         if (!entrepreneurEmail) {
-          throw new Error('Entrepreneur email not found in MAJU report data');
+          throw new Error('Entrepreneur email not found in MAJU report data (missing emel field)');
         }
 
         const { data: entrepreneur, error: entrepreneurError } = await supabase
@@ -350,7 +380,7 @@ export default async function handler(req, res) {
           throw new Error(`Entrepreneur not found: ${entrepreneurEmail}`);
         }
 
-        console.log(`✅ Entrepreneur resolved: ${entrepreneur.id}`);
+        console.log(`✅ Entrepreneur resolved for UM: ${entrepreneur.id}`);
 
         // Build schema-whitelisted UM payload (aligned with upward_mobility_reports table)
         const umSupabasePayload = {};

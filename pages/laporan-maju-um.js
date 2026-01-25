@@ -65,6 +65,7 @@ const LaporanMajuPage = () => {
     LOKASI_BISNES: '',
     PRODUK_SERVIS: '',
     NO_TELEFON: '',
+    emel: '', // Mentee email from mapping for Supabase entrepreneur lookup
     TARIKH_SESI: format(new Date(), 'yyyy-MM-dd'),
     SESI_NUMBER: 1,
     MOD_SESI: '',
@@ -345,8 +346,11 @@ const LaporanMajuPage = () => {
           updatedFormData.NO_TELEFON = sessionData.menteeMapping.NO_TELEFON || '';
           // Use the correct field name from the mapping sheet
           updatedFormData.Folder_ID = sessionData.menteeMapping.Folder_ID || '';
+          // Store mentee email for Supabase entrepreneur lookup
+          updatedFormData.emel = sessionData.menteeMapping.MENTEE_EMAIL_FROM_MAPPING || '';
           
           console.log('🔍 Final Folder_ID set to:', updatedFormData.Folder_ID);
+          console.log('🔍 Mentee email (emel) set to:', updatedFormData.emel);
         } else {
           console.log('❌ No mentee mapping data received');
         }
@@ -894,6 +898,7 @@ const handleSubmit = async (e) => {
         NAMA_MENTEE: formData.NAMA_MENTEE,
         NAMA_BISNES: formData.NAMA_BISNES,
         SESI_NUMBER: currentSessionNumber,
+        emel: formData.emel || '',
         LOKASI_BISNES: '',
         PRODUK_SERVIS: '',
         NO_TELEFON: '',
@@ -954,6 +959,7 @@ const handleSubmit = async (e) => {
         NAMA_MENTEE: formData.NAMA_MENTEE,
         NAMA_BISNES: formData.NAMA_BISNES,
         SESI_NUMBER: currentSessionNumber,
+        emel: formData.emel || '',
         LOKASI_BISNES: formData.LOKASI_BISNES,
         PRODUK_SERVIS: formData.PRODUK_SERVIS,
         NO_TELEFON: formData.NO_TELEFON,
