@@ -421,7 +421,7 @@ export default async function handler(req, res) {
           const parsed = parseInt(umData.UM_PEKERJA_SEMASA);
           if (!isNaN(parsed)) umSupabasePayload.pekerja_semasa = parsed;
         }
-        if (umData.UM_ULASAN_PEKERJA) umSupabasePayload.ulasan_pekerja = umData.UM_ULASAN_PEKERJA;
+        if (umData.UM_ULASAN_PEKERJA) umSupabasePayload.ulasan_pekerjaan = umData.UM_ULASAN_PEKERJA;
 
         if (umData.UM_ASET_BUKAN_TUNAI_SEMASA) {
           const parsed = parseFloat(umData.UM_ASET_BUKAN_TUNAI_SEMASA);
@@ -457,7 +457,7 @@ export default async function handler(req, res) {
         umSupabasePayload.created_at = now;
         umSupabasePayload.updated_at = now;
 
-        console.log(`📋 UM payload keys: ${Object.keys(umSupabasePayload).length} fields`);
+        console.log('📋 UM payload keys:', Object.keys(umSupabasePayload));
 
         const { data: insertedUM, error: umInsertError } = await supabase
           .from('upward_mobility_reports')
