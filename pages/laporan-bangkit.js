@@ -450,8 +450,34 @@ export default function LaporanSesiPage() {
       return { ...p, inisiatif: l };
     });
   const addInisiatif = () => {
-    if ((formState.inisiatif || []).length < 4)
+    // Validate existing initiatives are complete before adding new one
+    const currentInisiatif = formState.inisiatif || [];
+    for (let i = 0; i < currentInisiatif.length; i++) {
+      const item = currentInisiatif[i];
+      if (!item.focusArea || item.focusArea.trim() === '') {
+        setError(`Sila lengkapkan Fokus Area untuk Inisiatif #${i + 1} sebelum menambah inisiatif baru.`);
+        return;
+      }
+      if (!item.keputusan || item.keputusan.trim() === '') {
+        setError(`Sila lengkapkan Keputusan untuk Inisiatif #${i + 1} sebelum menambah inisiatif baru.`);
+        return;
+      }
+      if (item.keputusan === 'CUSTOM' && (!item.keputusanCustom || item.keputusanCustom.trim() === '')) {
+        setError(`Sila masukkan keputusan custom untuk Inisiatif #${i + 1} sebelum menambah inisiatif baru.`);
+        return;
+      }
+      if (!item.pelanTindakan || item.pelanTindakan.trim() === '') {
+        setError(`Sila lengkapkan Pelan Tindakan untuk Inisiatif #${i + 1} sebelum menambah inisiatif baru.`);
+        return;
+      }
+    }
+    
+    // Clear any previous error
+    setError('');
+    
+    if (currentInisiatif.length < 4) {
       addDynamicListItem('inisiatif', { focusArea: '', keputusan: '', keputusanCustom: undefined, pelanTindakan: '' });
+    }
   };
   const handleFileChange = (type, fileList, multiple = false) =>
     setFiles((prev) => ({ ...prev, [type]: multiple ? Array.from(fileList) : fileList[0] }));
@@ -530,6 +556,47 @@ export default function LaporanSesiPage() {
       setIsSubmitting(false);
       return;
     }
+
+    // ============== INISIATIF VALIDATION ==============
+    // Validate all Inisiatif entries for Sesi 1 (not required for MIA)
+    if (!isMIA && currentSession === 1) {
+      const inisiatifList = formState.inisiatif || [];
+      
+      if (inisiatifList.length === 0) {
+        setError('Sila tambah sekurang-kurangnya satu Inisiatif.');
+        setIsSubmitting(false);
+        return;
+      }
+      
+      for (let i = 0; i < inisiatifList.length; i++) {
+        const item = inisiatifList[i];
+        
+        if (!item.focusArea || item.focusArea.trim() === '') {
+          setError(`Inisiatif #${i + 1}: Fokus Area adalah wajib diisi.`);
+          setIsSubmitting(false);
+          return;
+        }
+        
+        if (!item.keputusan || item.keputusan.trim() === '') {
+          setError(`Inisiatif #${i + 1}: Keputusan adalah wajib diisi.`);
+          setIsSubmitting(false);
+          return;
+        }
+        
+        if (item.keputusan === 'CUSTOM' && (!item.keputusanCustom || item.keputusanCustom.trim() === '')) {
+          setError(`Inisiatif #${i + 1}: Sila masukkan keputusan custom.`);
+          setIsSubmitting(false);
+          return;
+        }
+        
+        if (!item.pelanTindakan || item.pelanTindakan.trim() === '') {
+          setError(`Inisiatif #${i + 1}: Pelan Tindakan adalah wajib diisi.`);
+          setIsSubmitting(false);
+          return;
+        }
+      }
+    }
+    // ============== END INISIATIF VALIDATION ==============
 
     // ============== UPWARD MOBILITY VALIDATION ==============
     // UM data is MANDATORY for ALL Bangkit sessions EXCEPT MIA submissions
@@ -1059,14 +1126,14 @@ Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun la
                 <h4 className="font-bold text-gray-700">Inisiatif #{index + 1}</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <SelectField label="Fokus Area" value={inisiatifItem.focusArea} onChange={(e) => handleInisiatifChange(index, 'focusArea', e.target.value)} required>
-                    <option value="">-- Pilih Fokus Area --</option>
+                    <option value="">-- Pilih Fokus Area (Wajib) --</option>
                     {[...new Set(frameworkData.map((item) => item.Focus_Area))].map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
                     ))}
                   </SelectField>
                   <div>
                     <SelectField label="Keputusan" value={inisiatifItem.keputusan} onChange={(e) => handleInisiatifChange(index, 'keputusan', e.target.value)} disabled={!inisiatifItem.focusArea} required>
-                      <option value="">-- Pilih Keputusan --</option>
+                      <option value="">-- Pilih Keputusan (Wajib) --</option>
                       {keputusanOptions.map((opt) => (
                         <option key={opt.Keputusan} value={opt.Keputusan}>{opt.Keputusan}</option>
                       ))}
@@ -1562,12 +1629,12 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                 <h4 className="font-bold text-gray-700">Inisiatif Baru #{index + 1}</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <SelectField label="Fokus Area" value={inisiatifItem.focusArea} onChange={(e) => handleInisiatifChange(index, 'focusArea', e.target.value)} required>
-                    <option value="">-- Pilih Fokus Area --</option>
+                    <option value="">-- Pilih Fokus Area (Wajib) --</option>
                     {focusAreaOptions.map((opt) => (<option key={opt} value={opt}>{opt}</option>))}
                   </SelectField>
                   <div>
                     <SelectField label="Keputusan" value={inisiatifItem.keputusan} onChange={(e) => handleInisiatifChange(index, 'keputusan', e.target.value)} disabled={!inisiatifItem.focusArea} required>
-                      <option value="">-- Pilih Keputusan --</option>
+                      <option value="">-- Pilih Keputusan (Wajib) --</option>
                       {keputusanOptions.map((opt) => (<option key={opt.Keputusan} value={opt.Keputusan}>{opt.Keputusan}</option>))}
                       <option value="CUSTOM">Lain-lain (Custom)</option>
                     </SelectField>
