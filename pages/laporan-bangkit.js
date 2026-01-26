@@ -89,21 +89,65 @@ const TextArea = ({ label, value, onChange, placeholder, helperText, rows = 4, r
     />
   </div>
 );
-const FileInput = ({ label, multiple = false, onChange, required = false }) => (
-  <div>
-    <label className="block text-sm font-medium text-gray-700 mb-1">
-      {label}
-      {required && <span className="text-red-500">*</span>}
-    </label>
-    <input
-      type="file"
-      multiple={multiple}
-      onChange={onChange}
-      required={required}
-      className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-    />
-  </div>
-);
+const FileInput = ({ label, multiple = false, onChange, required = false, isImageUpload = false }) => {
+  const [warning, setWarning] = React.useState('');
+
+  const handleFileChange = (e) => {
+    const files = e.target.files;
+    
+    // Validate file types if this is an image upload field
+    if (isImageUpload && files && files.length > 0) {
+      const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+      let hasInvalidFile = false;
+      
+      for (let i = 0; i < files.length; i++) {
+        if (!validImageTypes.includes(files[i].type)) {
+          hasInvalidFile = true;
+          break;
+        }
+      }
+      
+      if (hasInvalidFile) {
+        setWarning('⚠️ Fail bukan gambar dikesan. Sila muat naik gambar (JPG / PNG) sahaja.');
+      } else {
+        setWarning('');
+      }
+    }
+    
+    // Call the original onChange handler
+    if (onChange) {
+      onChange(e);
+    }
+  };
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {label}
+        {required && <span className="text-red-500">*</span>}
+      </label>
+      <input
+        type="file"
+        multiple={multiple}
+        onChange={handleFileChange}
+        required={required}
+        accept={isImageUpload ? "image/jpeg,image/png" : undefined}
+        className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+      />
+      {isImageUpload && (
+        <p className="mt-1 text-xs text-gray-500">
+          Format dibenarkan: JPG, JPEG, PNG sahaja<br />
+          ❌ PDF, ZIP, Word, Google Drive link tidak diterima
+        </p>
+      )}
+      {warning && (
+        <div className="mt-2 p-2 bg-yellow-50 border border-yellow-300 rounded text-sm text-yellow-800">
+          {warning}
+        </div>
+      )}
+    </div>
+  );
+};
 const InfoCard = ({ companyName, address, phone }) => (
   <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg text-sm">
     <h3 className="text-base font-bold text-gray-800 mb-2">Maklumat Usahawan</h3>
@@ -960,15 +1004,6 @@ const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async 
           </div>
         </Section>
 
-        {/* Lawatan Premis checkbox */}
-        <Section title="Lawatan Premis">
-          <div className="flex items-center gap-3">
-            <input id="premisDilawat" type="checkbox" className="h-5 w-5 rounded text-blue-600 focus:ring-blue-500" checked={!!formState.sesi.premisDilawat} onChange={(e) => handleInputChange('sesi', 'premisDilawat', e.target.checked)} />
-            <label htmlFor="premisDilawat" className="font-medium text-gray-700">Premis dilawat semasa sesi ini</label>
-          </div>
-        </Section>
-
-
         <Section title="Prestasi Jualan">
           <div className="p-4 border rounded-lg">
             <h3 className="font-semibold text-md mb-2">Jualan Tahun Sebelum</h3>
@@ -1449,12 +1484,20 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
         </div>
 
         <Section title="Muat Naik Gambar (Sesi 1)">
-          <FileInput label="Gambar Carta GrowthWheel 360°" onChange={(e) => handleFileChange('gw', e.target.files)} required />
-          <FileInput label="Satu (1) Gambar Individu Usahawan (Profil)" onChange={(e) => handleFileChange('profil', e.target.files)} required />
-          <FileInput label="Dua (2) Gambar Sesi Mentoring" multiple onChange={(e) => handleFileChange('sesi', e.target.files, true)} required />
+          <FileInput label="Gambar Carta GrowthWheel 360°" onChange={(e) => handleFileChange('gw', e.target.files)} required isImageUpload={true} />
+          <FileInput label="Satu (1) Gambar Individu Usahawan (Profil)" onChange={(e) => handleFileChange('profil', e.target.files)} required isImageUpload={true} />
+          <FileInput label="Dua (2) Gambar Sesi Mentoring" multiple onChange={(e) => handleFileChange('sesi', e.target.files, true)} required isImageUpload={true} />
+          
+          {/* Lawatan Premis checkbox */}
+          <div className="mt-6">
+            <label className="flex items-center gap-3">
+              <input id="premisDilawat" type="checkbox" className="h-5 w-5 rounded text-blue-600 focus:ring-blue-500" checked={!!formState.sesi.premisDilawat} onChange={(e) => handleInputChange('sesi', 'premisDilawat', e.target.checked)} />
+              <span className="font-medium text-gray-700">Lawatan Premis Telah Dijalankan?</span>
+            </label>
+          </div>
           {formState.sesi.premisDilawat && (
             <div>
-              <FileInput label="Gambar Lawatan Premis *" multiple onChange={(e) => handleFileChange('premis', e.target.files, true)} required />
+              <FileInput label="Gambar Lawatan Premis *" multiple onChange={(e) => handleFileChange('premis', e.target.files, true)} required isImageUpload={true} />
               <p className="mt-1 text-sm text-gray-600 italic">
                 Gambar bahagian depan premis bisnes mentee, Gambar-gambar ruang dalam bisnes mentee, Gambar-gambar aset yang ada (terutama yang dibeli menggunakan geran BIMB), selfie depan premise
               </p>
@@ -1948,7 +1991,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
         )}
 
         <Section title={`Muat Naik Gambar (Sesi ${currentSession})`}>
-          <FileInput label="Gambar Sesi Mentoring" multiple onChange={(e) => handleFileChange('sesi', e.target.files, true)} required />
+          <FileInput label="Gambar Sesi Mentoring" multiple onChange={(e) => handleFileChange('sesi', e.target.files, true)} required isImageUpload={true} />
           {!previousData.premisDilawat && (
             <div>
               <div className="text-sm text-yellow-800 bg-yellow-50 border border-yellow-200 rounded p-2 mb-2">
@@ -1958,6 +2001,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                 label="Gambar Lawatan Premis (disyorkan – belum dilawat)"
                 multiple
                 onChange={(e) => handleFileChange('premis', e.target.files, true)}
+                isImageUpload={true}
               />
               <p className="mt-1 text-sm text-gray-600 italic">
                 Gambar bahagian depan premis bisnes mentee, Gambar-gambar ruang dalam bisnes mentee, Gambar-gambar aset yang ada (terutama yang dibeli menggunakan geran BIMB), selfie depan premise

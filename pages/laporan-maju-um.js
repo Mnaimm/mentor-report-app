@@ -2559,6 +2559,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                       onFileChange={(e) => handleFileChange('gw360', e.target.files)}
                       multiple={false}
                       required={currentSessionNumber === 1}
+                      isImageUpload={true}
                     />
                   )}
                   {formData.URL_GAMBAR_GW360 && currentSessionNumber === 1 && (
@@ -2583,6 +2584,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                     onFileChange={(e) => handleFileChange('sesi', e.target.files, true)}
                     multiple={true}
                     required
+                    isImageUpload={true}
                   />
                   {formData.URL_GAMBAR_SESI_JSON.length > 0 && (
                     <div className="mt-2">
@@ -2622,6 +2624,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                             onFileChange={(e) => handleFileChange('premis', e.target.files, true)}
                             multiple={true}
                             required={lawatanPremisChecked}
+                            isImageUpload={true}
                           />
                           <p className="mt-1 text-sm text-gray-600 italic">
                             Gambar bahagian depan premis bisnes mentee, Gambar-gambar ruang dalam bisnes mentee, Gambar-gambar aset yang ada (terutama yang dibeli menggunakan geran BIMB), selfie depan premise
