@@ -19,11 +19,14 @@ export default async function handler(req, res) {
     });
 
     const sheets = google.sheets({ version: 'v4', auth });
-    
-    const REPORT_SHEET_ID = process.env.GOOGLE_SHEETS_REPORT_ID;
-    const LAPORAN_MAJU_TAB = "LaporanMaju"; // Explicitly set to 'LaporanMaju'
 
-    // Fetch the LaporanMaju tab
+    const REPORT_SHEET_ID = process.env.GOOGLE_SHEETS_MAJU_REPORT_ID || process.env.GOOGLE_SHEETS_REPORT_ID;
+    const LAPORAN_MAJU_TAB = process.env.LAPORAN_MAJU_UM_TAB || 'LaporanMajuUM'; // ✅ FIX: Match submitMajuReportum.js
+
+    console.log('🔍 [laporanMajuData] Using sheet ID:', REPORT_SHEET_ID);
+    console.log('🔍 [laporanMajuData] Using tab name:', LAPORAN_MAJU_TAB);
+
+    // Fetch the LaporanMajuUM tab
     const laporanMajuResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: REPORT_SHEET_ID,
       range: `${LAPORAN_MAJU_TAB}!A:ZZ`, // Fetch a wide range to get all columns
@@ -43,8 +46,13 @@ export default async function handler(req, res) {
       });
     }
 
-    const headers = laporanMajuRows[0].map(normHeader); // Normalize headers from LaporanMaju tab
+    const headers = laporanMajuRows[0].map(normHeader); // Normalize headers from LaporanMajuUM tab
     const dataRows = laporanMajuRows.slice(1);
+
+    console.log('🔍 [laporanMajuData] Searching for mentee:', name);
+    console.log('🔍 [laporanMajuData] Total rows fetched:', laporanMajuRows.length);
+    console.log('🔍 [laporanMajuData] Raw headers:', laporanMajuRows[0]);
+    console.log('🔍 [laporanMajuData] Normalized headers:', headers);
 
     // Find column indices dynamically using normalized headers from LaporanMaju
     // These must EXACTLY match your LaporanMaju tab's header row
@@ -71,7 +79,33 @@ export default async function handler(req, res) {
         console.warn(`Header 'MIA_STATUS' not found in '${LAPORAN_MAJU_TAB}' tab. MIA functionality might be limited.`);
     }
 
+    console.log('🔍 [laporanMajuData] Column indices:', {
+      menteeNameColIndex,
+      sesiNumberColIndex,
+      latarBelakangColIndex,
+      dataKewanganJsonColIndex,
+      mentoringFindingsJsonColIndex,
+      premisPhotosColIndex,
+      miaStatusColIndex
+    });
+    console.log('🔍 [laporanMajuData] Expected: menteeNameColIndex should be 3 (Column D), sesiNumberColIndex should be 8 (Column I)');
+
+    console.log('🔍 [laporanMajuData] First 5 mentee names in sheet:');
+    dataRows.slice(0, 5).forEach((row, idx) => {
+      console.log(`  Row ${idx + 2}: "${row[menteeNameColIndex]}" (session: "${row[sesiNumberColIndex]}")`);
+    });
+
     const menteeReports = dataRows.filter(row => row && (row[menteeNameColIndex] || '') === name);
+
+    console.log('🔍 [laporanMajuData] Filter logic: row[' + menteeNameColIndex + '] === "' + name + '"');
+    console.log('🔍 [laporanMajuData] Matched reports:', menteeReports.length);
+    if (menteeReports.length > 0) {
+      menteeReports.forEach((r, idx) => {
+        console.log(`  Match ${idx + 1}: Mentee="${r[menteeNameColIndex]}", Session="${r[sesiNumberColIndex]}"`);
+      });
+    } else {
+      console.log('❌ [laporanMajuData] NO MATCHES FOUND for:', name);
+    }
     
     let currentSession = 1;
     let latestPreviousData = null; 

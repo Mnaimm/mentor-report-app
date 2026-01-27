@@ -74,12 +74,16 @@ export default async function handler(req, res) {
       miaProofUrl: 'MIA_PROOF_URL',
     };
 
+    let tabName;
+
     if (programType === 'bangkit') {
       spreadsheetId = process.env.GOOGLE_SHEETS_REPORT_ID;
       headersConfig = bangkitHeaders;
+      tabName = process.env.BANGKIT_TAB || 'Bangkit'; // ✅ FIX: Use Bangkit tab (where TEST2 exists)
     } else if (programType === 'maju') {
       spreadsheetId = process.env.GOOGLE_SHEETS_MAJU_REPORT_ID; // Use Maju sheet ID
       headersConfig = majuHeaders;
+      tabName = 'LaporanMaju'; // Maju data is in LaporanMaju tab
     } else {
       return res.status(400).json({ error: 'Invalid programType specified.' });
     }
@@ -88,9 +92,13 @@ export default async function handler(req, res) {
       throw new Error(`Missing GOOGLE_SHEETS_REPORT_ID or GOOGLE_SHEETS_MAJU_REPORT_ID for program type: ${programType}`);
     }
 
+    console.log('🔍 [menteeData] ProgramType:', programType);
+    console.log('🔍 [menteeData] Using sheet ID:', spreadsheetId);
+    console.log('🔍 [menteeData] Using tab name:', tabName);
+
     const reportResp = await sheets.spreadsheets.values.get({
       spreadsheetId: spreadsheetId,
-      range: 'A:ZZ', // Pull a wide range to cover all columns for both sheets
+      range: `${tabName}!A:ZZ`, // ✅ FIX: Specify tab name to match where data is written
     });
 
     res.setHeader('Cache-Control', 'no-store');
@@ -112,6 +120,9 @@ export default async function handler(req, res) {
     const headers = rows[0];
     const dataRows = rows.slice(1);
 
+    console.log('🔍 [menteeData] Total rows fetched:', rows.length);
+    console.log('🔍 [menteeData] Headers:', headers.slice(0, 10));
+
     const idx = (headerName) => headers.indexOf(headerName);
 
     // Dynamic COL object based on selected headersConfig
@@ -132,10 +143,25 @@ export default async function handler(req, res) {
 
 
     // filter all reports for this mentee (exact match)
+    console.log('🔍 [menteeData] Searching for mentee:', name);
+    console.log('🔍 [menteeData] Mentee name column index (COL.namaUsahawan):', COL.namaUsahawan);
+    console.log('🔍 [menteeData] First 5 mentee names in sheet:');
+    dataRows.slice(0, 5).forEach((row, idx) => {
+      console.log(`  Row ${idx + 2}: "${row[COL.namaUsahawan]}"`);
+    });
+
     const menteeReports = dataRows.filter(r => {
       const val = r[COL.namaUsahawan];
       return val && val.toString().trim() === name.trim();
     });
+
+    console.log('🔍 [menteeData] Matched reports:', menteeReports.length);
+    if (menteeReports.length > 0) {
+      menteeReports.forEach((r, idx) => {
+        const sessionNum = (r[COL.sesiLaporan] || '').toString();
+        console.log(`  Match ${idx + 1}: Session="${sessionNum}"`);
+      });
+    }
 
     let lastSession = 0;
     let status = '';
