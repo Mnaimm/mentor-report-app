@@ -3,6 +3,19 @@ import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 
+// Grade to Criteria mapping for Quick Tags
+const GRADE_CRITERIA_MAP = {
+  'Grade 1 (G1)': [
+    'BIMB SME Facility',
+    'Other Bank SME Facility',
+    'Ready Documentation'
+  ],
+  'Grade 2 (G2)': [
+    'BangKIT to Maju',
+    'Maju to SME Financing',
+    'Improve Credit Score'
+  ]
+};
 
 // ADD this helper function at the top of your laporan-sesi.js file:
 
@@ -189,7 +202,6 @@ export default function LaporanSesiPage() {
     // UPWARD MOBILITY FIELDS (MANDATORY for ALL Bangkit sessions)
     upwardMobility: {
       // Section 1: Engagement Status
-      UM_STATUS_PENGLIBATAN: '',
       UM_STATUS: '',
       UM_KRITERIA_IMPROVEMENT: '',
       // Section 2: BIMB Channels & Fintech
@@ -436,6 +448,24 @@ export default function LaporanSesiPage() {
       }
     }));
   };
+
+  // Handler for Quick Tag clicks - appends criteria to textarea
+  const handleTagClick = (tag) => {
+    const currentValue = formState.upwardMobility.UM_KRITERIA_IMPROVEMENT || '';
+    
+    // Check if tag already exists in the textarea (case-insensitive)
+    if (currentValue.toLowerCase().includes(tag.toLowerCase())) {
+      return; // Tag already present, don't add again
+    }
+    
+    // Append tag with comma separator
+    const newValue = currentValue.trim() 
+      ? `${currentValue.trim()}, ${tag}` 
+      : tag;
+    
+    handleUMChange('UM_KRITERIA_IMPROVEMENT', newValue);
+  };
+
   const addDynamicListItem = (listName, newItem) =>
     setFormState((p) => ({ ...p, [listName]: [...(p[listName] || []), newItem] }));
   const handleInisiatifChange = (index, field, value) =>
@@ -606,9 +636,6 @@ export default function LaporanSesiPage() {
     if (!isMIA) {
 
     // Section 1: Engagement Status
-    if (!formState.upwardMobility.UM_STATUS_PENGLIBATAN || formState.upwardMobility.UM_STATUS_PENGLIBATAN.trim() === '') {
-      umErrors.push('Upward Mobility - Status Penglibatan Usahawan adalah wajib diisi');
-    }
     if (!formState.upwardMobility.UM_STATUS || formState.upwardMobility.UM_STATUS.trim() === '') {
       umErrors.push('Upward Mobility - Upward Mobility Status adalah wajib diisi');
     }
@@ -891,7 +918,6 @@ const uploadImage = (file, fId, menteeName, sessionNumber) => new Promise(async 
       // UPWARD MOBILITY - Only include for non-MIA submissions
       if (!isMIA) {
         reportData.UPWARD_MOBILITY_JSON = JSON.stringify({
-          UM_STATUS_PENGLIBATAN: formState.upwardMobility.UM_STATUS_PENGLIBATAN || '',
           UM_STATUS: formState.upwardMobility.UM_STATUS || '',
           UM_KRITERIA_IMPROVEMENT: formState.upwardMobility.UM_KRITERIA_IMPROVEMENT || '',
           UM_AKAUN_BIMB: formState.upwardMobility.UM_AKAUN_BIMB || '',
@@ -1202,28 +1228,6 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
             <Section title="Bahagian 1: Status Penglibatan & Mobiliti">
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Status Penglibatan Usahawan <span className="text-red-500">*</span>
-                </label>
-                <div className="space-y-2">
-                  {['Active', 'Not Active (Contactable)', 'Not Involved (Uncontactable)'].map((status) => (
-                    <label key={status} className="flex items-center p-3 border-2 border-gray-300 rounded-lg hover:border-orange-500 hover:bg-orange-50 cursor-pointer transition-all">
-                      <input
-                        type="radio"
-                        name="UM_STATUS_PENGLIBATAN"
-                        value={status}
-                        checked={formState.upwardMobility.UM_STATUS_PENGLIBATAN === status}
-                        onChange={(e) => handleUMChange('UM_STATUS_PENGLIBATAN', e.target.value)}
-                        className="mr-3"
-                        required
-                      />
-                      <span className="font-medium">{status}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Upward Mobility Status <span className="text-red-500">*</span>
                 </label>
                 <div className="space-y-2">
@@ -1247,6 +1251,30 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                   ))}
                 </div>
               </div>
+
+              {/* Quick Tags Section */}
+              {formState.upwardMobility.UM_STATUS && formState.upwardMobility.UM_STATUS !== 'NIL' && GRADE_CRITERIA_MAP[formState.upwardMobility.UM_STATUS] && (
+                <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    💡 Quick Tags - Klik untuk tambah ke kriteria:
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {GRADE_CRITERIA_MAP[formState.upwardMobility.UM_STATUS].map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => handleTagClick(tag)}
+                        className="px-3 py-1.5 bg-white border-2 border-blue-400 text-blue-700 rounded-full hover:bg-blue-500 hover:text-white hover:border-blue-600 transition-all duration-200 text-sm font-medium shadow-sm hover:shadow-md"
+                      >
+                        + {tag}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-600 mt-2">
+                    Klik mana-mana tag di atas untuk menambahnya ke dalam textarea di bawah. Anda masih boleh taip sendiri jika perlu.
+                  </p>
+                </div>
+              )}
 
               <TextArea
                 label="Jika G1/G2, nyatakan kriteria improvement"
@@ -1701,28 +1729,6 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
             <Section title="Bahagian 1: Status Penglibatan & Mobiliti">
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Status Penglibatan Usahawan <span className="text-red-500">*</span>
-                </label>
-                <div className="space-y-2">
-                  {['Active', 'Not Active (Contactable)', 'Not Involved (Uncontactable)'].map((status) => (
-                    <label key={status} className="flex items-center p-3 border-2 border-gray-300 rounded-lg hover:border-orange-500 hover:bg-orange-50 cursor-pointer transition-all">
-                      <input
-                        type="radio"
-                        name="UM_STATUS_PENGLIBATAN"
-                        value={status}
-                        checked={formState.upwardMobility.UM_STATUS_PENGLIBATAN === status}
-                        onChange={(e) => handleUMChange('UM_STATUS_PENGLIBATAN', e.target.value)}
-                        className="mr-3"
-                        required
-                      />
-                      <span className="font-medium">{status}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Upward Mobility Status <span className="text-red-500">*</span>
                 </label>
                 <div className="space-y-2">
@@ -1746,6 +1752,30 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                   ))}
                 </div>
               </div>
+
+              {/* Quick Tags Section */}
+              {formState.upwardMobility.UM_STATUS && formState.upwardMobility.UM_STATUS !== 'NIL' && GRADE_CRITERIA_MAP[formState.upwardMobility.UM_STATUS] && (
+                <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    💡 Quick Tags - Klik untuk tambah ke kriteria:
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {GRADE_CRITERIA_MAP[formState.upwardMobility.UM_STATUS].map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => handleTagClick(tag)}
+                        className="px-3 py-1.5 bg-white border-2 border-blue-400 text-blue-700 rounded-full hover:bg-blue-500 hover:text-white hover:border-blue-600 transition-all duration-200 text-sm font-medium shadow-sm hover:shadow-md"
+                      >
+                        + {tag}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-600 mt-2">
+                    Klik mana-mana tag di atas untuk menambahnya ke dalam textarea di bawah. Anda masih boleh taip sendiri jika perlu.
+                  </p>
+                </div>
+              )}
 
               <TextArea
                 label="Jika G1/G2, nyatakan kriteria improvement"

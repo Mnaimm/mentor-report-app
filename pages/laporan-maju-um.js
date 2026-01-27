@@ -23,6 +23,29 @@ const safeJSONParse = (str) => {
   }
 };
 
+// Grade to Criteria mapping for Quick Tags
+const GRADE_CRITERIA_MAP = {
+  G1: [
+    'BIMB SME Facility',
+    'Other Bank SME Facility',
+    'Ready Documentation'
+  ],
+  G2: [
+    'BangKIT to Maju',
+    'Maju to SME Financing',
+    'Improve Credit Score'
+  ],
+  G3: [
+    'Income/Sale',
+    'Job Creation',
+    'Asset',
+    'Saving',
+    'Zakat',
+    'Digitalization',
+    'Online Sales'
+  ]
+};
+
 // Enhanced TextArea component with helper text (guidance always visible, never submitted)
 const EnhancedTextArea = ({ label, name, value, onChange, helperText, rows = 5, required = false, disabled = false }) => {
   return (
@@ -88,7 +111,6 @@ const LaporanMajuPage = () => {
     // UPWARD MOBILITY FIELDS (Sections 3-6)
     UPWARD_MOBILITY: {
       // Section 3: Status & Mobiliti
-      UM_STATUS_PENGLIBATAN: '',
       UM_STATUS: '',
       UM_KRITERIA_IMPROVEMENT: '',
       UM_TARIKH_LAWATAN_PREMIS: '',
@@ -273,7 +295,6 @@ const LaporanMajuPage = () => {
       STATUS_PERNIAGAAN_KESELURUHAN: '',
       RUMUSAN_DAN_LANGKAH_KEHADAPAN: '',
       UPWARD_MOBILITY: {
-        UM_STATUS_PENGLIBATAN: '',
         UM_STATUS: '',
         UM_KRITERIA_IMPROVEMENT: '',
         UM_TARIKH_LAWATAN_PREMIS: '',
@@ -487,6 +508,23 @@ const LaporanMajuPage = () => {
     });
   };
 
+  // Handler for Quick Tag clicks - appends criteria to textarea
+  const handleTagClick = (tag) => {
+    const currentValue = formData.UPWARD_MOBILITY.UM_KRITERIA_IMPROVEMENT || '';
+    
+    // Check if tag already exists in the textarea (case-insensitive)
+    if (currentValue.toLowerCase().includes(tag.toLowerCase())) {
+      return; // Tag already present, don't add again
+    }
+    
+    // Append tag with comma separator
+    const newValue = currentValue.trim() 
+      ? `${currentValue.trim()}, ${tag}` 
+      : tag;
+    
+    handleUMChange('UM_KRITERIA_IMPROVEMENT', newValue);
+  };
+
   // HOTFIX: Use working Bangkit Apps Script for images until Maju Apps Script gets uploadImage handler
   // Simple file storage functions (like laporan-sesi)
   const handleFileChange = (type, fileList, multiple = false) => {
@@ -697,9 +735,7 @@ const validateForm = () => {
     
     // 4. UPWARD MOBILITY validations (required for all sessions)
     // Section 3: Status & Mobiliti
-    if (!formData.UPWARD_MOBILITY.UM_STATUS_PENGLIBATAN || formData.UPWARD_MOBILITY.UM_STATUS_PENGLIBATAN.trim() === '') {
-      errors.push('Upward Mobility - Status Penglibatan Usahawan adalah wajib diisi');
-    }
+
     if (!formData.UPWARD_MOBILITY.UM_STATUS || formData.UPWARD_MOBILITY.UM_STATUS.trim() === '') {
       errors.push('Upward Mobility - Upward Mobility Status adalah wajib diisi');
     }
@@ -922,7 +958,6 @@ const handleSubmit = async (e) => {
         MIA_PROOF_URL: imageUrls.mia,
         // UPWARD MOBILITY - Allow partial data for MIA submissions
         UPWARD_MOBILITY_JSON: JSON.stringify({
-          UM_STATUS_PENGLIBATAN: formData.UPWARD_MOBILITY.UM_STATUS_PENGLIBATAN || '',
           UM_STATUS: formData.UPWARD_MOBILITY.UM_STATUS || '',
           UM_KRITERIA_IMPROVEMENT: formData.UPWARD_MOBILITY.UM_KRITERIA_IMPROVEMENT || '',
           UM_TARIKH_LAWATAN_PREMIS: formData.UPWARD_MOBILITY.UM_TARIKH_LAWATAN_PREMIS || '',
@@ -983,7 +1018,6 @@ const handleSubmit = async (e) => {
         MIA_PROOF_URL: imageUrls.mia,
         // UPWARD MOBILITY - Store as JSON for MAJU AppScript
         UPWARD_MOBILITY_JSON: JSON.stringify({
-          UM_STATUS_PENGLIBATAN: formData.UPWARD_MOBILITY.UM_STATUS_PENGLIBATAN || '',
           UM_STATUS: formData.UPWARD_MOBILITY.UM_STATUS || '',
           UM_KRITERIA_IMPROVEMENT: formData.UPWARD_MOBILITY.UM_KRITERIA_IMPROVEMENT || '',
           UM_TARIKH_LAWATAN_PREMIS: formData.UPWARD_MOBILITY.UM_TARIKH_LAWATAN_PREMIS || '',
@@ -1514,15 +1548,65 @@ Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun la
               {/* --- Data Kewangan Bulanan --- */}
               <div className="bg-white p-6 rounded-lg shadow-sm">
                 <Section title="Data Kewangan Bulanan">
-                  {formData.DATA_KEWANGAN_BULANAN_JSON.map((data, index) => (
+                  {formData.DATA_KEWANGAN_BULANAN_JSON.map((data, index) => {
+                    // Generate dynamic year options (current year and previous 2 years)
+                    const currentYear = new Date().getFullYear();
+                    const yearOptions = [currentYear, currentYear - 1, currentYear - 2];
+                    const monthOptions = [
+                      'January', 'February', 'March', 'April', 'May', 'June',
+                      'July', 'August', 'September', 'October', 'November', 'December'
+                    ];
+                    
+                    // Parse existing Bulan value (e.g., "January 2024" or handle legacy formats)
+                    const bulanParts = (data.Bulan || '').split(' ');
+                    const selectedMonth = bulanParts[0] || '';
+                    const selectedYear = bulanParts[1] || currentYear.toString();
+                    
+                    return (
                     <div key={index} className="border p-4 mb-4 rounded-md bg-gray-50">
                       <h4 className="font-semibold text-gray-700 mb-2">Bulan #{index + 1}</h4>
-                      <InputField
-                        label="Bulan"
-                        name="Bulan"
-                        value={data.Bulan || ''}
-                        onChange={(e) => handleDynamicChange('DATA_KEWANGAN_BULANAN_JSON', index, 'Bulan', e.target.value)}
-                      />
+                      
+                      {/* Month and Year Dropdowns Side by Side */}
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Bulan
+                        </label>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <select
+                              name="Month"
+                              value={selectedMonth}
+                              onChange={(e) => {
+                                const newBulan = `${e.target.value} ${selectedYear}`;
+                                handleDynamicChange('DATA_KEWANGAN_BULANAN_JSON', index, 'Bulan', newBulan);
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                            >
+                              <option value="">Select Month</option>
+                              {monthOptions.map((month) => (
+                                <option key={month} value={month}>{month}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <select
+                              name="Year"
+                              value={selectedYear}
+                              onChange={(e) => {
+                                const newBulan = `${selectedMonth} ${e.target.value}`;
+                                handleDynamicChange('DATA_KEWANGAN_BULANAN_JSON', index, 'Bulan', newBulan);
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                            >
+                              <option value="">Select Year</option>
+                              {yearOptions.map((year) => (
+                                <option key={year} value={year}>{year}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                      
                       <InputField
                         label="Jumlah Jualan (RM)"
                         name="Jumlah Jualan"
@@ -1576,7 +1660,8 @@ Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun la
                         Remove Bulan
                       </button>
                     </div>
-                  ))}
+                    );
+                  })}
                   <button
                     type="button"
                     onClick={() =>
@@ -1867,37 +1952,6 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
 
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Status Penglibatan Usahawan <span className="text-red-500">*</span>
-                    </label>
-                    <div className="space-y-2">
-                      <label className="flex items-center p-3 border-2 border-gray-300 rounded-lg hover:border-orange-500 hover:bg-orange-50 cursor-pointer transition-all">
-                        <input
-                          type="radio"
-                          name="UM_STATUS_PENGLIBATAN"
-                          value="Aktif"
-                          checked={formData.UPWARD_MOBILITY.UM_STATUS_PENGLIBATAN === 'Aktif'}
-                          onChange={(e) => handleUMChange('UM_STATUS_PENGLIBATAN', e.target.value)}
-                          className="mr-3"
-                          required
-                        />
-                        <span className="font-medium">Aktif</span>
-                      </label>
-                      <label className="flex items-center p-3 border-2 border-gray-300 rounded-lg hover:border-orange-500 hover:bg-orange-50 cursor-pointer transition-all">
-                        <input
-                          type="radio"
-                          name="UM_STATUS_PENGLIBATAN"
-                          value="Tidak Aktif"
-                          checked={formData.UPWARD_MOBILITY.UM_STATUS_PENGLIBATAN === 'Tidak Aktif'}
-                          onChange={(e) => handleUMChange('UM_STATUS_PENGLIBATAN', e.target.value)}
-                          className="mr-3"
-                        />
-                        <span className="font-medium">Tidak Aktif</span>
-                      </label>
-                    </div>
-                  </div>
-
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       Upward Mobility Status <span className="text-red-500">*</span>
                     </label>
                     <div className="space-y-2">
@@ -1960,6 +2014,30 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                       </label>
                     </div>
                   </div>
+
+                  {/* Quick Tags Section */}
+                  {formData.UPWARD_MOBILITY.UM_STATUS && formData.UPWARD_MOBILITY.UM_STATUS !== 'NIL' && GRADE_CRITERIA_MAP[formData.UPWARD_MOBILITY.UM_STATUS] && (
+                    <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        💡 Quick Tags - Klik untuk tambah ke kriteria:
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {GRADE_CRITERIA_MAP[formData.UPWARD_MOBILITY.UM_STATUS].map((tag) => (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => handleTagClick(tag)}
+                            className="px-3 py-1.5 bg-white border-2 border-blue-400 text-blue-700 rounded-full hover:bg-blue-500 hover:text-white hover:border-blue-600 transition-all duration-200 text-sm font-medium shadow-sm hover:shadow-md"
+                          >
+                            + {tag}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-xs text-gray-600 mt-2">
+                        Klik mana-mana tag di atas untuk menambahnya ke dalam textarea di bawah. Anda masih boleh taip sendiri jika perlu.
+                      </p>
+                    </div>
+                  )}
 
                   <TextArea
                     label="Jika G1/G2/G3, nyatakan kriteria improvement"
