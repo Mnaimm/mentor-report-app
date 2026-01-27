@@ -3,7 +3,6 @@ import { useState, useEffect, useRef } from 'react';
 import { getSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { canAccessCoordinator, isReadOnly } from '../../lib/auth';
-import Layout from '../../components/Layout';
 import StatCard from '../../components/StatCard';
 import KpiCard from '../../components/KpiCard';
 import StatusBadge from '../../components/StatusBadge';
@@ -340,19 +339,17 @@ export default function CoordinatorDashboard({ userEmail, isReadOnlyUser, access
 
   if (loading) {
     return (
-      <Layout>
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading dashboard...</p>
-          </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard...</p>
         </div>
-      </Layout>
+      </div>
     );
   }
 
   return (
-    <Layout>
+    <div>
       {/* Read-Only Badge */}
       {isReadOnlyUser && <ReadOnlyBadge userEmail={userEmail} />}
 
@@ -936,7 +933,7 @@ export default function CoordinatorDashboard({ userEmail, isReadOnlyUser, access
           </div>
         )}
       </div>
-    </Layout>
+    </div>
   );
 }
 

@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
-import Layout from '../../components/Layout';
 import MenteeCard from '../../components/MenteeCard';
 
 export default function MentorDashboard() {
@@ -221,26 +220,23 @@ export default function MentorDashboard() {
 
   if (error) {
     return (
-      <Layout title="My Mentees">
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-            <p className="text-red-600 font-semibold mb-2">Error Loading Dashboard</p>
-            <p className="text-red-500 text-sm">{error}</p>
-            <button
-              onClick={fetchDashboardData}
-              className="mt-4 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
-            >
-              Retry
-            </button>
-          </div>
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+          <p className="text-red-600 font-semibold mb-2">Error Loading Dashboard</p>
+          <p className="text-red-500 text-sm">{error}</p>
+          <button
+            onClick={fetchDashboardData}
+            className="mt-4 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+          >
+            Retry
+          </button>
         </div>
-      </Layout>
+      </div>
     );
   }
 
   return (
-    <Layout title="My Mentees">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">My Mentees Dashboard</h1>
@@ -586,6 +582,6 @@ export default function MentorDashboard() {
           </div>
         )}
       </div>
-    </Layout>
+    </div>
   );
 }

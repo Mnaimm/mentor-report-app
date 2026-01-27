@@ -2,6 +2,7 @@
 import '../styles/globals.css';
 import Head from 'next/head';
 import { SessionProvider } from 'next-auth/react';
+import Layout from '../components/Layout';
 
 function MyApp({ Component, pageProps: { session, ...pageProps } }) {
   return (
@@ -15,7 +16,9 @@ function MyApp({ Component, pageProps: { session, ...pageProps } }) {
         {/* ADD THIS LINE - Content Security Policy to allow Google Apps Script connections */}
         <meta httpEquiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://script.google.com https://script.googleusercontent.com; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
       </Head>
-      <Component {...pageProps} />
+      <Layout>
+        <Component {...pageProps} />
+      </Layout>
     </SessionProvider>
   );
 }
