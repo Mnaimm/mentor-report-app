@@ -159,10 +159,10 @@ export default function MentorDashboard() {
 
   const handleViewDetails = (mentee) => {
     // For now, show an alert with mentee info (can be replaced with modal or detail page)
-    alert(`Mentee Details:\n\nName: ${mentee.name}\nBusiness: ${mentee.businessName}\nProgram: ${mentee.program}\nBatch: ${mentee.batch}\nEmail: ${mentee.email}\nPhone: ${mentee.phone || 'N/A'}\n\nCurrent Round: ${mentee.currentRound}\nProgress: ${mentee.reportsThisRound}/${mentee.expectedReportsThisRound}\nStatus: ${mentee.status}`);
+    alert(`Mentee Details:\n\nName: ${mentee.name}\nBusiness: ${mentee.businessName}\nProgram: ${mentee.program}\nBatch: ${mentee.batch}\nEmail: ${mentee.email}\nPhone: ${mentee.phone || 'N/A'}\n\nCurrent Round: ${mentee.currentRound}\nProgress: ${mentee.reportsThisRound}\/${mentee.expectedReportsThisRound}\nStatus: ${mentee.status}`);
     
     // Future: Navigate to dedicated detail page
-    // router.push(`/mentor/mentee/${mentee.id}`);
+    // router.push(`\/mentor\/mentee\/${mentee.id}`);
   };
 
   const handleContact = (mentee, method) => {

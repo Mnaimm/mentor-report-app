@@ -1,0 +1,212 @@
+maju commit 25012026
+
+✅ Migration Complete
+I've successfully migrated laporan-maju-um.js image uploads to match laporan-bangkit.js exactly.
+
+Changes Made:
+Replaced uploadImage() function (lines 607-699)
+
+❌ Removed: FileReader, base64 encoding, compression logic, /api/upload-proxy
+✅ Added: FormData with direct file append, /api/upload-image endpoint
+Mechanically identical to laporan-bangkit.js
+Replaced uploadMiaProof() function (lines 702-769)
+
+❌ Removed: FileReader, base64 encoding, compression logic, /api/upload-proxy
+✅ Added: FormData with direct file append, /api/upload-image endpoint
+Uses same approach as main uploadImage function
+Removed compressImageForProxy() function (lines 501-606)
+
+105 lines of dead code deleted
+No longer referenced anywhere in the file
+Summary:
+Lines removed: ~280
+Lines added: ~77
+Net change: -203 lines
+Files modified: 1 laporan-maju-um.js only)
+No other files touched
+The implementation now uses:
+
+✅ /api/upload-image endpoint
+✅ FormData for file uploads
+✅ Direct file streaming (no base64)
+✅ No client-side compression
+✅ Same behavior as laporan-bangkit.js
+
+migrate laporan-maju-um.js to upload-image API
+
+- Replace uploadImage() with FormData + /api/upload-image
+- Replace uploadMiaProof() with FormData + /api/upload-image
+- Remove compressImageForProxy() function (dead code)
+- Remove FileReader and base64 encoding logic
+- Remove /api/upload-proxy calls
+- Match laporan-bangkit.js implementation exactly
+- Net: -203 lines"
+✅ Changes committed successfully!
+
+Commit: 9e42554
+
+1 file changed
+45 insertions(+)
+248 deletions(-)
+
+
+Summary of Changes to submitMajuReportum.js
+I've successfully enforced full parity with the Bangkit implementation while preserving MAJU-specific report handling. Here are the key changes:
+
+✅ 1. Helper Function Added
+Added getRowNumberFromUpdatedRange() function at the top (matching Bangkit)
+✅ 2. UM Google Sheet Mapping (Full Parity)
+Completely rewrote mapUMDataToSheetRow() to match Bangkit's exact 72-column structure:
+Columns A-K (0-10): Basic session info (timestamp, email, program, mentor, mentee details)
+Columns L-AR (11-43): Legacy fields left empty (33 columns)
+Columns AS-BT (44-71): UM-specific fields (28 columns) - exact match with Bangkit
+Changed program identifier to 'MAJU' (column C)
+Uses reportData.SESI_NUMBER for session formatting
+All UM field mappings now align perfectly with Bangkit column positions
+✅ 3. UM Sheet Write Flow (Reorganized)
+Moved UM sheet write section to execute before Supabase writes (matching Bangkit flow)
+Captures umSheetRowNumber for use in Supabase
+Uses 8-second timeout (matching Bangkit)
+Non-blocking error handling with proper logging
+✅ 4. Supabase UM Insert (Schema-Whitelisted)
+Completely rewrote to use field-by-field insertion (no object spreading)
+Only includes fields with actual values
+Validates numeric fields with parseFloat() and parseInt()
+Skips invalid values (NaN checks)
+Entrepreneur ID resolution: Uses email lookup strategy (same as Bangkit):
+Passes sheets_row_number from UM sheet write
+All field names match Supabase schema exactly (e.g., ulasan_aset_bukan_tunai, aset_bukan_tunai_semasa)
+✅ 5. Response Structure Updated
+Updated final response to include UM sheet status:
+umSheet.success, umSheet.rowNumber, umSheet.error
+Proper error messaging when UM write fails
+✅ 6. Data Flow Architecture
+The final flow is now:
+
+MAJU report data → laporanmajuum tab + reports table (program: 'Maju')
+UM data → UM tab (shared) + upward_mobility_reports table
+Identical structure to Bangkit UM
+Only differs by program identifier ('MAJU' vs 'BANGKIT')
+✅ 7. Non-Blocking Behavior
+All UM operations (both sheet and Supabase) are non-blocking
+Failures logged to dual_write_monitoring table
+MAJU submission succeeds even if UM write fails
+🎯 Outcome
+The implementation now has complete parity with Bangkit's UM handling while maintaining MAJU-specific report management. The code is cleaner, more maintainable, and follows the exact same patterns used in the Bangkit implementation.
+
+
+Excellent! I've found the exact issue. The MAJU form (laporan-maju-um.js) has a PHASE 6 that calls /api/submit-upward-mobility AFTER the main submission succeeds. This creates the duplicate entry in the UM tab.
+
+Here's what's happening:
+
+Form submits to /api/submitMajuReportum → writes to laporanmajuum tab + UM tab ✅
+Then frontend makes a second call to /api/submit-upward-mobility → writes to UM tab again ❌ (DUPLICATE!)
+Solution: Remove/disable the frontend call to /api/submit-upward-mobility since the backend already handles UM writes.
+
+Let me remove this duplicate call:
+
+Edited
+laporan-maju-um.js+13-79
+Perfect! Now let me verify there are no other calls to this endpoint:
+
+Good! The remaining calls are only from:
+
+✅ upward-mobility.js - This is the standalone UM form (correct, not part of session submission)
+✅ [upward-mobility - Copy.js](c:\Users\MyLenovo\Downloads\mentor-report\pages\upward-mobility - Copy.js) - Backup/copy file (not active)
+✅ Documentation files (README, PRD)
+Perfect! The fix is complete. Let me create a summary document:
+
+✅ Fix Complete: Removed Duplicate UM Entry
+Problem Identified
+The MAJU form was creating 2 entries in the UM tab for each submission because:
+
+Backend (submitMajuReportum.js) writes to UM tab ✅ (correct)
+Frontend (laporan-maju-um.js) was making a second call to /api/submit-upward-mobility ❌ (duplicate!)
+Solution Implemented
+Removed the frontend call to /api/submit-upward-mobility from laporan-maju-um.js:1109-1125 (lines 1109-1125).
+
+Current Architecture (✅ Full Parity with Bangkit)
+Single MAJU Session Submission writes to 4 destinations:
+
+#	Destination	Purpose
+1️⃣	laporanmajuum tab	MAJU session report (58 columns including inline UM data)
+2️⃣	UM tab	Shared cross-program UM tracking (72 columns)
+3️⃣	reports table (Supabase)	Session metadata + JSONB data
+4️⃣	upward_mobility_reports table (Supabase)	UM-specific tracking
+All 4 writes happen inside /api/submitMajuReportum (matching Bangkit's implementation).
+
+Endpoint Clarification
+/api/submit-upward-mobility remains available as a STANDALONE endpoint for:
+
+Optional UM-only submissions (no session report)
+Called from upward-mobility.js form
+NOT called during session submissions
+Testing Recommendations
+After this fix, test a MAJU submission and verify:
+
+✅ 1 entry in laporanmajuum tab
+✅ 1 entry in UM tab (not 2!)
+✅ Document generation works correctly
+✅ All 4 Supabase records created successfully
+
+
+Remove duplicate UM tab entry for MAJU submissions
+
+- Removed frontend call to /api/submit-upward-mobility in laporan-maju-um.js
+- Backend submitMajuReportum.js now handles all UM writes (full parity with Bangkit)
+- Single MAJU submission writes to 4 destinations without duplicates:
+  1. laporanmajuum tab (58 cols with inline UM data)
+  2. UM tab (72 cols shared cross-program tracking)
+  3. reports table (Supabase)
+  4. upward_mobility_reports table (Supabase)
+- /api/submit-upward-mobility remains as standalone endpoint only
+- Fixes issue where UM tab re
+
+
+
+✅ Fixed Supabase entrepreneur_id resolution in MAJU submission
+Changes Made:
+1. Backend API (submitMajuReportum.js)
+Reports Table Insert (Line ~253):
+
+Added entrepreneur lookup by email before payload build
+Uses emel field (matching Bangkit convention)
+Fallback chain: emel → emailUsahawan → entrepreneurEmail
+Injects entrepreneur_id into payload (required NOT NULL FK)
+Non-blocking: logs warning on failure, continues with Sheets writes
+UM Reports Table Insert (Line ~362):
+
+Updated entrepreneur lookup to use same emel field
+Consistent with reports table resolution strategy
+Error Logging:
+
+Enhanced monitoring metadata to include entrepreneur_email for debugging
+2. Frontend Form (laporan-maju-um.js)
+Initial Form State (Line ~67):
+
+Added emel: '' field to initialFormState
+Mentee Selection Handler (Line ~348):
+
+Extracts MENTEE_EMAIL_FROM_MAPPING from API response
+Stores as formData.emel
+Logs value for debugging
+Submission Payload (Line ~890 & ~955):
+
+Includes emel in both MIA and regular dataToSend payloads
+Positioned after SESI_NUMBER for logical grouping
+Behavior:
+✅ Frontend sends emel from mapping sheet
+✅ Backend resolves entrepreneur by email
+✅ If found → injects entrepreneur_id into reports payload
+⚠️ If NOT found → logs warning, aborts reports insert (non-blocking)
+✅ Sheets/Drive/UM writes continue regardless
+✅ Matches Bangkit implementation pattern
+
+
+✅ Committed changes successfully (9f76823)
+
+The fix resolves the NULL entrepreneur_id constraint violation by:
+
+Frontend sends emel from mapping sheet
+Backend looks up entrepreneur and injects FK
+Non-blocking behavior maintains reliability

@@ -1,0 +1,33 @@
+{
+  "name": "mentor-report-sync-scripts",
+  "version": "1.0.0",
+  "description": "Production sync scripts for migrating Google Sheets data to Supabase",
+  "type": "module",
+  "main": "07-master-sync.js",
+  "scripts": {
+    "sync": "node 07-master-sync.js",
+    "sync:dry": "DRY_RUN=true node 07-master-sync.js",
+    "sync:live": "DRY_RUN=false node 07-master-sync.js",
+    "sync:batches": "node 01-sync-batches.js",
+    "sync:mapping": "node 02-sync-mapping.js",
+    "sync:batch7": "node 03-sync-batch-7.js",
+    "sync:bangkit": "node 04-sync-bangkit-reports.js",
+    "sync:maju": "node 05-sync-maju-reports.js",
+    "sync:um": "node 06-sync-um-standalone.js"
+  },
+  "keywords": [
+    "supabase",
+    "migration",
+    "sync",
+    "google-sheets"
+  ],
+  "author": "Claude Code",
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "dotenv": "^16.3.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

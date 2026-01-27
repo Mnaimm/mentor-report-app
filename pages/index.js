@@ -420,10 +420,20 @@ export default function HomePage() {
               </div>
             )}
 
+            {/* Admin check for restricted features */}
+            {(() => {
+              const isAdmin = session?.user?.email && 
+                process.env.NEXT_PUBLIC_ADMIN_EMAILS
+                  ?.split(',')
+                  .map(e => e.trim())
+                  .includes(session.user.email);
+              return null; // Just set up the check, cards below will use it
+            })()}
+
             {/* Quick links */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               <ToolCard
-                href="/laporan-sesi"
+                href="/laporan-bangkit"
                 title="Laporan Sesi iTEKAD Bangkit"
                 description="Isi laporan berterusan untuk usahawan anda di sini."
               />
@@ -432,11 +442,21 @@ export default function HomePage() {
                 title="Laporan Sesi iTEKAD Maju"
                 description="Isi laporan kemajuan untuk usahawan anda."
               />
-              <ToolCard
-                href="/upward-mobility"
-                title="Borang Upward Mobility"
-                description="Lengkapkan borang Upward Mobility untuk Sesi 2 dan Sesi 4."
-              />
+              {(() => {
+                const isAdmin = session?.user?.email && 
+                  process.env.NEXT_PUBLIC_ADMIN_EMAILS
+                    ?.split(',')
+                    .map(e => e.trim())
+                    .includes(session.user.email);
+                
+                return isAdmin ? (
+                  <ToolCard
+                    href="/upward-mobility"
+                    title="Borang UM Manual (Admin)"
+                    description="Untuk kes khas sahaja - manual UM entry."
+                  />
+                ) : null;
+              })()}
               <ToolCard
                 href="/growthwheel"
                 title="Penilaian GrowthWheel 360°"

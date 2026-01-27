@@ -10,8 +10,7 @@ export default function MenteeCard({ mentee, selected, onSelect, onAssign, onVie
     if (mentee.status === 'overdue') return 1;
     if (mentee.status === 'due_soon') return 2;
     if (mentee.status === 'on_track') return 3;
-    if (mentee.status === 'pending_first_session') return 4;
-    return 5;
+    return 4;
   };
 
   // Status colors and border styles

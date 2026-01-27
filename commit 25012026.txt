@@ -1,0 +1,149 @@
+commit 25012026
+
+✅ UM REMOVAL COMPLETE
+Changes Made:
+1. Backend API (my-dashboard.js)
+✅ Removed:
+
+UM sheet loading (50 lines)
+UM submissions Map and indexing
+UM composite key logic
+umStatus field from mentee response
+umPending count from stats
+UM influence on needsAction calculation
+✅ Preserved:
+
+All Google Sheets session reading (V8, LaporanMaju)
+Session counting logic
+Round determination
+MIA handling
+Due date calculation
+Status calculation (overdue, due_soon, on_track)
+Result: API now returns mentee data WITHOUT umStatus field, stats.umPending removed, needsAction based ONLY on overdue + due_soon
+
+2. Frontend Dashboard (dashboard.js)
+✅ Removed:
+
+UM from urgency scoring (line 89)
+UM Pending stat card from summary panel
+"UM Forms Pending" from status breakdown
+✅ Preserved:
+
+All session display logic
+Filtering and sorting
+Status badges
+Timeline widgets
+Card grouping
+Result: Dashboard shows 3 stat cards instead of 4, no UM references in urgency sort
+
+3. MenteeCard Component (MenteeCard.js)
+✅ Removed:
+
+UM from card priority calculation
+UM pending status style (purple badge)
+UM Status Section display (green/purple box)
+"Submit UM Form" button
+handleSubmitUM() function
+✅ Preserved:
+
+All status badges (overdue, due soon, on track, MIA)
+Session progress display ("This Round" + "All Sessions")
+"Submit Session Report" button
+View Details and Email buttons
+Result: Cards show ONLY session-related information, no UM badges or buttons
+
+Verification:
+✅ No syntax errors in any file
+✅ Session counting unchanged
+✅ Round determination unchanged
+✅ MIA behavior unchanged
+✅ No new Supabase reads introduced
+✅ Admin pages (index.js, mentor-stats) untouched
+
+What Mentors Now See:
+Dashboard Stats:
+
+Total Mentees
+On Track
+Need Action (overdue + due soon only)
+Mentee Cards Show:
+
+Status badge (overdue, due soon, on track, MIA)
+Current round progress (e.g., "1/1" or "0/1")
+All sessions count (e.g., "3/5")
+Last session date
+Due date with days remaining
+Completely Removed:
+
+All UM form references
+Purple "UM Pending" badges
+UM submission tracking
+"Submit UM Form" buttons
+The mentor dashboard is now purely focused on session reporting, while UM tracking remains available in the admin overview (index.js) if needed.
+
+
+remove UM tracking from mentor dashboard and update form routes
+
+BREAKING CHANGES:
+- Remove all Upward Mobility (UM) form tracking from mentor dashboard
+- UM tracking remains available in admin overview (index.js)
+
+Changes:
+- Remove UM sheet loading and submission checking (my-dashboard.js API)
+- Remove umStatus field from mentee response
+- Remove umPending stat and UM influence on needsAction count
+- Remove UM badges and buttons from mentee cards
+- Remove UM from urgency scoring
+- Update submit report routes: Bangkit -> /laporan-bangkit, Maju -> /laporan-maju-um
+
+Preserved:
+- All session counting logic unchanged
+- Round determination unchanged
+- MIA handling unchanged
+- Google Sheets as source of truth
+- Admin UM tracking untouched"
+✅ Successfully committed!
+
+Commit: 47f6268
+Files changed: 3 files
+Lines: +11 insertions, -170 deletions
+
+Summary:
+
+Removed UM tracking from mentor dashboard (backend + frontend)
+Updated form routes to new combined forms
+All session/round/MIA logic preserved
+Admin overview UM tracking unchanged
+The changes are now committed to your local repository.
+
+
+
+ improve submit button logic and program label reliability
+
+Changes:
+- Change Submit Session Report button visibility to round-based logic
+  (show if reportsThisRound < expectedReportsThisRound)
+- Fix program badge to use mentee.program directly from API instead of 
+  deriving from batch name (more reliable)
+
+Impact:
+- Button now shows for mentees who completed past sessions but not current round
+- Example: Shah Kirin (Batch 4) has Session 1, needs Session 2 - button now appears
+- Program labels (Bangkit/Maju) now display correctly even if batch naming is inconsistent
+
+Behavior preserved:
+- Status calculation unchanged
+- Progress counting unchanged  
+- Badge colors unchanged (blue=Bangkit, green=Maju)
+- All other logic unchanged"
+
+
+Commit: 9a2d4bc
+File changed: 1 file (components/MenteeCard.js)
+Lines: +19 insertions, -28 deletions
+
+Summary:
+
+Submit button now based on current round completion (round-based, not status-based)
+Program badge now uses direct mentee.program field (more reliable)
+All behavioral logic preserved

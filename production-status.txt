@@ -1,0 +1,79 @@
+🔍 PRODUCTION VERIFICATION CHECKLIST
+=====================================
+
+📋 Step 1: Check Current Branch
+Current branch: main
+
+📋 Step 2: Check files that should be working in PRODUCTION
+
+✅ pages/laporan-sesi.js exists
+   Last modified: 2026-01-24 08:10:41
+   📡 Uses: /api/upload-image (Google Drive API)
+
+✅ pages/api/submitReport.js exists
+   Last modified: 2026-01-15 22:35:40
+
+✅ pages/api/upload-image.js exists
+   Last modified: 2026-01-24 00:35:41
+   📡 Uses: /api/upload-image (Google Drive API)
+
+✅ pages/api/upload-proxy.js exists
+   Last modified: 2026-01-24 00:00:27
+   📡 Uses: /api/upload-image (Google Drive API)
+   📡 Uses: /api/upload-proxy (Apps Script)
+
+📋 Step 3: Check Git Status
+
+ M pages/laporan-bangkit.js
+ M pages/laporan-sesi.js
+?? CLAUDE_CODE_VERIFY_PRODUCTION.md
+?? appscript-5/
+?? check-production.sh
+?? fix-upload-proxy-instructions.md
+?? "new appscript.md"
+?? production-status.txt
+
+📋 Step 4: Show Last 10 Commits
+
+f3afdc6 - Refactored laporan-bangkit image upload flow:   - Separated image upload from Apps Script processing   - Routed image uploads to /api/upload-image instead of upload-proxy   - Fixed FileReader flow to prevent stuck uploads   - Added detailed logging for compression & upload steps
+50bd699 Add custom keputusan input option for Bangkit report
+3c3cad9 fix: Replace placeholder-as-value pattern with helper text in form textareas
+505e973 fix: Add separate Apps Script deployment for MAJU UM and update reportType routing
+aa0fac2 fix: Implement dual-spreadsheet architecture for MAJU UM reports
+5ac24e8 chore: Clean up project structure - move docs to /docs folder and update .gitignore
+01d2a8f fix: Correct Bangkit sheet column mapping to use individual UM columns
+e66d911 feat: Add Upward Mobility tracking to Bangkit session reports
+a20d201 feat: Add UM validation, dual-write, and submitBangkit API endpoint
+ae35a54 feat: Enhance UM form with datepicker and detailed field descriptions
+
+📋 Step 5: Compare with Production Remote
+
+Fetching from remote...
+Your local is: 28 commits ahead, 0 commits behind origin/main
+
+⚠️  You have 28 unpushed commits:
+f3afdc6 - Refactored laporan-bangkit image upload flow:   - Separated image upload from Apps Script processing   - Routed image uploads to /api/upload-image instead of upload-proxy   - Fixed FileReader flow to prevent stuck uploads   - Added detailed logging for compression & upload steps
+50bd699 Add custom keputusan input option for Bangkit report
+3c3cad9 fix: Replace placeholder-as-value pattern with helper text in form textareas
+505e973 fix: Add separate Apps Script deployment for MAJU UM and update reportType routing
+aa0fac2 fix: Implement dual-spreadsheet architecture for MAJU UM reports
+
+📋 Step 6: Files Modified in Last 24 Commits
+
+pages/api/submitBangkit.js
+pages/api/submitMajuReport.js
+pages/api/submitMajuReportum.js
+pages/api/submitReport.js
+pages/api/upload-image.js
+pages/api/upload-proxy - Copy.js
+pages/api/upload-proxy.js
+pages/laporan-bangkit.js
+pages/laporan-maju-um.js
+
+✅ Verification Complete!
+
+📝 NEXT STEPS:
+1. Confirm laporan-sesi.js works in production
+2. Identify last commit BEFORE the 24-commit sprint
+3. Create recovery branch from that commit
+4. Rebuild laporan-bangkit.js cleanly

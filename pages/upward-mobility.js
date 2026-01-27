@@ -180,13 +180,21 @@ export default function UpwardMobilityPage() {
   const [success, setSuccess] = useState('');
 
   // Check if user is admin
-  const isAdmin = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',').includes(session?.user?.email);
-// ADD THIS DEBUG CODE HERE:
-//console.log('🔍 Admin Debug Info:');
-//console.log('- NEXT_PUBLIC_ADMIN_EMAILS:', process.env.NEXT_PUBLIC_ADMIN_EMAILS);
-//onsole.log('- session.user.email:', session?.user?.email);
-//console.log('- isAdmin result:', isAdmin);
-//console.log('- Admin emails array:', process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(','));
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [authChecking, setAuthChecking] = useState(true);
+
+  useEffect(() => {
+    if (status === 'authenticated' && session?.user?.email) {
+      const adminEmails = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',').map(e => e.trim()) || [];
+      const authorized = adminEmails.includes(session.user.email);
+      setIsAuthorized(authorized);
+      setAuthChecking(false);
+    } else if (status === 'unauthenticated') {
+      setAuthChecking(false);
+    }
+  }, [status, session]);
+
+  const isAdmin = isAuthorized;
   // Initial form state
   const initialFormState = {
     email: session?.user?.email || '',
@@ -387,7 +395,7 @@ useEffect(() => {
     }
   };
 
-  if (status === 'loading' || isLoading) {
+  if (status === 'loading' || isLoading || authChecking) {
     return (
       <div className="bg-gray-100 min-h-screen flex items-center justify-center">
         <div className="text-center">Memuatkan...</div>
@@ -400,6 +408,46 @@ useEffect(() => {
       <div className="bg-gray-100 min-h-screen flex items-center justify-center">
         <div className="text-center">
           <p>Sila log masuk untuk mengakses borang ini.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Admin access check
+  if (!isAuthorized) {
+    return (
+      <div className="bg-gray-100 min-h-screen flex items-center justify-center">
+        <div className="max-w-md mx-auto bg-white p-8 rounded-lg shadow-lg text-center">
+          <div className="text-6xl mb-4">🔒</div>
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">Access Denied</h1>
+          <p className="text-gray-600 mb-4">
+            Borang ini hanya untuk kegunaan admin sahaja.
+         /* Admin Warning Banner */}
+        <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-r-lg">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <span className="text-2xl">⚠️</span>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-bold text-yellow-800">Admin Tool - Untuk Kes Khas Sahaja</h3>
+              <p className="text-sm text-yellow-700 mt-1">
+                Borang ini untuk kegunaan manual jika mentor tidak dapat submit laporan.
+                Mentor regular sila gunakan borang gabungan laporan.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        { </p>
+          <p className="text-sm text-gray-500 mb-6">
+            Sila gunakan borang gabungan laporan untuk submit sesi mentoring.
+          </p>
+          <button
+            onClick={() => window.location.href = '/mentor/dashboard'}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+          >
+            Kembali ke Dashboard
+          </button>
         </div>
       </div>
     );

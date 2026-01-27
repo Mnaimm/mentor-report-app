@@ -1,0 +1,188 @@
+git commit -m "Improve image upload UX with file type validation and helper text
+
+- Add accept attribute (image/jpeg,image/png) to all image upload fields
+- Display helper text: Format dibenarkan JPG, JPEG, PNG sahaja
+- Add real-time validation warning for non-image files
+- Move Lawatan Premis checkbox to bottom of upload section in Bangkit form
+- Apply changes to Bangkit (3 fields) and MAJU UM (2 fields)
+- Non-blocking yellow warning keeps UX friendly for mentors"
+✅ Changes committed successfully!
+
+Commit: 788eae9
+Files changed: 3 files, 121 insertions(+), 32 deletions(-)
+
+FileInput.js
+laporan-bangkit.js
+laporan-maju-um.js
+
+Make all Inisiatif fields required in Bangkit form
+
+- Add validation for Fokus Area and Keputusan fields
+- Prevent adding new Inisiatif with incomplete current entries
+- Update placeholder text to indicate required fields (Wajib)
+- Add comprehensive validation in handleSubmit for all Inisiatif fields
+- Apply changes to both Sesi 1 and Sesi 2+ forms
+- Ensure complete data for document generation and Google Sheets"
+✅ Changes committed successfully!
+
+Commit: e604f4a
+File changed: 1 file, 72 insertions(+), 5 deletions(-)
+
+
+✅ Script A Image Logic Successfully Integrated into Script B
+What Was Changed
+Replaced Script B's inferior image handling with Script A's proven robust implementation. The new code is in Code.js:1325-1536.
+
+Key Improvements
+Script A Features (Now in Script B):
+
+✅ Proportional resizing - clampImageWidth_() maintains aspect ratio, only shrinks (never enlarges)
+✅ Table-aware 2-column layout - findAncestorTableCell_() detects table context
+✅ Visible error placeholders - Shows [[Image not available: URL]] instead of silent failures
+✅ Robust URL parsing - JSON arrays + comma-separated + multiple Drive URL patterns
+Script B Regressions Fixed:
+
+❌ Fixed width distortion - Was: image.setWidth(400) → Now: Proportional with max width
+❌ No table detection - Was: All images same layout → Now: 2-column grid in tables
+❌ Silent failures - Was: Errors logged but invisible → Now: Visible error text in doc
+❌ Limited URL support - Was: Basic Drive patterns → Now: 4+ Drive URL patterns
+Functions Replaced/Added
+New Functions (lines 1325-1421):
+Replaced Function (lines 1423-1536):
+Old Behavior (Script B v5.1):
+
+Fixed 400px width (distortion risk)
+No table detection (all same layout)
+Silent failures (errors only in logs)
+Basic JSON + single URL handling
+New Behavior (Script A logic):
+
+Max 450px body / 220px cell (proportional)
+2-column grid inside tables
+Visible error placeholders in document
+JSON + comma-separated + Drive ID extraction
+No Changes To
+✅ Preserved Script B Features:
+
+Upward Mobility data handling (lines 54-148)
+Template selection logic (TEMPLATE_ID_SESI_1 / SESI_2_4)
+Validation logic (validateInisiatifData_)
+Bangkit sheet structure (H headers)
+Session subfolder management
+✅ Preserved Script A Features:
+
+All image handling logic copied verbatim
+Layout constants (MAX_BODY_WIDTH=450, MAX_CELL_WIDTH=220)
+Error handling strategy (visible placeholders)
+Integration Points
+All 7 image insertion calls now use the improved function (no changes needed):
+
+Code.js:477: insertImageAt_(body, '{{Link_Carta_GrowthWheel}}', row[H.LinkCartaGW])
+Code.js:478: insertImageAt_(body, '{{Link_Gambar_Profil}}', row[H.LinkGambarProfil])
+Code.js:479: insertImageAt_(body, '{{Link Gambar}}', row[H.LinkGambar])
+Code.js:480: insertImageAt_(body, '{{Link_Gambar_Premis}}', row[H.LinkGambarPremis])
+Code.js:690: , row[H.LinkGambar])
+Code.js:756: , row[H.LinkGambar])
+Code.js:759: , previousImages)
+Function signature is 100% compatible - no changes required to existing calls.
+
+Assumptions & Dependencies
+Assumptions:
+
+Document templates have placeholders in format {{Marker Name}}
+Some placeholders may be inside table cells (e.g., session photos)
+URLs come from Google Sheets as strings (JSON arrays or comma-separated)
+Images may fail to load (network issues, permissions, invalid URLs)
+Dependencies:
+
+DocumentApp API - Standard Google Docs API
+DriveApp API - For Drive file access by ID
+UrlFetchApp API - For direct URL image fetching
+escapeRegExp_() - Still used by other parts of Script B (preserved)
+No External Libraries Required - All Google Apps Script built-in APIs.
+
+Version Update
+Updated from: v5.1 - Required Inisiatif Validation
+Updated to: v5.2 - Improved Image Handling (Script A logic)
+
+Changelog:
+
+Integrated Script A's robust image insertion logic
+Added proportional resizing with clampImageWidth_()
+Added table-aware 2-column layout detection
+Added visible error placeholders for failed images
+Enhanced Drive URL parsing (4 patterns supported)
+Preserved all Upward Mobility and validation features
+Testing Recommendations
+Test Cases:
+
+Single image - Verify proportional sizing in body (max 450px)
+Multiple images in table - Verify 2-column grid layout (220px each)
+JSON array - Test ["url1", "url2", "url3"] format
+Comma-separated - Test "url1, url2, url3" format
+Invalid URL - Verify visible error text appears: [[Image not available: URL]]
+Drive URLs - Test all 4 patterns:
+/file/d/FILE_ID/view
+?id=FILE_ID
+Plain file ID
+/uc?id=FILE_ID
+Mixed formats - JSON with some valid, some invalid URLs
+Expected Results:
+
+Images render without distortion
+Table cells show 2-column grid
+Failed images show visible error text (not blank)
+All URL formats parse correctly
+The integration is complete and backward-compatible with all existing Script B functionality.
+
+
+
+
+Fix UM schema mismatch: rename ulasan_pekerja to ulasan_pekerjaan
+
+- Fix PGRST204 error in both submitBangkit.js and submitMajuReportum.js
+- Payload key ulasan_pekerja renamed to ulasan_pekerjaan to match Supabase schema
+- Enhanced logging to display all UM payload keys for debugging
+- Supabase schema is source of truth - payload must conform"
+✅ Changes committed successfully!
+
+Commit: 6b57589
+Files changed: 2
+Changes: 4 insertions(+), 4 deletions(-)
+
+The fix for the UM schema mismatch has been committed to the main branch.
+
+
+
+✅ Sesi 2-4 Template is CORRECT
+Your Sesi 2-4 template already has the right structure!
+
+How it works:
+Template Sesi 2-4 placeholders:
+
+{{Sesi2_ISU_UTAMA}} - Shows Fokus + Keputusan from previous session
+{{Sesi2_RINGKASAN}} - Shows Ringkasan Sesi
+{{Sesi2_LANGKAH_KEHADAPAN}} - Shows Cadangan Tindakan (action plans)
+Apps Script functions:
+
+buildSessionIsuUtama_() - Code.js:1167-1207
+
+Reads Fokus Area + Keputusan from previous session
+Formats as: "Fokus Area: Keputusan"
+✅ Already includes custom Keputusan (after our fix)
+buildSessionLangkahKehadapan_() - Code.js:1209-1218
+
+Reads Cadangan Tindakan 1-4 from current session
+Formats as numbered list: "1. Action\n2. Action"
+✅ Already reads Tindakan correctly with headers['Tindakan${i}']
+{{SesiX_RINGKASAN}} - Filled from Ringkasan Sesi column
+
+Summary:
+Sesi 1 template: ✅ UPDATED (you added Cadangan placeholders)
+Sesi 2-4 template: ✅ NO CHANGES NEEDED (already works correctly)
+
+The Sesi 2-4 template separates Keputusan (in ISU UTAMA) from Cadangan Tindakan (in LANGKAH KEHADAPAN), which makes sense because:
+
+ISU UTAMA = Problems/decisions from previous session
+LANGKAH KEHADAPAN = Action plans for current session
+Your Pelan Tindakan data will appear in the {{SesiX_LANGKAH_KEHADAPAN}} section for Sesi 2-4!

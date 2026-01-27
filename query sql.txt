@@ -1,0 +1,431 @@
+SELECT
+  table_name
+FROM information_schema.tables
+WHERE table_schema = 'public'
+ORDER BY table_name;
+
+
+| table_name               |
+
+| ------------------------ |
+
+| activity_logs            |
+
+| batch_rounds             |
+
+| batch_rounds_with_status |
+
+| batches                  |
+
+| data_discrepancies       |
+
+| dual_write_logs          |
+
+| dual_write_monitoring    |
+
+| entrepreneurs            |
+
+| image_uploads            |
+
+| mentor_assignments       |
+
+| mentor_profiles          |
+
+| mentors                  |
+
+| orphaned_uploads         |
+
+| reports                  |
+
+| sessions                 |
+
+| system_health_metrics    |
+
+| todays_summary           |
+
+| upward_mobility_reports  |
+
+| user_roles               |
+
+| users                    |
+
+| view_mentor_kpis         |
+
+| view_mentor_status       |
+
+| view_program_summary     |
+
+| view_session_status      |
+
+| vw_entrepreneur_lookup   |
+
+| vw_mentor_lookup         |
+
+| vw_reports_data_quality  |
+
+| vw_reports_summary       |
+
+| vw_reports_with_entities |
+
+| vw_um_summary            |
+
+
+
+SELECT
+  column_name,
+  data_type,
+  is_nullable,
+  column_default
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'entrepreneurs'
+ORDER BY ordinal_position;
+
+| column_name   | data_type                | is_nullable | column_default              |
+
+| ------------- | ------------------------ | ----------- | --------------------------- |
+
+| id            | uuid                     | NO          | gen_random_uuid()           |
+
+| name          | character varying        | NO          | null                        |
+
+| email         | character varying        | YES         | null                        |
+
+| business_name | character varying        | YES         | null                        |
+
+| phone         | character varying        | YES         | null                        |
+
+| region        | USER-DEFINED             | YES         | null                        |
+
+| zone          | character varying        | YES         | null                        |
+
+| batch         | character varying        | YES         | null                        |
+
+| folder_id     | character varying        | YES         | null                        |
+
+| program       | USER-DEFINED             | NO          | null                        |
+
+| cohort        | character varying        | YES         | null                        |
+
+| status        | character varying        | YES         | 'active'::character varying |
+
+| created_at    | timestamp with time zone | YES         | now()                       |
+
+| updated_at    | timestamp with time zone | YES         | now()                       |
+
+| business_type | character varying        | YES         | null                        |
+
+| state         | character varying        | YES         | null                        |
+
+| district      | character varying        | YES         | null                        |
+
+| notes         | text                     | YES         | null                        |
+
+
+
+
+
+SELECT
+  column_name,
+  data_type,
+  is_nullable,
+  column_default
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'upward_mobility_reports'
+ORDER BY ordinal_position;
+
+
+| column_name              | data_type                   | is_nullable | column_default         |
+| ------------------------ | --------------------------- | ----------- | ---------------------- |
+| id                       | uuid                        | NO          | gen_random_uuid()      |
+| entrepreneur_id          | uuid                        | YES         | null                   |
+| mentor_id                | uuid                        | YES         | null                   |
+| program                  | text                        | YES         | 'iTEKAD BangKIT'::text |
+| batch                    | text                        | YES         | null                   |
+| sesi_mentoring           | text                        | YES         | null                   |
+| report_date              | timestamp without time zone | YES         | now()                  |
+| jenis_perniagaan         | text                        | YES         | null                   |
+| status_penglibatan       | text                        | YES         | null                   |
+| upward_mobility_status   | text                        | YES         | null                   |
+| kriteria_improvement     | text                        | YES         | null                   |
+| tarikh_lawatan           | text                        | YES         | null                   |
+| penggunaan_akaun_semasa  | text                        | YES         | null                   |
+| penggunaan_bimb_biz      | text                        | YES         | null                   |
+| buka_akaun_al_awfar      | text                        | YES         | null                   |
+| penggunaan_bimb_merchant | text                        | YES         | null                   |
+| lain_lain_fasiliti       | text                        | YES         | null                   |
+| langgan_mesin_kira       | text                        | YES         | null                   |
+| pendapatan_sebelum       | numeric                     | YES         | null                   |
+| pendapatan_selepas       | numeric                     | YES         | null                   |
+| ulasan_pendapatan        | text                        | YES         | null                   |
+| pekerjaan_sebelum        | integer                     | YES         | null                   |
+| pekerjaan_selepas        | integer                     | YES         | null                   |
+| ulasan_pekerjaan         | text                        | YES         | null                   |
+| aset_bukan_tunai_sebelum | numeric                     | YES         | null                   |
+| aset_bukan_tunai_selepas | numeric                     | YES         | null                   |
+| aset_tunai_sebelum       | numeric                     | YES         | null                   |
+| aset_tunai_selepas       | numeric                     | YES         | null                   |
+| ulasan_aset              | text                        | YES         | null                   |
+| simpanan_sebelum         | numeric                     | YES         | null                   |
+| simpanan_selepas         | numeric                     | YES         | null                   |
+| ulasan_simpanan          | text                        | YES         | null                   |
+| zakat_sebelum            | numeric                     | YES         | null                   |
+| zakat_selepas            | numeric                     | YES         | null                   |
+| ulasan_zakat             | text                        | YES         | null                   |
+| digital_sebelum          | ARRAY                       | YES         | null                   |
+| digital_selepas          | ARRAY                       | YES         | null                   |
+| ulasan_digital           | text                        | YES         | null                   |
+| online_sales_sebelum     | ARRAY                       | YES         | null                   |
+| online_sales_selepas     | ARRAY                       | YES         | null                   |
+| ulasan_online_sales      | text                        | YES         | null                   |
+| sheets_row_number        | integer                     | YES         | null                   |
+| created_at               | timestamp without time zone | YES         | now()                  |
+| updated_at               | timestamp without time zone | YES         | now()                  |
+| um_status                | text                        | YES         | null                   |
+| bank_akaun_semasa        | text                        | YES         | null                   |
+| bank_bizapp              | text                        | YES         | null                   |
+| bank_al_awfar            | text                        | YES         | null                   |
+| bank_merchant_terminal   | text                        | YES         | null                   |
+| bank_fasiliti_lain       | text                        | YES         | null                   |
+| bank_mesinkira           | text                        | YES         | null                   |
+| pendapatan_semasa        | numeric                     | YES         | null                   |
+| pekerja_semasa           | integer                     | YES         | null                   |
+| aset_bukan_tunai_semasa  | numeric                     | YES         | null                   |
+| ulasan_aset_bukan_tunai  | text                        | YES         | null                   |
+| aset_tunai_semasa        | numeric                     | YES         | null                   |
+| ulasan_aset_tunai        | text                        | YES         | null                   |
+| simpanan_semasa          | numeric                     | YES         | null                   |
+| zakat_semasa             | text                        | YES         | null                   |
+| digital_semasa           | text                        | YES         | null                   |
+| marketing_semasa         | text                        | YES         | null                   |
+| ulasan_marketing         | text                        | YES         | null                   |
+
+SELECT
+  column_name,
+  data_type,
+  is_nullable,
+  column_default
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'reports'
+ORDER BY ordinal_position;
+
+| column_name               | data_type                | is_nullable | column_default                 |
+| ------------------------- | ------------------------ | ----------- | ------------------------------ |
+| id                        | uuid                     | NO          | gen_random_uuid()              |
+| session_id                | uuid                     | YES         | null                           |
+| mentor_id                 | uuid                     | YES         | null                           |
+| entrepreneur_id           | uuid                     | NO          | null                           |
+| program                   | USER-DEFINED             | NO          | null                           |
+| mentor_email              | character varying        | YES         | null                           |
+| nama_mentor               | character varying        | YES         | null                           |
+| nama_mentee               | character varying        | YES         | null                           |
+| nama_bisnes               | character varying        | YES         | null                           |
+| lokasi_bisnes             | text                     | YES         | null                           |
+| produk_servis             | text                     | YES         | null                           |
+| no_telefon                | character varying        | YES         | null                           |
+| session_date              | date                     | YES         | null                           |
+| session_number            | integer                  | YES         | null                           |
+| mod_sesi                  | character varying        | YES         | null                           |
+| lokasi_f2f                | text                     | YES         | null                           |
+| masa_mula                 | time without time zone   | YES         | null                           |
+| masa_tamat                | time without time zone   | YES         | null                           |
+| latarbelakang_usahawan    | text                     | YES         | null                           |
+| data_kewangan_bulanan     | jsonb                    | YES         | '[]'::jsonb                    |
+| mentoring_findings        | jsonb                    | YES         | '[]'::jsonb                    |
+| refleksi_mentor_perasaan  | text                     | YES         | null                           |
+| refleksi_mentor_komitmen  | text                     | YES         | null                           |
+| refleksi_mentor_lain      | text                     | YES         | null                           |
+| status_perniagaan         | text                     | YES         | null                           |
+| rumusan_langkah_kehadapan | text                     | YES         | null                           |
+| nama_usahawan             | character varying        | YES         | null                           |
+| nama_syarikat             | character varying        | YES         | null                           |
+| kemaskini_inisiatif       | text                     | YES         | null                           |
+| rumusan                   | text                     | YES         | null                           |
+| inisiatif                 | jsonb                    | YES         | '[]'::jsonb                    |
+| jualan_terkini            | jsonb                    | YES         | '[]'::jsonb                    |
+| pautan_media_sosial       | text                     | YES         | null                           |
+| pemerhatian               | text                     | YES         | null                           |
+| refleksi                  | jsonb                    | YES         | '{}'::jsonb                    |
+| premis_dilawat            | boolean                  | YES         | false                          |
+| gw_skor                   | jsonb                    | YES         | '[]'::jsonb                    |
+| image_urls                | jsonb                    | YES         | '{}'::jsonb                    |
+| mia_status                | character varying        | YES         | 'Tidak MIA'::character varying |
+| mia_reason                | text                     | YES         | null                           |
+| folder_id                 | character varying        | YES         | null                           |
+| doc_url                   | text                     | YES         | null                           |
+| base_payment_amount       | numeric                  | YES         | null                           |
+| adjusted_payment_amount   | numeric                  | YES         | null                           |
+| payment_status            | character varying        | YES         | 'pending'::character varying   |
+| approved_at               | timestamp with time zone | YES         | null                           |
+| approved_by               | uuid                     | YES         | null                           |
+| paid_at                   | timestamp with time zone | YES         | null                           |
+| paid_by                   | uuid                     | YES         | null                           |
+| source                    | character varying        | YES         | 'web_form'::character varying  |
+| sheets_row_number         | integer                  | YES         | null                           |
+| submission_date           | timestamp with time zone | YES         | now()                          |
+| status                    | character varying        | YES         | 'submitted'::character varying |
+| created_at                | timestamp with time zone | YES         | now()                          |
+| updated_at                | timestamp with time zone | YES         | now()                          |
+| duration_minutes          | integer                  | YES         | null                           |
+| topics_discussed          | text                     | YES         | null                           |
+| progress_notes            | text                     | YES         | null                           |
+| challenges                | text                     | YES         | null                           |
+| next_steps                | text                     | YES         | null                           |
+| mentor_feedback           | text                     | YES         | null                           |
+| google_doc_url            | text                     | YES         | null                           |
+| google_drive_file_id      | character varying        | YES         | null                           |
+| payment_date              | timestamp with time zone | YES         | null                           |
+| submitted_by              | character varying        | YES         | null                           |
+| mia_proof_url             | text                     | YES         | null                           |
+
+
+
+
+
+SELECT
+  tc.table_name,
+  kcu.column_name
+FROM information_schema.table_constraints tc
+JOIN information_schema.key_column_usage kcu
+  ON tc.constraint_name = kcu.constraint_name
+WHERE tc.constraint_type = 'PRIMARY KEY'
+  AND tc.table_schema = 'public'
+ORDER BY tc.table_name;
+
+
+| table_name              | column_name |
+| ----------------------- | ----------- |
+| activity_logs           | id          |
+| batch_rounds            | id          |
+| batches                 | id          |
+| dual_write_logs         | id          |
+| dual_write_monitoring   | id          |
+| entrepreneurs           | id          |
+| image_uploads           | id          |
+| mentor_assignments      | id          |
+| mentor_profiles         | id          |
+| mentors                 | id          |
+| orphaned_uploads        | id          |
+| reports                 | id          |
+| sessions                | id          |
+| sessions                | id          |
+| system_health_metrics   | id          |
+| upward_mobility_reports | id          |
+| user_roles              | id          |
+| users                   | id          |
+| users                   | id          |
+
+
+SELECT
+  tc.table_name,
+  kcu.column_name,
+  ccu.table_name AS foreign_table,
+  ccu.column_name AS foreign_column
+FROM information_schema.table_constraints tc
+JOIN information_schema.key_column_usage kcu
+  ON tc.constraint_name = kcu.constraint_name
+JOIN information_schema.constraint_column_usage ccu
+  ON ccu.constraint_name = tc.constraint_name
+WHERE tc.constraint_type = 'FOREIGN KEY'
+  AND tc.table_schema = 'public'
+ORDER BY tc.table_name;
+
+
+| table_name              | column_name        | foreign_table      | foreign_column |
+| ----------------------- | ------------------ | ------------------ | -------------- |
+| activity_logs           | user_id            | users              | id             |
+| batch_rounds            | batch_id           | batches            | id             |
+| image_uploads           | related_report_id  | reports            | id             |
+| image_uploads           | related_session_id | sessions           | id             |
+| mentor_assignments      | mentor_id          | users              | id             |
+| mentor_assignments      | batch_id           | batches            | id             |
+| mentor_assignments      | transferred_to     | users              | id             |
+| mentor_assignments      | entrepreneur_id    | entrepreneurs      | id             |
+| mentor_profiles         | user_id            | users              | id             |
+| reports                 | session_id         | sessions           | id             |
+| reports                 | approved_by        | users              | id             |
+| reports                 | paid_by            | users              | id             |
+| reports                 | entrepreneur_id    | entrepreneurs      | id             |
+| reports                 | mentor_id          | mentors            | id             |
+| sessions                | mentor_id          | mentors            | id             |
+| sessions                | entrepreneur_id    | entrepreneurs      | id             |
+| sessions                | batch_id           | batches            | id             |
+| sessions                | assignment_id      | mentor_assignments | id             |
+| upward_mobility_reports | entrepreneur_id    | entrepreneurs      | id             |
+| upward_mobility_reports | mentor_id          | mentors            | id             |
+
+
+SELECT
+  column_name,
+  data_type,
+  is_nullable,
+  column_default
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'mentors'
+ORDER BY ordinal_position;
+| column_name | data_type                | is_nullable | column_default              |
+| ----------- | ------------------------ | ----------- | --------------------------- |
+| id          | uuid                     | NO          | gen_random_uuid()           |
+| name        | character varying        | NO          | null                        |
+| email       | character varying        | NO          | null                        |
+| phone       | character varying        | YES         | null                        |
+| region      | USER-DEFINED             | YES         | null                        |
+| program     | USER-DEFINED             | YES         | null                        |
+| status      | character varying        | YES         | 'active'::character varying |
+| created_at  | timestamp with time zone | YES         | now()                       |
+| updated_at  | timestamp with time zone | YES         | now()                       |
+
+
+SELECT
+  column_name,
+  data_type,
+  is_nullable,
+  column_default
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'mentor_assignments'
+ORDER BY ordinal_position;
+| column_name     | data_type                | is_nullable | column_default              |
+| --------------- | ------------------------ | ----------- | --------------------------- |
+| id              | uuid                     | NO          | gen_random_uuid()           |
+| mentor_id       | uuid                     | YES         | null                        |
+| entrepreneur_id | uuid                     | YES         | null                        |
+| batch_id        | uuid                     | YES         | null                        |
+| status          | USER-DEFINED             | YES         | 'active'::assignment_status |
+| assigned_at     | timestamp with time zone | YES         | now()                       |
+| completed_at    | timestamp with time zone | YES         | null                        |
+| transferred_to  | uuid                     | YES         | null                        |
+| notes           | text                     | YES         | null                        |
+| created_at      | timestamp with time zone | YES         | now()                       |
+| updated_at      | timestamp with time zone | YES         | now()                       |
+
+
+
+SELECT
+  column_name,
+  data_type,
+  is_nullable,
+  column_default
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'mentor_profiles'
+ORDER BY ordinal_position;
+
+
+| column_name  | data_type                | is_nullable | column_default          |
+| ------------ | ------------------------ | ----------- | ----------------------- |
+| id           | uuid                     | NO          | gen_random_uuid()       |
+| user_id      | uuid                     | YES         | null                    |
+| phone        | character varying        | YES         | null                    |
+| bank_name    | character varying        | YES         | null                    |
+| bank_account | character varying        | YES         | null                    |
+| programs     | ARRAY                    | YES         | ARRAY[]::program_type[] |
+| regions      | ARRAY                    | YES         | ARRAY[]::region_type[]  |
+| max_mentees  | integer                  | YES         | 10                      |
+| is_premier   | boolean                  | YES         | false                   |
+| bio          | text                     | YES         | null                    |
+| created_at   | timestamp with time zone | YES         | now()                   |
+| updated_at   | timestamp with time zone | YES         | now()                   |
