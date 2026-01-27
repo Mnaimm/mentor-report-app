@@ -422,23 +422,7 @@ useEffect(() => {
           <h1 className="text-2xl font-bold text-gray-800 mb-2">Access Denied</h1>
           <p className="text-gray-600 mb-4">
             Borang ini hanya untuk kegunaan admin sahaja.
-         /* Admin Warning Banner */}
-        <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-r-lg">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <span className="text-2xl">⚠️</span>
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-bold text-yellow-800">Admin Tool - Untuk Kes Khas Sahaja</h3>
-              <p className="text-sm text-yellow-700 mt-1">
-                Borang ini untuk kegunaan manual jika mentor tidak dapat submit laporan.
-                Mentor regular sila gunakan borang gabungan laporan.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        { </p>
+          </p>
           <p className="text-sm text-gray-500 mb-6">
             Sila gunakan borang gabungan laporan untuk submit sesi mentoring.
           </p>

@@ -438,7 +438,7 @@ export default function HomePage() {
                 description="Isi laporan berterusan untuk usahawan anda di sini."
               />
               <ToolCard
-                href="/laporan-maju"
+                href="/laporan-maju-um"
                 title="Laporan Sesi iTEKAD Maju"
                 description="Isi laporan kemajuan untuk usahawan anda."
               />

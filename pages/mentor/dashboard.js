@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
+import Layout from '../../components/Layout';
 import MenteeCard from '../../components/MenteeCard';
 
 export default function MentorDashboard() {
@@ -159,10 +160,10 @@ export default function MentorDashboard() {
 
   const handleViewDetails = (mentee) => {
     // For now, show an alert with mentee info (can be replaced with modal or detail page)
-    alert(`Mentee Details:\n\nName: ${mentee.name}\nBusiness: ${mentee.businessName}\nProgram: ${mentee.program}\nBatch: ${mentee.batch}\nEmail: ${mentee.email}\nPhone: ${mentee.phone || 'N/A'}\n\nCurrent Round: ${mentee.currentRound}\nProgress: ${mentee.reportsThisRound}\/${mentee.expectedReportsThisRound}\nStatus: ${mentee.status}`);
+    alert(`Mentee Details:\n\nName: ${mentee.name}\nBusiness: ${mentee.businessName}\nProgram: ${mentee.program}\nBatch: ${mentee.batch}\nEmail: ${mentee.email}\nPhone: ${mentee.phone || 'N/A'}\n\nCurrent Round: ${mentee.currentRound}\nProgress: ${mentee.reportsThisRound}/${mentee.expectedReportsThisRound}\nStatus: ${mentee.status}`);
     
     // Future: Navigate to dedicated detail page
-    // router.push(`\/mentor\/mentee\/${mentee.id}`);
+    // router.push(`/mentor/mentee/${mentee.id}`);
   };
 
   const handleContact = (mentee, method) => {
@@ -220,23 +221,26 @@ export default function MentorDashboard() {
 
   if (error) {
     return (
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-          <p className="text-red-600 font-semibold mb-2">Error Loading Dashboard</p>
-          <p className="text-red-500 text-sm">{error}</p>
-          <button
-            onClick={fetchDashboardData}
-            className="mt-4 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
-          >
-            Retry
-          </button>
+      <Layout title="My Mentees">
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+            <p className="text-red-600 font-semibold mb-2">Error Loading Dashboard</p>
+            <p className="text-red-500 text-sm">{error}</p>
+            <button
+              onClick={fetchDashboardData}
+              className="mt-4 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+            >
+              Retry
+            </button>
+          </div>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <Layout title="My Mentees">
+      <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">My Mentees Dashboard</h1>
@@ -582,6 +586,6 @@ export default function MentorDashboard() {
           </div>
         )}
       </div>
-    </div>
+    </Layout>
   );
 }
