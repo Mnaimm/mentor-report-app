@@ -84,20 +84,6 @@ export default function Navbar() {
                     >
                       Laporan MAJU/UM
                     </Link>
-                    <Link
-                      href="/laporan-maju"
-                      className={`block px-4 py-2 text-sm ${isCurrentPage('/laporan-maju') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:bg-blue-50'}`}
-                      onClick={(e) => isCurrentPage('/laporan-maju') && e.preventDefault()}
-                    >
-                      Laporan MAJU
-                    </Link>
-                    <Link
-                      href="/laporan-sesi"
-                      className={`block px-4 py-2 text-sm ${isCurrentPage('/laporan-sesi') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:bg-blue-50'}`}
-                      onClick={(e) => isCurrentPage('/laporan-sesi') && e.preventDefault()}
-                    >
-                      Laporan Sesi
-                    </Link>
                   </div>
                 </div>
 
@@ -194,32 +180,6 @@ export default function Navbar() {
                       }}
                     >
                       Laporan MAJU/UM
-                    </Link>
-                    <Link
-                      href="/laporan-maju"
-                      className={`block px-3 py-2 rounded-md text-sm transition-colors ${isCurrentPage('/laporan-maju') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
-                      onClick={(e) => {
-                        if (isCurrentPage('/laporan-maju')) {
-                          e.preventDefault();
-                        } else {
-                          setMobileMenuOpen(false);
-                        }
-                      }}
-                    >
-                      Laporan MAJU
-                    </Link>
-                    <Link
-                      href="/laporan-sesi"
-                      className={`block px-3 py-2 rounded-md text-sm transition-colors ${isCurrentPage('/laporan-sesi') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
-                      onClick={(e) => {
-                        if (isCurrentPage('/laporan-sesi')) {
-                          e.preventDefault();
-                        } else {
-                          setMobileMenuOpen(false);
-                        }
-                      }}
-                    >
-                      Laporan Sesi
                     </Link>
                   </div>
                 </div>

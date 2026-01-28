@@ -39,6 +39,20 @@ const nextConfig = {
         ]
       }
     ];
+  },
+  async redirects() {
+    return [
+      {
+        source: '/laporan-sesi',
+        destination: '/laporan-bangkit',
+        permanent: false, // 307 temporary redirect
+      },
+      {
+        source: '/laporan-maju',
+        destination: '/laporan-maju-um',
+        permanent: false, // 307 temporary redirect
+      },
+    ];
   }
 };
 
