@@ -1,10 +1,12 @@
 // components/Navbar.js
 import Link from 'next/link';
 import { useSession, signIn, signOut } from 'next-auth/react';
+import { useState } from 'react';
 
 export default function Navbar() {
   const { data: session, status } = useSession();
   const isAuthenticated = status === 'authenticated';
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
     <header className="bg-white shadow-sm sticky top-0 z-50">
@@ -12,18 +14,32 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo and Brand */}
           <div className="flex-shrink-0">
-            <Link href="/" className="flex items-center gap-3">
-              <img className="h-10 w-auto" src="/logo1.png" alt="Logo" />
-              <span className="font-bold text-xl text-gray-800">Mentor Portal</span>
+            <Link href="/" className="flex items-center gap-2 md:gap-3">
+              <img className="h-8 md:h-10 w-auto" src="/logo1.png" alt="Logo" />
+              <span className="font-bold text-sm md:text-xl text-gray-800 hidden sm:inline">Mentor Portal</span>
             </Link>
           </div>
 
-          {/* Navigation Menu */}
-          <div className="flex items-center gap-4">
+          {/* Mobile Menu Button */}
+          <button
+            className="md:hidden text-gray-700 hover:text-blue-600"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {mobileMenuOpen ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              )}
+            </svg>
+          </button>
+
+          {/* Desktop Navigation Menu */}
+          <div className="hidden md:flex items-center gap-1 lg:gap-4">
             {/* Home Link - Always visible */}
             <Link 
               href="/" 
-              className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+              className="text-gray-700 hover:text-blue-600 px-2 lg:px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
             >
               Home
             </Link>
@@ -33,14 +49,14 @@ export default function Navbar() {
               <>
                 <Link 
                   href="/mentor/dashboard" 
-                  className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                  className="text-gray-700 hover:text-blue-600 px-2 lg:px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
                 >
-                  Mentor Dashboard
+                  Dashboard
                 </Link>
                 
                 {/* Dropdown for Laporan options */}
                 <div className="relative group">
-                  <button className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1">
+                  <button className="text-gray-700 hover:text-blue-600 px-2 lg:px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1 whitespace-nowrap">
                     Laporan
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -63,7 +79,7 @@ export default function Navbar() {
                       href="/laporan-maju" 
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50"
                     >
-                      Laporan MAJU (Legacy)
+                      Laporan MAJU
                     </Link>
                     <Link 
                       href="/laporan-sesi" 
@@ -75,13 +91,13 @@ export default function Navbar() {
                 </div>
 
                 {/* User Info and Logout */}
-                <div className="flex items-center gap-3 border-l border-gray-300 pl-4">
-                  <div className="text-sm text-gray-600">
+                <div className="flex items-center gap-2 border-l border-gray-300 pl-2 lg:pl-4">
+                  <div className="text-sm text-gray-600 hidden lg:block truncate max-w-[150px]">
                     {session.user?.name || session.user?.email}
                   </div>
                   <button
                     onClick={() => signOut({ callbackUrl: '/' })}
-                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                    className="bg-red-600 hover:bg-red-700 text-white px-3 lg:px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
                   >
                     Logout
                   </button>
@@ -93,7 +109,7 @@ export default function Navbar() {
             {!isAuthenticated && status !== 'loading' && (
               <button
                 onClick={() => signIn('google')}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-3 lg:px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
               >
                 Login
               </button>
@@ -105,6 +121,92 @@ export default function Navbar() {
             )}
           </div>
         </div>
+
+        {/* Mobile Navigation Menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden pb-4 space-y-2">
+            <Link 
+              href="/" 
+              className="block text-gray-700 hover:text-blue-600 hover:bg-gray-50 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Home
+            </Link>
+
+            {isAuthenticated && (
+              <>
+                <Link 
+                  href="/mentor/dashboard" 
+                  className="block text-gray-700 hover:text-blue-600 hover:bg-gray-50 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Dashboard
+                </Link>
+                
+                <div className="px-3 py-2">
+                  <p className="text-sm font-medium text-gray-700 mb-2">Laporan</p>
+                  <div className="space-y-1 pl-4">
+                    <Link 
+                      href="/laporan-bangkit" 
+                      className="block text-gray-700 hover:text-blue-600 hover:bg-gray-50 px-3 py-2 rounded-md text-sm transition-colors"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Laporan BangKIT
+                    </Link>
+                    <Link 
+                      href="/laporan-maju-um" 
+                      className="block text-gray-700 hover:text-blue-600 hover:bg-gray-50 px-3 py-2 rounded-md text-sm transition-colors"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Laporan MAJU/UM
+                    </Link>
+                    <Link 
+                      href="/laporan-maju" 
+                      className="block text-gray-700 hover:text-blue-600 hover:bg-gray-50 px-3 py-2 rounded-md text-sm transition-colors"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Laporan MAJU
+                    </Link>
+                    <Link 
+                      href="/laporan-sesi" 
+                      className="block text-gray-700 hover:text-blue-600 hover:bg-gray-50 px-3 py-2 rounded-md text-sm transition-colors"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Laporan Sesi
+                    </Link>
+                  </div>
+                </div>
+
+                <div className="border-t border-gray-200 pt-2 mt-2">
+                  <div className="text-sm text-gray-600 px-3 py-2">
+                    {session.user?.name || session.user?.email}
+                  </div>
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      signOut({ callbackUrl: '/' });
+                    }}
+                    className="w-full text-left bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-md text-sm font-medium transition-colors mx-0"
+                  >
+                    Logout
+                  </button>
+                </div>
+              </>
+            )}
+
+            {!isAuthenticated && status !== 'loading' && (
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  signIn('google');
+                }}
+                className="w-full text-left bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md text-sm font-medium transition-colors mx-0"
+              >
+                Login
+              </button>
+            )}
+          </div>
+        )}
       </nav>
     </header>
   );

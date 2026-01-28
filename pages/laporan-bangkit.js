@@ -7,7 +7,6 @@ import {
   INITIAL_UPWARD_MOBILITY_STATE,
   calculateCheckboxValue,
   calculateTagClickValue,
-  calculateTagClickValue,
   validateUpwardMobility,
   UPWARD_MOBILITY_SECTIONS
 } from '../lib/upwardMobilityUtils';
