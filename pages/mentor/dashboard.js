@@ -132,7 +132,7 @@ export default function MentorDashboard() {
           const bProgress = b.expectedReportsThisRound > 0
             ? (b.reportsThisRound / b.expectedReportsThisRound)
             : 0;
-          return aProgress - bProgress; // Ascending: 0/1 first, 1/1 last
+          return aProgress - bProgress; // Ascending: zero progress first, full progress last
 
         case 'batch':
           // Sort by batch name
@@ -159,7 +159,8 @@ export default function MentorDashboard() {
 
   const handleViewDetails = (mentee) => {
     // For now, show an alert with mentee info (can be replaced with modal or detail page)
-    alert(`Mentee Details:\n\nName: ${mentee.name}\nBusiness: ${mentee.businessName}\nProgram: ${mentee.program}\nBatch: ${mentee.batch}\nEmail: ${mentee.email}\nPhone: ${mentee.phone || 'N/A'}\n\nCurrent Round: ${mentee.currentRound}\nProgress: ${mentee.reportsThisRound}/${mentee.expectedReportsThisRound}\nStatus: ${mentee.status}`);
+    const progress = `${mentee.reportsThisRound} of ${mentee.expectedReportsThisRound}`;
+    alert(`Mentee Details:\n\nName: ${mentee.name}\nBusiness: ${mentee.businessName}\nProgram: ${mentee.program}\nBatch: ${mentee.batch}\nEmail: ${mentee.email}\nPhone: ${mentee.phone || 'N/A'}\n\nCurrent Round: ${mentee.currentRound}\nProgress: ${progress}\nStatus: ${mentee.status}`);
     
     // Future: Navigate to dedicated detail page
     // router.push(`/mentor/mentee/${mentee.id}`);
@@ -241,49 +242,49 @@ export default function MentorDashboard() {
         <p className="text-gray-600 mb-3">
           Welcome back, {session?.user?.name || 'Mentor'}! Track your mentees' progress and upcoming sessions.
         </p>
-          
-          {/* Enhanced Summary Panel */}
-          {dashboardData && (
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6 mt-4 shadow-sm">
-              <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                📊 My Mentees Dashboard
-                {dashboardData.mentor?.currentPeriod && (
-                  <span className="ml-auto text-sm font-normal bg-blue-100 text-blue-800 px-3 py-1 rounded-full">
-                    {dashboardData.mentor.currentPeriod}
-                  </span>
-                )}
-              </h2>
+        
+        {/* Enhanced Summary Panel */}
+        {dashboardData && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6 mt-4 shadow-sm">
+            <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+              📊 My Mentees Dashboard
+              {dashboardData.mentor?.currentPeriod && (
+                <span className="ml-auto text-sm font-normal bg-blue-100 text-blue-800 px-3 py-1 rounded-full">
+                  {dashboardData.mentor.currentPeriod}
+                </span>
+              )}
+            </h2>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                <div className="bg-white rounded-lg p-3 shadow-sm">
-                  <div className="text-2xl font-bold text-blue-600">{dashboardData.stats?.totalMentees || 0}</div>
-                  <div className="text-xs text-gray-600">Total Mentees</div>
-                </div>
-                <div className="bg-white rounded-lg p-3 shadow-sm">
-                  <div className="text-2xl font-bold text-green-600">{dashboardData.stats?.onTrack || 0}</div>
-                  <div className="text-xs text-gray-600">✓ On Track</div>
-                </div>
-                <div className="bg-white rounded-lg p-3 shadow-sm">
-                  <div className="text-2xl font-bold text-orange-600">{dashboardData.stats?.needsAction || 0}</div>
-                  <div className="text-xs text-gray-600">⚠️ Need Action</div>
-                </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <div className="bg-white rounded-lg p-3 shadow-sm">
+                <div className="text-2xl font-bold text-blue-600">{dashboardData.stats?.totalMentees || 0}</div>
+                <div className="text-xs text-gray-600">Total Mentees</div>
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">🔴</span>
-                  <span><span className="font-semibold text-red-600">{dashboardData.stats?.overdue || 0}</span> Overdue</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">🟡</span>
-                  <span><span className="font-semibold text-yellow-600">{dashboardData.stats?.dueSoon || 0}</span> Due Soon</span>
-                </div>
+              <div className="bg-white rounded-lg p-3 shadow-sm">
+                <div className="text-2xl font-bold text-green-600">{dashboardData.stats?.onTrack || 0}</div>
+                <div className="text-xs text-gray-600">✓ On Track</div>
+              </div>
+              <div className="bg-white rounded-lg p-3 shadow-sm">
+                <div className="text-2xl font-bold text-orange-600">{dashboardData.stats?.needsAction || 0}</div>
+                <div className="text-xs text-gray-600">⚠️ Need Action</div>
               </div>
             </div>
-          )}
-        </div>
 
-        {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🔴</span>
+                <span><span className="font-semibold text-red-600">{dashboardData.stats?.overdue || 0}</span> Overdue</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🟡</span>
+                <span><span className="font-semibold text-yellow-600">{dashboardData.stats?.dueSoon || 0}</span> Due Soon</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-blue-500">
             <div className="flex items-center justify-between">
@@ -579,7 +580,6 @@ export default function MentorDashboard() {
             ))}
           </div>
         )}
-      </div>
     </div>
   );
 }

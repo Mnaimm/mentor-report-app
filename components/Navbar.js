@@ -1,12 +1,17 @@
 // components/Navbar.js
 import Link from 'next/link';
 import { useSession, signIn, signOut } from 'next-auth/react';
+import { useRouter } from 'next/router';
 import { useState } from 'react';
 
 export default function Navbar() {
   const { data: session, status } = useSession();
+  const router = useRouter();
   const isAuthenticated = status === 'authenticated';
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Helper to check if a path is the current page
+  const isCurrentPage = (path) => router.pathname === path;
 
   return (
     <header className="bg-white shadow-sm sticky top-0 z-50">
@@ -37,9 +42,10 @@ export default function Navbar() {
           {/* Desktop Navigation Menu */}
           <div className="hidden md:flex items-center gap-1 lg:gap-4">
             {/* Home Link - Always visible */}
-            <Link 
-              href="/" 
-              className="text-gray-700 hover:text-blue-600 px-2 lg:px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
+            <Link
+              href="/"
+              className={`px-2 lg:px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${isCurrentPage('/') ? 'text-blue-600 bg-blue-50 cursor-default' : 'text-gray-700 hover:text-blue-600'}`}
+              onClick={(e) => isCurrentPage('/') && e.preventDefault()}
             >
               Home
             </Link>
@@ -47,9 +53,10 @@ export default function Navbar() {
             {/* Authenticated User Menu */}
             {isAuthenticated && (
               <>
-                <Link 
-                  href="/mentor/dashboard" 
-                  className="text-gray-700 hover:text-blue-600 px-2 lg:px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
+                <Link
+                  href="/mentor/dashboard"
+                  className={`px-2 lg:px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${isCurrentPage('/mentor/dashboard') ? 'text-blue-600 bg-blue-50 cursor-default' : 'text-gray-700 hover:text-blue-600'}`}
+                  onClick={(e) => isCurrentPage('/mentor/dashboard') && e.preventDefault()}
                 >
                   Dashboard
                 </Link>
@@ -63,27 +70,31 @@ export default function Navbar() {
                     </svg>
                   </button>
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 hidden group-hover:block">
-                    <Link 
-                      href="/laporan-bangkit" 
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50"
+                    <Link
+                      href="/laporan-bangkit"
+                      className={`block px-4 py-2 text-sm ${isCurrentPage('/laporan-bangkit') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:bg-blue-50'}`}
+                      onClick={(e) => isCurrentPage('/laporan-bangkit') && e.preventDefault()}
                     >
                       Laporan BangKIT
                     </Link>
-                    <Link 
-                      href="/laporan-maju-um" 
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50"
+                    <Link
+                      href="/laporan-maju-um"
+                      className={`block px-4 py-2 text-sm ${isCurrentPage('/laporan-maju-um') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:bg-blue-50'}`}
+                      onClick={(e) => isCurrentPage('/laporan-maju-um') && e.preventDefault()}
                     >
                       Laporan MAJU/UM
                     </Link>
-                    <Link 
-                      href="/laporan-maju" 
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50"
+                    <Link
+                      href="/laporan-maju"
+                      className={`block px-4 py-2 text-sm ${isCurrentPage('/laporan-maju') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:bg-blue-50'}`}
+                      onClick={(e) => isCurrentPage('/laporan-maju') && e.preventDefault()}
                     >
                       Laporan MAJU
                     </Link>
-                    <Link 
-                      href="/laporan-sesi" 
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50"
+                    <Link
+                      href="/laporan-sesi"
+                      className={`block px-4 py-2 text-sm ${isCurrentPage('/laporan-sesi') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:bg-blue-50'}`}
+                      onClick={(e) => isCurrentPage('/laporan-sesi') && e.preventDefault()}
                     >
                       Laporan Sesi
                     </Link>
@@ -125,20 +136,32 @@ export default function Navbar() {
         {/* Mobile Navigation Menu */}
         {mobileMenuOpen && (
           <div className="md:hidden pb-4 space-y-2">
-            <Link 
-              href="/" 
-              className="block text-gray-700 hover:text-blue-600 hover:bg-gray-50 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-              onClick={() => setMobileMenuOpen(false)}
+            <Link
+              href="/"
+              className={`block px-3 py-2 rounded-md text-sm font-medium transition-colors ${isCurrentPage('/') ? 'text-blue-600 bg-blue-50 cursor-default' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
+              onClick={(e) => {
+                if (isCurrentPage('/')) {
+                  e.preventDefault();
+                } else {
+                  setMobileMenuOpen(false);
+                }
+              }}
             >
               Home
             </Link>
 
             {isAuthenticated && (
               <>
-                <Link 
-                  href="/mentor/dashboard" 
-                  className="block text-gray-700 hover:text-blue-600 hover:bg-gray-50 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                  onClick={() => setMobileMenuOpen(false)}
+                <Link
+                  href="/mentor/dashboard"
+                  className={`block px-3 py-2 rounded-md text-sm font-medium transition-colors ${isCurrentPage('/mentor/dashboard') ? 'text-blue-600 bg-blue-50 cursor-default' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
+                  onClick={(e) => {
+                    if (isCurrentPage('/mentor/dashboard')) {
+                      e.preventDefault();
+                    } else {
+                      setMobileMenuOpen(false);
+                    }
+                  }}
                 >
                   Dashboard
                 </Link>
@@ -146,31 +169,55 @@ export default function Navbar() {
                 <div className="px-3 py-2">
                   <p className="text-sm font-medium text-gray-700 mb-2">Laporan</p>
                   <div className="space-y-1 pl-4">
-                    <Link 
-                      href="/laporan-bangkit" 
-                      className="block text-gray-700 hover:text-blue-600 hover:bg-gray-50 px-3 py-2 rounded-md text-sm transition-colors"
-                      onClick={() => setMobileMenuOpen(false)}
+                    <Link
+                      href="/laporan-bangkit"
+                      className={`block px-3 py-2 rounded-md text-sm transition-colors ${isCurrentPage('/laporan-bangkit') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
+                      onClick={(e) => {
+                        if (isCurrentPage('/laporan-bangkit')) {
+                          e.preventDefault();
+                        } else {
+                          setMobileMenuOpen(false);
+                        }
+                      }}
                     >
                       Laporan BangKIT
                     </Link>
-                    <Link 
-                      href="/laporan-maju-um" 
-                      className="block text-gray-700 hover:text-blue-600 hover:bg-gray-50 px-3 py-2 rounded-md text-sm transition-colors"
-                      onClick={() => setMobileMenuOpen(false)}
+                    <Link
+                      href="/laporan-maju-um"
+                      className={`block px-3 py-2 rounded-md text-sm transition-colors ${isCurrentPage('/laporan-maju-um') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
+                      onClick={(e) => {
+                        if (isCurrentPage('/laporan-maju-um')) {
+                          e.preventDefault();
+                        } else {
+                          setMobileMenuOpen(false);
+                        }
+                      }}
                     >
                       Laporan MAJU/UM
                     </Link>
-                    <Link 
-                      href="/laporan-maju" 
-                      className="block text-gray-700 hover:text-blue-600 hover:bg-gray-50 px-3 py-2 rounded-md text-sm transition-colors"
-                      onClick={() => setMobileMenuOpen(false)}
+                    <Link
+                      href="/laporan-maju"
+                      className={`block px-3 py-2 rounded-md text-sm transition-colors ${isCurrentPage('/laporan-maju') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
+                      onClick={(e) => {
+                        if (isCurrentPage('/laporan-maju')) {
+                          e.preventDefault();
+                        } else {
+                          setMobileMenuOpen(false);
+                        }
+                      }}
                     >
                       Laporan MAJU
                     </Link>
-                    <Link 
-                      href="/laporan-sesi" 
-                      className="block text-gray-700 hover:text-blue-600 hover:bg-gray-50 px-3 py-2 rounded-md text-sm transition-colors"
-                      onClick={() => setMobileMenuOpen(false)}
+                    <Link
+                      href="/laporan-sesi"
+                      className={`block px-3 py-2 rounded-md text-sm transition-colors ${isCurrentPage('/laporan-sesi') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
+                      onClick={(e) => {
+                        if (isCurrentPage('/laporan-sesi')) {
+                          e.preventDefault();
+                        } else {
+                          setMobileMenuOpen(false);
+                        }
+                      }}
                     >
                       Laporan Sesi
                     </Link>
