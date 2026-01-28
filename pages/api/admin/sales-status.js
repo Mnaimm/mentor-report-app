@@ -18,14 +18,14 @@ export default async function handler(req, res) {
     // Read Maju reports sheet
     let majuSheet = [];
     try {
-      majuSheet = await client.getRows('LaporanMaju');
+      majuSheet = await client.getRows('LaporanMajuUM');
     } catch (e) {
-      console.warn('⚠️ LaporanMaju sheet not found, skipping Maju reports');
+      console.warn('⚠️ LaporanMajuUM sheet not found, skipping Maju reports');
     }
 
     console.log(`📊 Loaded ${mappingSheet.length} rows from mapping sheet`);
     console.log(`📊 Loaded ${sessionSheet.length} rows from V8 (Bangkit) sheet`);
-    console.log(`📊 Loaded ${majuSheet.length} rows from LaporanMaju sheet`); 
+    console.log(`📊 Loaded ${majuSheet.length} rows from LaporanMajuUM sheet`); 
     
     // Try to get batch sheet, if it doesn't exist, extract batches from mapping
     let batchSheet;
@@ -66,7 +66,7 @@ export default async function handler(req, res) {
       sessionsByMentee.get(menteeName).push(sessionData);
     }
 
-    // Process Maju sessions (LaporanMaju sheet)
+    // Process Maju sessions (LaporanMajuUM sheet)
     for (const session of majuSheet) {
       const menteeName = (session['NAMA_MENTEE'] || '').toString().trim();
       if (!menteeName) continue;

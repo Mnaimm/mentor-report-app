@@ -88,15 +88,15 @@ export default async function handler(req, res) {
 
     const client = await getSheetsClient();
     const mappingSheet = await client.getRows('mapping');
-    const bangkitSheet = await client.getRows('V8');
+    const bangkitSheet = await client.getRows('Bangkit');
     const batchSheet = await client.getRows('batch');
 
     // Read Maju reports sheet
     let majuSheet = [];
     try {
-      majuSheet = await client.getRows('LaporanMaju');
+      majuSheet = await client.getRows('LaporanMajuUM');
     } catch (e) {
-      console.warn(`⚠️ [${debugInfo.requestId}] LaporanMaju sheet not found, skipping Maju reports`);
+      console.warn(`⚠️ [${debugInfo.requestId}] LaporanMajuUM sheet not found, skipping Maju reports`);
     }
 
     // Read Upward Mobility forms

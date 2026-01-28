@@ -155,7 +155,7 @@ async function getGoogleSheetsTabs() {
     // Count rows in key tabs
     console.log('\n   📊 Counting rows in key tabs:');
 
-    const tabsToCount = ['v8', 'LaporanMaju', 'mapping', 'batch 5', 'batch 6'];
+    const tabsToCount = ['Bangkit', 'LaporanMajuUM', 'mapping', 'batch 5', 'batch 6'];
     const counts = {};
 
     for (const tabName of tabsToCount) {

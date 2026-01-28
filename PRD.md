@@ -208,7 +208,7 @@ The Mentor Reporting Tool is a comprehensive web-based application designed for 
 
 #### Primary Data Sheets
 1. **V8 Sheet:** Main repository for iTEKAD Bangkit reports
-2. **LaporanMaju Sheet:** Dedicated storage for Maju program data
+2. **LaporanMajuUM Sheet:** Dedicated storage for Maju program data
 3. **Mapping Sheet:** Mentor-mentee relationship management
 4. **Batch Sheet:** Program round/period configuration
 5. **Bank Sheet:** Framework data for structured responses

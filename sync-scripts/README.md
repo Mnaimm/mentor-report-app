@@ -10,7 +10,7 @@ Production-ready scripts to migrate ~800+ records from Google Sheets to Supabase
 | `02-sync-mapping.js` | mapping.json (204 rows) | mentors + entrepreneurs + assignments | ~408 |
 | `03-sync-batch-7.js` | all-m.json (69 rows) | entrepreneurs + assignments | ~138 |
 | `04-sync-bangkit-reports.js` | bangkit.json (105 rows) | sessions + reports + UM reports | ~315 |
-| `05-sync-maju-reports.js` | laporanmaju.json (28 rows) | sessions + reports + UM reports | ~84 |
+| `05-sync-maju-reports.js` | LaporanMajuUM.json (28 rows) | sessions + reports + UM reports | ~84 |
 | `06-sync-um-standalone.js` | um.json (23 rows) | upward_mobility_reports | ~23 |
 | `07-master-sync.js` | - | Runs all above scripts | **~1000+** |
 

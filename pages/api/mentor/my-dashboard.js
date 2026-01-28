@@ -186,14 +186,14 @@ export default async function handler(req, res) {
     // 2. CRITICAL: Read sessions from Google Sheets (source of truth), NOT Supabase
     console.log('📋 Reading session data from Google Sheets...');
     const client = await getSheetsClient();
-    const bangkitSheet = await client.getRows('V8');
+    const bangkitSheet = await client.getRows('Bangkit');
 
     // Read Maju reports sheet
     let majuSheet = [];
     try {
-      majuSheet = await client.getRows('LaporanMaju');
+      majuSheet = await client.getRows('LaporanMajuUM');
     } catch (e) {
-      console.warn('⚠️ LaporanMaju sheet not found, skipping Maju reports');
+      console.warn('⚠️ LaporanMajuUM sheet not found, skipping Maju reports');
     }
 
     console.log(`📊 Loaded ${bangkitSheet.length} Bangkit reports and ${majuSheet.length} Maju reports`);

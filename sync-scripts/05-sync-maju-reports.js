@@ -1,5 +1,5 @@
 // 05-sync-maju-reports.js
-// Syncs laporanmaju.json (28 rows) to sessions + reports + upward_mobility_reports tables
+// Syncs LaporanMajuUM.json (28 rows) to sessions + reports + upward_mobility_reports tables
 
 import { createClient } from '@supabase/supabase-js';
 import * as fs from 'fs';
@@ -115,17 +115,17 @@ function buildUMReport(row, mentorId, entrepreneurId) {
 async function syncMajuReports() {
   console.log('\n=== 05-sync-maju-reports.js ===');
   console.log(`DRY_RUN: ${DRY_RUN}`);
-  console.log('Input: sync-data/laporanmaju.json (28 rows)');
+  console.log('Input: sync-data/LaporanMajuUM.json (28 rows)');
   console.log('Output: sessions + reports + upward_mobility_reports tables\n');
 
-  const dataPath = path.join(process.cwd(), 'sync-data', 'laporanmaju.json');
+  const dataPath = path.join(process.cwd(), 'sync-data', 'LaporanMajuUM.json');
   if (!fs.existsSync(dataPath)) {
     console.error(`❌ File not found: ${dataPath}`);
     process.exit(1);
   }
 
   const data = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
-  console.log(`📊 Loaded ${data.length} rows from laporanmaju.json\n`);
+  console.log(`📊 Loaded ${data.length} rows from LaporanMajuUM.json\n`);
 
   for (let i = 0; i < data.length; i++) {
     const row = data[i];

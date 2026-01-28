@@ -13,7 +13,7 @@ const { resolveAllEntities } = require('./lib/entity-resolver');
 
 // Configuration
 const SPREADSHEET_ID = process.env.GOOGLE_SHEETS_REPORT_ID;
-const SHEET_NAME = 'V8';
+const SHEET_NAME = 'Bangkit';
 const TEST_MODE = process.argv.includes('--test');
 const TEST_LIMIT = 10;
 

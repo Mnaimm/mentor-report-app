@@ -69,7 +69,7 @@ async function checkCounts(supabase, getRows) {
 
   // Bangkit counts
   try {
-    const bangkitSheetRows = await getRows(SPREADSHEET_ID, 'V8', 'A:A');
+    const bangkitSheetRows = await getRows(SPREADSHEET_ID, 'Bangkit', 'A:A');
     const bangkitSheetCount = bangkitSheetRows.length;
 
     const { count: bangkitDbCount, error: bangkitError } = await supabase
@@ -104,7 +104,7 @@ async function checkCounts(supabase, getRows) {
 
   // Maju counts
   try {
-    const majuSheetRows = await getRows(SPREADSHEET_ID, 'LaporanMaju', 'A:A');
+    const majuSheetRows = await getRows(SPREADSHEET_ID, 'LaporanMajuUM', 'A:A');
     const majuSheetCount = majuSheetRows.length;
 
     const { count: majuDbCount, error: majuError } = await supabase
@@ -182,7 +182,7 @@ async function checkRecentSubmissions(supabase, getRows) {
 
   // Bangkit recent submissions
   try {
-    const bangkitSheetRows = await getRows(SPREADSHEET_ID, 'V8', 'A:H');
+    const bangkitSheetRows = await getRows(SPREADSHEET_ID, 'Bangkit', 'A:H');
     // Get last 10 rows (most recent)
     const recentBangkit = bangkitSheetRows.slice(-10);
 
@@ -228,7 +228,7 @@ async function checkRecentSubmissions(supabase, getRows) {
 
   // Maju recent submissions
   try {
-    const majuSheetRows = await getRows(SPREADSHEET_ID, 'LaporanMaju', 'A:D');
+    const majuSheetRows = await getRows(SPREADSHEET_ID, 'LaporanMajuUM', 'A:D');
     const recentMaju = majuSheetRows.slice(-10);
 
     let missingInDb = 0;
@@ -337,7 +337,7 @@ async function checkDataConsistency(supabase, getRows) {
 
     if (bangkitError) throw bangkitError;
 
-    const bangkitSheetRows = await getRows(SPREADSHEET_ID, 'V8', 'A:L');
+    const bangkitSheetRows = await getRows(SPREADSHEET_ID, 'Bangkit', 'A:L');
     let mismatches = 0;
     const mismatchDetails = [];
 
@@ -409,7 +409,7 @@ async function checkDataConsistency(supabase, getRows) {
 
     if (majuError) throw majuError;
 
-    const majuSheetRows = await getRows(SPREADSHEET_ID, 'LaporanMaju', 'A:AB');
+    const majuSheetRows = await getRows(SPREADSHEET_ID, 'LaporanMajuUM', 'A:AB');
     let mismatches = 0;
     const mismatchDetails = [];
 

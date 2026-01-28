@@ -1,0 +1,6 @@
+# Project Standards
+- **Ground Truth:** Source code is the truth; ignore outdated PRDs.
+- **DRY Principle:** Compare `laporan-bangkit.js` and `laporan-maju-um.js`. Extract shared 'Upward Mobility' logic to `UpwardMobilityUtils.js`.
+- **Data Sync:** Every write must be a non-blocking dual-write (Sheets + Supabase). Use `upsert` for Supabase.
+- **Auth:** Authorization must be derived from 'Mentor Mapping' (NextAuth + Role check).
+- **Verification:** Any change MUST be tested by the Browser Agent (UI clicks + Auth checks).

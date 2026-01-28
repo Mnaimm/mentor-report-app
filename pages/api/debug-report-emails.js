@@ -1,7 +1,7 @@
 import { google } from "googleapis";
 
 const REPORT_SHEET_ID = process.env.GOOGLE_SHEETS_REPORT_ID;
-const REPORT_TAB      = process.env.REPORT_TAB || "V8";
+const REPORT_TAB      = process.env.REPORT_TAB || "Bangkit";
 
 async function getSheets() {
   const base64 = process.env.GOOGLE_CREDENTIALS_BASE64;

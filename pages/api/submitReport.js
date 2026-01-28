@@ -11,7 +11,7 @@ function getRowNumberFromUpdatedRange(updatedRange) {
 
 /**
  * Maps data from laporan-sesi.js (Bangkit program) to its Google Sheet row.
- * Ensure this matches your 'V8' sheet column headers.
+ * Ensure this matches your 'Bangkit' sheet column headers.
  */
 const mapBangkitDataToSheetRow = (data) => {
   const row = Array(100).fill(''); // Adjust size if needed

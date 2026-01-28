@@ -119,7 +119,7 @@ export default async function handler(req, res) {
     try {
       const { getRows } = await getSheetsClient();
       mappingData = await getRows('mapping');
-      bangkitData = await getRows('V8');
+      bangkitData = await getRows('Bangkit');
       majuData = await getRows('LaporanMaju');
       batchData = await getRows('batch');
       

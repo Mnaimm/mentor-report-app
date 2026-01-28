@@ -78,7 +78,7 @@ async function syncBangkitDocURLs(supabase, getRows) {
 
     // Fetch V8 sheet data (Column BB is index 53)
     console.log('\n📥 Fetching V8 sheet data...');
-    const rows = await getRows(SPREADSHEET_ID, 'V8', 'A:BB');
+    const rows = await getRows(SPREADSHEET_ID, 'Bangkit', 'A:BB');
 
     // Process each missing report
     console.log('\n🔍 Checking for doc URLs in sheet...');
@@ -139,7 +139,7 @@ async function syncBangkitDocURLs(supabase, getRows) {
  * Sync Maju doc URLs from Column AA (Laporan_Maju_Doc_ID)
  */
 async function syncMajuDocURLs(supabase, getRows) {
-  printSection('📊 MAJU (LaporanMaju → Column AA)');
+  printSection('📊 MAJU (LaporanMajuUM → Column AA)');
 
   try {
     // Get all Maju reports missing doc_url
@@ -171,9 +171,9 @@ async function syncMajuDocURLs(supabase, getRows) {
       return;
     }
 
-    // Fetch LaporanMaju sheet data (Column AA is index 26)
-    console.log('\n📥 Fetching LaporanMaju sheet data...');
-    const rows = await getRows(MAJU_SPREADSHEET_ID, 'LaporanMaju', 'A:AA');
+    // Fetch LaporanMajuUM sheet data (Column AA is index 26)
+    console.log('\n📥 Fetching LaporanMajuUM sheet data...');
+    const rows = await getRows(MAJU_SPREADSHEET_ID, 'LaporanMajuUM', 'A:AA');
 
     // Process each missing report
     console.log('\n🔍 Checking for doc URLs in sheet...');

@@ -113,12 +113,12 @@ async function syncMajuReports() {
     console.log('🗄️  Connecting to Supabase...');
     const supabase = createSupabaseClient();
 
-    // Fetch data from LaporanMaju sheet
+    // Fetch data from LaporanMajuUM sheet
     console.log(`📥 Fetching data from "${SHEET_NAME}" tab...`);
     let rows = await getRows(SPREADSHEET_ID, SHEET_NAME, 'A:AD');
 
     if (rows.length === 0) {
-      console.log('⚠️  No data found in LaporanMaju sheet');
+      console.log('⚠️  No data found in LaporanMajuUM sheet');
       return;
     }
 
@@ -154,7 +154,7 @@ async function syncMajuReports() {
       console.log(`   📝 Session ${sessionNumber || '?'}`);
 
       // Convert row object to array for entity resolution
-      // LaporanMaju columns: 0-29 (30 columns)
+      // LaporanMajuUM columns: 0-29 (30 columns)
       const rowArray = [
         row.Timestamp,              // 0
         row['NAMA_MENTOR'],         // 1

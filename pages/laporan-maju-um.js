@@ -8,6 +8,14 @@ import TextArea from '../components/TextArea';
 import FileInput from '../components/FileInput';
 import InfoCard from '../components/InfoCard';
 import { format } from 'date-fns';
+import {
+  GRADE_CRITERIA_MAP,
+  UPWARD_MOBILITY_SECTIONS,
+  INITIAL_UPWARD_MOBILITY_STATE,
+  calculateCheckboxValue,
+  calculateTagClickValue,
+  validateUpwardMobility
+} from '../lib/upwardMobilityUtils';
 
 // Helper function to safely parse JSON
 const safeJSONParse = (str) => {
@@ -21,29 +29,6 @@ const safeJSONParse = (str) => {
     console.error("Error parsing JSON:", e, "Input string:", str);
     return [];
   }
-};
-
-// Grade to Criteria mapping for Quick Tags
-const GRADE_CRITERIA_MAP = {
-  G1: [
-    'BIMB SME Facility',
-    'Other Bank SME Facility',
-    'Ready Documentation'
-  ],
-  G2: [
-    'BangKIT to Maju',
-    'Maju to SME Financing',
-    'Improve Credit Score'
-  ],
-  G3: [
-    'Income/Sale',
-    'Job Creation',
-    'Asset',
-    'Saving',
-    'Zakat',
-    'Digitalization',
-    'Online Sales'
-  ]
 };
 
 // Enhanced TextArea component with helper text (guidance always visible, never submitted)
@@ -62,9 +47,8 @@ const EnhancedTextArea = ({ label, name, value, onChange, helperText, rows = 5, 
         name={name}
         value={value || ''}
         onChange={onChange}
-        className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-vertical text-gray-900 ${
-          disabled ? 'bg-gray-100 cursor-not-allowed' : ''
-        }`}
+        className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-vertical text-gray-900 ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''
+          }`}
         rows={rows}
         required={required}
         disabled={disabled}
@@ -109,37 +93,7 @@ const LaporanMajuPage = () => {
     // MIA fields
     MIA_PROOF_URL: '',
     // UPWARD MOBILITY FIELDS (Sections 3-6)
-    UPWARD_MOBILITY: {
-      // Section 3: Status & Mobiliti
-      UM_STATUS: '',
-      UM_KRITERIA_IMPROVEMENT: '',
-      UM_TARIKH_LAWATAN_PREMIS: '',
-      // Section 4: Bank Islam & Fintech (6 fields)
-      UM_AKAUN_BIMB: '',
-      UM_BIMB_BIZ: '',
-      UM_AL_AWFAR: '',
-      UM_MERCHANT_TERMINAL: '',
-      UM_FASILITI_LAIN: '',
-      UM_MESINKIRA: '',
-      // Section 5: Situasi Kewangan (Semasa + Ulasan pairs)
-      UM_PENDAPATAN_SEMASA: '',
-      UM_ULASAN_PENDAPATAN: '',
-      UM_PEKERJA_SEMASA: '',
-      UM_ULASAN_PEKERJA: '',
-      UM_ASET_BUKAN_TUNAI_SEMASA: '',
-      UM_ULASAN_ASET_BUKAN_TUNAI: '',
-      UM_ASET_TUNAI_SEMASA: '',
-      UM_ULASAN_ASET_TUNAI: '',
-      UM_SIMPANAN_SEMASA: '',
-      UM_ULASAN_SIMPANAN: '',
-      UM_ZAKAT_SEMASA: '',
-      UM_ULASAN_ZAKAT: '',
-      // Section 6: Digital & Marketing (Semasa + Ulasan pairs)
-      UM_DIGITAL_SEMASA: [],
-      UM_ULASAN_DIGITAL: '',
-      UM_MARKETING_SEMASA: [],
-      UM_ULASAN_MARKETING: '',
-    },
+    UPWARD_MOBILITY: { ...INITIAL_UPWARD_MOBILITY_STATE },
   };
 
   const [formData, setFormData] = useState(initialFormState);
@@ -182,13 +136,13 @@ const LaporanMajuPage = () => {
 
         if (isAdmin) {
           const uniqueMentors = Array.from(new Set(data.map(m => m.Mentor_Email)))
-                                .map(email => {
-                                  const mentorData = data.find(m => m.Mentor_Email === email);
-                                  return { label: mentorData ? mentorData.Mentor : email, value: email };
-                                });
+            .map(email => {
+              const mentorData = data.find(m => m.Mentor_Email === email);
+              return { label: mentorData ? mentorData.Mentor : email, value: email };
+            });
           setMentorsInMapping([{ label: 'Pilih Mentor', value: '' }, ...uniqueMentors]);
           if (!selectedMentorEmail && session?.user?.email && uniqueMentors.some(m => m.value === session.user.email)) {
-              setSelectedMentorEmail(session.user.email);
+            setSelectedMentorEmail(session.user.email);
           }
         }
       } catch (error) {
@@ -208,23 +162,23 @@ const LaporanMajuPage = () => {
     let mentorEmail = session?.user?.email || '';
 
     if (isAdmin && selectedMentorEmail) {
-        const selectedMentorData = allMenteesMapping.find(m => m.Mentor_Email === selectedMentorEmail);
-        if (selectedMentorData) {
-            mentorName = selectedMentorData.Mentor;
-            mentorEmail = selectedMentorData.Mentor_Email;
-        }
+      const selectedMentorData = allMenteesMapping.find(m => m.Mentor_Email === selectedMentorEmail);
+      if (selectedMentorData) {
+        mentorName = selectedMentorData.Mentor;
+        mentorEmail = selectedMentorData.Mentor_Email;
+      }
     } else if (!isAdmin && session?.user?.email) {
-        const loggedInMentorData = allMenteesMapping.find(m => m.Mentor_Email === session.user.email);
-        if (loggedInMentorData) {
-            mentorName = loggedInMentorData.Mentor;
-            mentorEmail = loggedInMentorData.Mentor_Email;
-        }
+      const loggedInMentorData = allMenteesMapping.find(m => m.Mentor_Email === session.user.email);
+      if (loggedInMentorData) {
+        mentorName = loggedInMentorData.Mentor;
+        mentorEmail = loggedInMentorData.Mentor_Email;
+      }
     }
 
     setFormData(prev => ({
-        ...prev,
-        NAMA_MENTOR: mentorName,
-        EMAIL_MENTOR: mentorEmail,
+      ...prev,
+      NAMA_MENTOR: mentorName,
+      EMAIL_MENTOR: mentorEmail,
     }));
   }, [selectedMentorEmail, allMenteesMapping, isAdmin, session?.user?.email]);
 
@@ -294,33 +248,7 @@ const LaporanMajuPage = () => {
       Laporan_Maju_Doc_ID: '',
       STATUS_PERNIAGAAN_KESELURUHAN: '',
       RUMUSAN_DAN_LANGKAH_KEHADAPAN: '',
-      UPWARD_MOBILITY: {
-        UM_STATUS: '',
-        UM_KRITERIA_IMPROVEMENT: '',
-        UM_TARIKH_LAWATAN_PREMIS: '',
-        UM_AKAUN_BIMB: '',
-        UM_BIMB_BIZ: '',
-        UM_AL_AWFAR: '',
-        UM_MERCHANT_TERMINAL: '',
-        UM_FASILITI_LAIN: '',
-        UM_MESINKIRA: '',
-        UM_PENDAPATAN_SEMASA: '',
-        UM_ULASAN_PENDAPATAN: '',
-        UM_PEKERJA_SEMASA: '',
-        UM_ULASAN_PEKERJA: '',
-        UM_ASET_BUKAN_TUNAI_SEMASA: '',
-        UM_ULASAN_ASET_BUKAN_TUNAI: '',
-        UM_ASET_TUNAI_SEMASA: '',
-        UM_ULASAN_ASET_TUNAI: '',
-        UM_SIMPANAN_SEMASA: '',
-        UM_ULASAN_SIMPANAN: '',
-        UM_ZAKAT_SEMASA: '',
-        UM_ULASAN_ZAKAT: '',
-        UM_DIGITAL_SEMASA: [],
-        UM_ULASAN_DIGITAL: '',
-        UM_MARKETING_SEMASA: [],
-        UM_ULASAN_MARKETING: '',
-      },
+      UPWARD_MOBILITY: { ...INITIAL_UPWARD_MOBILITY_STATE },
     }));
 
     setCurrentSessionNumber(1);
@@ -360,7 +288,7 @@ const LaporanMajuPage = () => {
           ['Folder_ID', 'FOLDER_ID', 'FolderId', 'folder_id', 'Mentee_Folder_ID'].forEach(field => {
             console.log(`  ${field}:`, sessionData.menteeMapping[field]);
           });
-          
+
           updatedFormData.NAMA_BISNES = sessionData.menteeMapping.NAMA_BISNES || '';
           updatedFormData.LOKASI_BISNES = sessionData.menteeMapping.LOKASI_BISNES || '';
           updatedFormData.PRODUK_SERVIS = sessionData.menteeMapping.PRODUK_SERVIS || '';
@@ -369,7 +297,7 @@ const LaporanMajuPage = () => {
           updatedFormData.Folder_ID = sessionData.menteeMapping.Folder_ID || '';
           // Store mentee email for Supabase entrepreneur lookup
           updatedFormData.emel = sessionData.menteeMapping.MENTEE_EMAIL_FROM_MAPPING || '';
-          
+
           console.log('🔍 Final Folder_ID set to:', updatedFormData.Folder_ID);
           console.log('🔍 Mentee email (emel) set to:', updatedFormData.emel);
         } else {
@@ -390,9 +318,9 @@ const LaporanMajuPage = () => {
 
         setPreviousLatarBelakangUsahawan(sessionData.latarBelakangUsahawanSesi1 || '');
         if (sessionData.currentSession === 1 && sessionData.latarBelakangUsahawanSesi1) {
-            updatedFormData.LATARBELAKANG_USAHAWAN = sessionData.latarBelakangUsahawanSesi1;
+          updatedFormData.LATARBELAKANG_USAHAWAN = sessionData.latarBelakangUsahawanSesi1;
         } else {
-            updatedFormData.LATARBELAKANG_USAHAWAN = '';
+          updatedFormData.LATARBELAKANG_USAHAWAN = '';
         }
 
         setHasPremisPhotosUploaded(sessionData.hasPremisPhotos || false);
@@ -494,9 +422,7 @@ const LaporanMajuPage = () => {
   const handleUMCheckboxChange = (field, value, checked) => {
     setFormData(prev => {
       const currentArray = prev.UPWARD_MOBILITY[field] || [];
-      const updatedArray = checked
-        ? [...currentArray, value]
-        : currentArray.filter(item => item !== value);
+      const updatedArray = calculateCheckboxValue(currentArray, value, checked);
 
       return {
         ...prev,
@@ -511,26 +437,20 @@ const LaporanMajuPage = () => {
   // Handler for Quick Tag clicks - appends criteria to textarea
   const handleTagClick = (tag) => {
     const currentValue = formData.UPWARD_MOBILITY.UM_KRITERIA_IMPROVEMENT || '';
-    
-    // Check if tag already exists in the textarea (case-insensitive)
-    if (currentValue.toLowerCase().includes(tag.toLowerCase())) {
-      return; // Tag already present, don't add again
+    const newValue = calculateTagClickValue(currentValue, tag);
+
+    // Only update if changed
+    if (newValue !== currentValue) {
+      handleUMChange('UM_KRITERIA_IMPROVEMENT', newValue);
     }
-    
-    // Append tag with comma separator
-    const newValue = currentValue.trim() 
-      ? `${currentValue.trim()}, ${tag}` 
-      : tag;
-    
-    handleUMChange('UM_KRITERIA_IMPROVEMENT', newValue);
   };
 
   // HOTFIX: Use working Bangkit Apps Script for images until Maju Apps Script gets uploadImage handler
   // Simple file storage functions (like laporan-sesi)
   const handleFileChange = (type, fileList, multiple = false) => {
-    setFiles((prev) => ({ 
-      ...prev, 
-      [type]: multiple ? Array.from(fileList) : fileList[0] 
+    setFiles((prev) => ({
+      ...prev,
+      [type]: multiple ? Array.from(fileList) : fileList[0]
     }));
   };
 
@@ -570,7 +490,7 @@ const LaporanMajuPage = () => {
 
       console.log('✅ Upload successful:', result.url);
       resolve(result.url);
-      
+
     } catch (error) {
       console.error('❌ Upload setup failed:', error);
       reject(error);
@@ -607,7 +527,7 @@ const LaporanMajuPage = () => {
 
       console.log('✅ MIA proof upload successful:', result.url);
       resolve(result.url);
-      
+
     } catch (error) {
       console.error('❌ MIA proof upload failed:', error);
       reject(error);
@@ -661,612 +581,584 @@ const LaporanMajuPage = () => {
   };
 
   // UPDATED: handleSubmit to include 'action' and 'reportType: maju'
-// In your laporan-maju.js, update the handleSubmit function's response handling:
+  // In your laporan-maju.js, update the handleSubmit function's response handling:
 
-// In your laporan-maju.js handleSubmit function, make sure dataToSend is properly defined:
+  // In your laporan-maju.js handleSubmit function, make sure dataToSend is properly defined:
 
-// Form validation function
-const validateForm = () => {
-  const errors = [];
-  
-  // For non-MIA submissions, check required fields
-  if (!isMIA) {
-    // 1. ✅ FIXED: Latar Belakang Usahawan is required ONLY for Sesi 1
-    if (currentSessionNumber === 1) {
-      if (!formData.LATARBELAKANG_USAHAWAN || formData.LATARBELAKANG_USAHAWAN.trim() === '') {
-        errors.push('Latar Belakang Usahawan & Situasi Bisnes adalah wajib diisi');
+  // Form validation function
+  const validateForm = () => {
+    const errors = [];
+
+    // For non-MIA submissions, check required fields
+    if (!isMIA) {
+      // 1. ✅ FIXED: Latar Belakang Usahawan is required ONLY for Sesi 1
+      if (currentSessionNumber === 1) {
+        if (!formData.LATARBELAKANG_USAHAWAN || formData.LATARBELAKANG_USAHAWAN.trim() === '') {
+          errors.push('Latar Belakang Usahawan & Situasi Bisnes adalah wajib diisi');
+        }
       }
-    }
-    
-    // 2. Minimum 1 Dapatan Sesi Mentoring with required fields
-    if (!formData.MENTORING_FINDINGS_JSON || formData.MENTORING_FINDINGS_JSON.length === 0) {
-      errors.push('Sekurang-kurangnya 1 Dapatan Sesi Mentoring diperlukan');
-    } else {
-      // Check each mentoring finding for required fields
-      formData.MENTORING_FINDINGS_JSON.forEach((finding, index) => {
-        if (!finding['Topik Perbincangan'] || finding['Topik Perbincangan'].trim() === '') {
-          errors.push(`Dapatan Mentoring #${index + 1}: Topik Perbincangan adalah wajib`);
-        }
-        if (!finding['Hasil yang Diharapkan'] || finding['Hasil yang Diharapkan'].trim() === '') {
-          errors.push(`Dapatan Mentoring #${index + 1}: Hasil yang Diharapkan adalah wajib`);
-        }
-        // Check minimum 1 action plan
-        if (!finding['Pelan Tindakan'] || finding['Pelan Tindakan'].length === 0) {
-          errors.push(`Dapatan Mentoring #${index + 1}: Sekurang-kurangnya 1 Pelan Tindakan diperlukan`);
-        } else {
-          // Check that at least one action plan has required fields
-          const validActionPlans = finding['Pelan Tindakan'].filter(plan => 
-            plan.Tindakan && plan.Tindakan.trim() !== ''
-          );
-          if (validActionPlans.length === 0) {
-            errors.push(`Dapatan Mentoring #${index + 1}: Pelan Tindakan mesti mempunyai sekurang-kurangnya 1 tindakan yang diisi`);
+
+      // 2. Minimum 1 Dapatan Sesi Mentoring with required fields
+      if (!formData.MENTORING_FINDINGS_JSON || formData.MENTORING_FINDINGS_JSON.length === 0) {
+        errors.push('Sekurang-kurangnya 1 Dapatan Sesi Mentoring diperlukan');
+      } else {
+        // Check each mentoring finding for required fields
+        formData.MENTORING_FINDINGS_JSON.forEach((finding, index) => {
+          if (!finding['Topik Perbincangan'] || finding['Topik Perbincangan'].trim() === '') {
+            errors.push(`Dapatan Mentoring #${index + 1}: Topik Perbincangan adalah wajib`);
           }
-        }
-      });
-    }
-    
-    // 3. ✅ NEW: Previous action updates required for Sesi 2+ (Either Kemajuan OR Cabaran, not both)
-    if (currentSessionNumber >= 2 && previousMentoringFindings.length > 0) {
-      let missingUpdates = [];
-      previousMentoringFindings.forEach((finding, findingIndex) => {
-        if (finding['Pelan Tindakan'] && Array.isArray(finding['Pelan Tindakan'])) {
-          finding['Pelan Tindakan'].forEach((plan, planIndex) => {
-            const hasKemajuan = plan.Kemajuan && plan.Kemajuan.trim() !== '';
-            const hasCabaran = plan.Cabaran && plan.Cabaran.trim() !== '';
-            
-            // Require at least ONE update (either Kemajuan OR Cabaran)
-            if (!hasKemajuan && !hasCabaran) {
-              missingUpdates.push(`Kemaskini samada Kemajuan atau Cabaran untuk "${plan.Tindakan || 'Tindakan ' + (planIndex + 1)}"`);
+          if (!finding['Hasil yang Diharapkan'] || finding['Hasil yang Diharapkan'].trim() === '') {
+            errors.push(`Dapatan Mentoring #${index + 1}: Hasil yang Diharapkan adalah wajib`);
+          }
+          // Check minimum 1 action plan
+          if (!finding['Pelan Tindakan'] || finding['Pelan Tindakan'].length === 0) {
+            errors.push(`Dapatan Mentoring #${index + 1}: Sekurang-kurangnya 1 Pelan Tindakan diperlukan`);
+          } else {
+            // Check that at least one action plan has required fields
+            const validActionPlans = finding['Pelan Tindakan'].filter(plan =>
+              plan.Tindakan && plan.Tindakan.trim() !== ''
+            );
+            if (validActionPlans.length === 0) {
+              errors.push(`Dapatan Mentoring #${index + 1}: Pelan Tindakan mesti mempunyai sekurang-kurangnya 1 tindakan yang diisi`);
             }
-          });
-        }
-      });
-      if (missingUpdates.length > 0) {
-        errors.push(`Sila kemaskini tindakan dari sesi sebelumnya: ${missingUpdates.join(', ')}`);
-      }
-    }
-    
-    // 4. ✅ NEW: Rumusan required for Sesi 2+
-    if (currentSessionNumber >= 2) {
-      if (!formData.RUMUSAN_DAN_LANGKAH_KEHADAPAN || formData.RUMUSAN_DAN_LANGKAH_KEHADAPAN.trim() === '') {
-        errors.push('Rumusan Keseluruhan dan Langkah Kehadapan adalah wajib diisi untuk Sesi 2 ke atas');
-      }
-    }
-    
-    // 4. UPWARD MOBILITY validations (required for all sessions)
-    // Section 3: Status & Mobiliti
-
-    if (!formData.UPWARD_MOBILITY.UM_STATUS || formData.UPWARD_MOBILITY.UM_STATUS.trim() === '') {
-      errors.push('Upward Mobility - Upward Mobility Status adalah wajib diisi');
-    }
-    // Tarikh Lawatan is now optional - can be "Belum dilawat" or a date
-
-    // Section 5: Situasi Kewangan - All ulasan fields are required
-    if (!formData.UPWARD_MOBILITY.UM_ULASAN_PENDAPATAN || formData.UPWARD_MOBILITY.UM_ULASAN_PENDAPATAN.trim() === '') {
-      errors.push('Upward Mobility - Ulasan Mentor untuk Pendapatan adalah wajib diisi');
-    }
-    if (!formData.UPWARD_MOBILITY.UM_ULASAN_PEKERJA || formData.UPWARD_MOBILITY.UM_ULASAN_PEKERJA.trim() === '') {
-      errors.push('Upward Mobility - Ulasan Mentor untuk Bilangan Pekerja adalah wajib diisi');
-    }
-    if (!formData.UPWARD_MOBILITY.UM_ULASAN_ASET_BUKAN_TUNAI || formData.UPWARD_MOBILITY.UM_ULASAN_ASET_BUKAN_TUNAI.trim() === '') {
-      errors.push('Upward Mobility - Ulasan Mentor untuk Aset Bukan Tunai adalah wajib diisi');
-    }
-    if (!formData.UPWARD_MOBILITY.UM_ULASAN_ASET_TUNAI || formData.UPWARD_MOBILITY.UM_ULASAN_ASET_TUNAI.trim() === '') {
-      errors.push('Upward Mobility - Ulasan Mentor untuk Aset Tunai adalah wajib diisi');
-    }
-    if (!formData.UPWARD_MOBILITY.UM_ULASAN_SIMPANAN || formData.UPWARD_MOBILITY.UM_ULASAN_SIMPANAN.trim() === '') {
-      errors.push('Upward Mobility - Ulasan Mentor untuk Simpanan adalah wajib diisi');
-    }
-    if (!formData.UPWARD_MOBILITY.UM_ULASAN_ZAKAT || formData.UPWARD_MOBILITY.UM_ULASAN_ZAKAT.trim() === '') {
-      errors.push('Upward Mobility - Ulasan Mentor untuk Zakat adalah wajib diisi');
-    }
-
-    // Section 6: Digital & Marketing - Ulasan fields are required
-    if (!formData.UPWARD_MOBILITY.UM_ULASAN_DIGITAL || formData.UPWARD_MOBILITY.UM_ULASAN_DIGITAL.trim() === '') {
-      errors.push('Upward Mobility - Ulasan Mentor untuk Penggunaan Digital adalah wajib diisi');
-    }
-    if (!formData.UPWARD_MOBILITY.UM_ULASAN_MARKETING || formData.UPWARD_MOBILITY.UM_ULASAN_MARKETING.trim() === '') {
-      errors.push('Upward Mobility - Ulasan Mentor untuk Jualan dan Pemasaran adalah wajib diisi');
-    }
-  } else {
-    // For MIA submissions, check MIA-specific requirements
-    if (!miaReason || miaReason.trim() === '') {
-      errors.push('Alasan/Sebab Usahawan MIA adalah wajib diisi');
-    }
-    if (!miaProofFile) {
-      errors.push('Bukti MIA (screenshot/dokumen) adalah wajib dimuat naik');
-    }
-  }
-  
-  return errors;
-};
-
-// ✅ NEW: Build cumulative mentoring findings that include previous sessions with updates
-const buildCumulativeMentoringFindings = () => {
-  let cumulativeFindings = [];
-  
-  // For Sesi 1, just return current findings
-  if (currentSessionNumber === 1) {
-    return formData.MENTORING_FINDINGS_JSON;
-  }
-  
-  // For Sesi 2+, combine previous findings (with updates) + current findings
-  if (previousMentoringFindings.length > 0) {
-    // Add updated previous findings first
-    const updatedPreviousFindings = previousMentoringFindings.map(finding => ({
-      ...finding,
-      // Mark these as being from previous session for document generation
-      SessionOrigin: currentSessionNumber - 1,
-      UpdatedInSession: currentSessionNumber
-    }));
-    cumulativeFindings = [...updatedPreviousFindings];
-  }
-  
-  // Add current session's new findings
-  const currentFindings = formData.MENTORING_FINDINGS_JSON.map(finding => ({
-    ...finding,
-    SessionOrigin: currentSessionNumber
-  }));
-  
-  cumulativeFindings = [...cumulativeFindings, ...currentFindings];
-  
-  console.log(`📊 Built cumulative findings for Sesi ${currentSessionNumber}:`, {
-    previousCount: previousMentoringFindings.length,
-    currentCount: formData.MENTORING_FINDINGS_JSON.length,
-    totalCount: cumulativeFindings.length
-  });
-  
-  return cumulativeFindings;
-};
-
-const handleSubmit = async (e) => {
-  e.preventDefault();
-
-  // IMMEDIATELY disable button to prevent double-click
-  if (loading) {
-    console.warn('⚠️ Submission already in progress, ignoring duplicate click');
-    return;
-  }
-  setLoading(true);
-
-  // Validate form first
-  const validationErrors = validateForm();
-  if (validationErrors.length > 0) {
-    // Create a more user-friendly error message
-    const errorMessage = `❌ Sila lengkapkan medan yang diperlukan (${validationErrors.length} isu):\n\n• ${validationErrors.join('\n• ')}`;
-    setMessage(errorMessage);
-    setMessageType('error');
-
-    // Scroll to the top to show error message
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-
-    setLoading(false); // Re-enable button if validation fails
-    return; // Stop submission if validation fails
-  }
-
-  setMessage('');
-  setMessageType('');
-  setSubmissionStage({ stage: 'preparing', message: 'Preparing submission...', detail: '' });
-
-  console.log('🚀 Starting form submission...');
-
-  try {
-    // Image upload phase - process all images first
-    console.log('📸 Starting batch image upload...');
-    const imageUrls = { gw360: '', sesi: [], premis: [], mia: '' };
-    const uploadPromises = [];
-
-    // Count total files for logging
-    const gw360Count = files.gw360 ? 1 : 0;
-    const sesiCount = files.sesi ? files.sesi.length : 0;  
-    const premisCount = files.premis ? files.premis.length : 0;
-    const miaCount = miaProofFile ? 1 : 0;
-
-    console.log(`📊 Image URLs in submission:`);
-    console.log(`  - Sesi Images: ${sesiCount}`);
-    console.log(`  - Premis Images: ${premisCount}`);
-    console.log(`  - GW360 Image: ${gw360Count ? 'Present' : 'Missing'}`);
-
-    const folderId = formData.Folder_ID;
-    const menteeNameForUpload = formData.NAMA_MENTEE;
-    const sessionNumberForUpload = currentSessionNumber;
-
-    // Check if we have images to upload
-    const hasImagesToUpload = files.gw360 || (files.sesi && files.sesi.length > 0) || (files.premis && files.premis.length > 0) || miaProofFile;
-    
-    if (!hasImagesToUpload) {
-      console.log('ℹ️ No images to upload, skipping upload phase');
-    } else {
-      console.log('📋 Folder ID:', folderId);
-      console.log('📋 Mentee Name:', menteeNameForUpload);
-    }
-
-    // Upload images if we have any
-    if (hasImagesToUpload) {
-      // Upload GW360 image (single file)
-      if (files.gw360) {
-        uploadPromises.push(uploadImage(files.gw360, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => (imageUrls.gw360 = url)));
-      }
-
-      // Upload Sesi images (multiple files)
-      if (files.sesi && files.sesi.length > 0) {
-        files.sesi.forEach((file) => uploadPromises.push(uploadImage(file, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => imageUrls.sesi.push(url))));
-      }
-
-      // Upload Premis images (multiple files)
-      if (files.premis && files.premis.length > 0) {
-        files.premis.forEach((file) => uploadPromises.push(uploadImage(file, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => imageUrls.premis.push(url))));
-      }
-
-      // Upload MIA proof if present
-      if (miaProofFile) {
-        uploadPromises.push(uploadMiaProof(miaProofFile, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => (imageUrls.mia = url)));
-      }
-
-      // Wait for all uploads to complete
-      if (uploadPromises.length > 0) {
-        // Update stage: uploading images
-        setSubmissionStage({
-          stage: 'uploading',
-          message: 'Uploading images to Google Drive...',
-          detail: `Uploading ${uploadPromises.length} image${uploadPromises.length > 1 ? 's' : ''}`
+          }
         });
-
-        console.log(`⏳ Waiting for ${uploadPromises.length} image uploads to complete...`);
-        await Promise.all(uploadPromises);
-        console.log('✅ All images uploaded successfully');
       }
 
-      // Clear compression progress immediately when uploads complete
-      setCompressionProgress({ show: false, current: 0, total: 0, message: '', fileName: '' });
-    }
+      // 3. ✅ NEW: Previous action updates required for Sesi 2+ (Either Kemajuan OR Cabaran, not both)
+      if (currentSessionNumber >= 2 && previousMentoringFindings.length > 0) {
+        let missingUpdates = [];
+        previousMentoringFindings.forEach((finding, findingIndex) => {
+          if (finding['Pelan Tindakan'] && Array.isArray(finding['Pelan Tindakan'])) {
+            finding['Pelan Tindakan'].forEach((plan, planIndex) => {
+              const hasKemajuan = plan.Kemajuan && plan.Kemajuan.trim() !== '';
+              const hasCabaran = plan.Cabaran && plan.Cabaran.trim() !== '';
 
-    // ✅ MAKE SURE dataToSend is declared in the correct scope
-    let dataToSend = {}; // ← Declare it here at the top
+              // Require at least ONE update (either Kemajuan OR Cabaran)
+              if (!hasKemajuan && !hasCabaran) {
+                missingUpdates.push(`Kemaskini samada Kemajuan atau Cabaran untuk "${plan.Tindakan || 'Tindakan ' + (planIndex + 1)}"`);
+              }
+            });
+          }
+        });
+        if (missingUpdates.length > 0) {
+          errors.push(`Sila kemaskini tindakan dari sesi sebelumnya: ${missingUpdates.join(', ')}`);
+        }
+      }
 
-    // CONDITIONALLY BUILD dataToSend BASED ON MIA STATUS
-    if (isMIA) {
-      console.log('📋 Building MIA data to send...');
+      // 4. ✅ NEW: Rumusan required for Sesi 2+
+      if (currentSessionNumber >= 2) {
+        if (!formData.RUMUSAN_DAN_LANGKAH_KEHADAPAN || formData.RUMUSAN_DAN_LANGKAH_KEHADAPAN.trim() === '') {
+          errors.push('Rumusan Keseluruhan dan Langkah Kehadapan adalah wajib diisi untuk Sesi 2 ke atas');
+        }
+      }
 
-      dataToSend = {
-        NAMA_MENTOR: formData.NAMA_MENTOR,
-        EMAIL_MENTOR: formData.EMAIL_MENTOR,
-        NAMA_MENTEE: formData.NAMA_MENTEE,
-        NAMA_BISNES: formData.NAMA_BISNES,
-        SESI_NUMBER: currentSessionNumber,
-        emel: formData.emel || '',
-        LOKASI_BISNES: '',
-        PRODUK_SERVIS: '',
-        NO_TELEFON: '',
-        TARIKH_SESI: '',
-        MOD_SESI: '',
-        LOKASI_F2F: '',
-        MASA_MULA: '',
-        MASA_TAMAT: '',
-        LATARBELAKANG_USAHAWAN: '',
-        DATA_KEWANGAN_BULANAN_JSON: [],
-        MENTORING_FINDINGS_JSON: [],
-        URL_GAMBAR_PREMIS_JSON: [],
-        URL_GAMBAR_SESI_JSON: [],
-        URL_GAMBAR_GW360: '',
-        Folder_ID: formData.Folder_ID,
-        Laporan_Maju_Doc_ID: '',
-        STATUS_PERNIAGAAN_KESELURUHAN: '',
-        RUMUSAN_DAN_LANGKAH_KEHADAPAN: '',
-        MIA_STATUS: 'MIA',
-        MIA_REASON: miaReason,
-        MIA_PROOF_URL: imageUrls.mia,
-        // UPWARD MOBILITY - Allow partial data for MIA submissions
-        UPWARD_MOBILITY_JSON: JSON.stringify({
-          UM_STATUS: formData.UPWARD_MOBILITY.UM_STATUS || '',
-          UM_KRITERIA_IMPROVEMENT: formData.UPWARD_MOBILITY.UM_KRITERIA_IMPROVEMENT || '',
-          UM_TARIKH_LAWATAN_PREMIS: formData.UPWARD_MOBILITY.UM_TARIKH_LAWATAN_PREMIS || '',
-          UM_AKAUN_BIMB: formData.UPWARD_MOBILITY.UM_AKAUN_BIMB || '',
-          UM_BIMB_BIZ: formData.UPWARD_MOBILITY.UM_BIMB_BIZ || '',
-          UM_AL_AWFAR: formData.UPWARD_MOBILITY.UM_AL_AWFAR || '',
-          UM_MERCHANT_TERMINAL: formData.UPWARD_MOBILITY.UM_MERCHANT_TERMINAL || '',
-          UM_FASILITI_LAIN: formData.UPWARD_MOBILITY.UM_FASILITI_LAIN || '',
-          UM_MESINKIRA: formData.UPWARD_MOBILITY.UM_MESINKIRA || '',
-          UM_PENDAPATAN_SEMASA: formData.UPWARD_MOBILITY.UM_PENDAPATAN_SEMASA || '',
-          UM_ULASAN_PENDAPATAN: formData.UPWARD_MOBILITY.UM_ULASAN_PENDAPATAN || '',
-          UM_PEKERJA_SEMASA: formData.UPWARD_MOBILITY.UM_PEKERJA_SEMASA || '',
-          UM_ULASAN_PEKERJA: formData.UPWARD_MOBILITY.UM_ULASAN_PEKERJA || '',
-          UM_ASET_BUKAN_TUNAI_SEMASA: formData.UPWARD_MOBILITY.UM_ASET_BUKAN_TUNAI_SEMASA || '',
-          UM_ULASAN_ASET_BUKAN_TUNAI: formData.UPWARD_MOBILITY.UM_ULASAN_ASET_BUKAN_TUNAI || '',
-          UM_ASET_TUNAI_SEMASA: formData.UPWARD_MOBILITY.UM_ASET_TUNAI_SEMASA || '',
-          UM_ULASAN_ASET_TUNAI: formData.UPWARD_MOBILITY.UM_ULASAN_ASET_TUNAI || '',
-          UM_SIMPANAN_SEMASA: formData.UPWARD_MOBILITY.UM_SIMPANAN_SEMASA || '',
-          UM_ULASAN_SIMPANAN: formData.UPWARD_MOBILITY.UM_ULASAN_SIMPANAN || '',
-          UM_ZAKAT_SEMASA: formData.UPWARD_MOBILITY.UM_ZAKAT_SEMASA || '',
-          UM_ULASAN_ZAKAT: formData.UPWARD_MOBILITY.UM_ULASAN_ZAKAT || '',
-          UM_DIGITAL_SEMASA: (formData.UPWARD_MOBILITY.UM_DIGITAL_SEMASA || []).join(', '),
-          UM_ULASAN_DIGITAL: formData.UPWARD_MOBILITY.UM_ULASAN_DIGITAL || '',
-          UM_MARKETING_SEMASA: (formData.UPWARD_MOBILITY.UM_MARKETING_SEMASA || []).join(', '),
-          UM_ULASAN_MARKETING: formData.UPWARD_MOBILITY.UM_ULASAN_MARKETING || '',
-        }),
-      };
+      // 4. UPWARD MOBILITY validations (required for all sessions)
+      // Section 3: Status & Mobiliti
+
+      const umErrors = validateUpwardMobility(formData.UPWARD_MOBILITY, isMIA);
+      if (umErrors.length > 0) {
+        errors.push(...umErrors);
+      }
     } else {
-      console.log('📋 Building regular report data to send...');
-
-      dataToSend = {
-        NAMA_MENTOR: formData.NAMA_MENTOR,
-        EMAIL_MENTOR: formData.EMAIL_MENTOR,
-        NAMA_MENTEE: formData.NAMA_MENTEE,
-        NAMA_BISNES: formData.NAMA_BISNES,
-        SESI_NUMBER: currentSessionNumber,
-        emel: formData.emel || '',
-        LOKASI_BISNES: formData.LOKASI_BISNES,
-        PRODUK_SERVIS: formData.PRODUK_SERVIS,
-        NO_TELEFON: formData.NO_TELEFON,
-        TARIKH_SESI: formData.TARIKH_SESI,
-        MOD_SESI: formData.MOD_SESI,
-        LOKASI_F2F: formData.LOKASI_F2F,
-        MASA_MULA: formData.MASA_MULA,
-        MASA_TAMAT: formData.MASA_TAMAT,
-        LATARBELAKANG_USAHAWAN: currentSessionNumber === 1 ? formData.LATARBELAKANG_USAHAWAN : previousLatarBelakangUsahawan,
-        DATA_KEWANGAN_BULANAN_JSON: formData.DATA_KEWANGAN_BULANAN_JSON,
-        MENTORING_FINDINGS_JSON: buildCumulativeMentoringFindings(),
-        URL_GAMBAR_PREMIS_JSON: imageUrls.premis,
-        URL_GAMBAR_SESI_JSON: imageUrls.sesi,
-        URL_GAMBAR_GW360: imageUrls.gw360,
-        Folder_ID: formData.Folder_ID,
-        Laporan_Maju_Doc_ID: '',
-        STATUS_PERNIAGAAN_KESELURUHAN: formData.STATUS_PERNIAGAAN_KESELURUHAN || '',
-        RUMUSAN_DAN_LANGKAH_KEHADAPAN: formData.RUMUSAN_DAN_LANGKAH_KEHADAPAN || '',
-        MIA_STATUS: 'Tidak MIA',
-        MIA_REASON: '',
-        MIA_PROOF_URL: imageUrls.mia,
-        // UPWARD MOBILITY - Store as JSON for MAJU AppScript
-        UPWARD_MOBILITY_JSON: JSON.stringify({
-          UM_STATUS: formData.UPWARD_MOBILITY.UM_STATUS || '',
-          UM_KRITERIA_IMPROVEMENT: formData.UPWARD_MOBILITY.UM_KRITERIA_IMPROVEMENT || '',
-          UM_TARIKH_LAWATAN_PREMIS: formData.UPWARD_MOBILITY.UM_TARIKH_LAWATAN_PREMIS || '',
-          UM_AKAUN_BIMB: formData.UPWARD_MOBILITY.UM_AKAUN_BIMB || '',
-          UM_BIMB_BIZ: formData.UPWARD_MOBILITY.UM_BIMB_BIZ || '',
-          UM_AL_AWFAR: formData.UPWARD_MOBILITY.UM_AL_AWFAR || '',
-          UM_MERCHANT_TERMINAL: formData.UPWARD_MOBILITY.UM_MERCHANT_TERMINAL || '',
-          UM_FASILITI_LAIN: formData.UPWARD_MOBILITY.UM_FASILITI_LAIN || '',
-          UM_MESINKIRA: formData.UPWARD_MOBILITY.UM_MESINKIRA || '',
-          UM_PENDAPATAN_SEMASA: formData.UPWARD_MOBILITY.UM_PENDAPATAN_SEMASA || '',
-          UM_ULASAN_PENDAPATAN: formData.UPWARD_MOBILITY.UM_ULASAN_PENDAPATAN || '',
-          UM_PEKERJA_SEMASA: formData.UPWARD_MOBILITY.UM_PEKERJA_SEMASA || '',
-          UM_ULASAN_PEKERJA: formData.UPWARD_MOBILITY.UM_ULASAN_PEKERJA || '',
-          UM_ASET_BUKAN_TUNAI_SEMASA: formData.UPWARD_MOBILITY.UM_ASET_BUKAN_TUNAI_SEMASA || '',
-          UM_ULASAN_ASET_BUKAN_TUNAI: formData.UPWARD_MOBILITY.UM_ULASAN_ASET_BUKAN_TUNAI || '',
-          UM_ASET_TUNAI_SEMASA: formData.UPWARD_MOBILITY.UM_ASET_TUNAI_SEMASA || '',
-          UM_ULASAN_ASET_TUNAI: formData.UPWARD_MOBILITY.UM_ULASAN_ASET_TUNAI || '',
-          UM_SIMPANAN_SEMASA: formData.UPWARD_MOBILITY.UM_SIMPANAN_SEMASA || '',
-          UM_ULASAN_SIMPANAN: formData.UPWARD_MOBILITY.UM_ULASAN_SIMPANAN || '',
-          UM_ZAKAT_SEMASA: formData.UPWARD_MOBILITY.UM_ZAKAT_SEMASA || '',
-          UM_ULASAN_ZAKAT: formData.UPWARD_MOBILITY.UM_ULASAN_ZAKAT || '',
-          UM_DIGITAL_SEMASA: (formData.UPWARD_MOBILITY.UM_DIGITAL_SEMASA || []).join(', '),
-          UM_ULASAN_DIGITAL: formData.UPWARD_MOBILITY.UM_ULASAN_DIGITAL || '',
-          UM_MARKETING_SEMASA: (formData.UPWARD_MOBILITY.UM_MARKETING_SEMASA || []).join(', '),
-          UM_ULASAN_MARKETING: formData.UPWARD_MOBILITY.UM_ULASAN_MARKETING || '',
-        }),
-      };
+      // For MIA submissions, check MIA-specific requirements
+      if (!miaReason || miaReason.trim() === '') {
+        errors.push('Alasan/Sebab Usahawan MIA adalah wajib diisi');
+      }
+      if (!miaProofFile) {
+        errors.push('Bukti MIA (screenshot/dokumen) adalah wajib dimuat naik');
+      }
     }
 
-    // ✅ Now dataToSend is properly defined and can be used
-    console.log('📤 Data to send:', dataToSend);
-    
-    // DEBUG: Check if images are present
-    console.log('🖼️ Image URLs in submission:');
-    console.log('  - Sesi Images:', dataToSend.URL_GAMBAR_SESI_JSON?.length || 0);
-    console.log('  - Premis Images:', dataToSend.URL_GAMBAR_PREMIS_JSON?.length || 0);
-    console.log('  - GW360 Image:', dataToSend.URL_GAMBAR_GW360 ? 'Present' : 'Missing');
-    
-    console.log('🌐 Submitting to /api/submitMajuReportum...');
+    return errors;
+  };
 
-    // Update stage: saving to database
-    setSubmissionStage({
-      stage: 'saving',
-      message: 'Saving report to Google Sheets & Upward Mobility...',
-      detail: 'Writing to MAJU and UM sheets. This may take up to 40 seconds'
+  // ✅ NEW: Build cumulative mentoring findings that include previous sessions with updates
+  const buildCumulativeMentoringFindings = () => {
+    let cumulativeFindings = [];
+
+    // For Sesi 1, just return current findings
+    if (currentSessionNumber === 1) {
+      return formData.MENTORING_FINDINGS_JSON;
+    }
+
+    // For Sesi 2+, combine previous findings (with updates) + current findings
+    if (previousMentoringFindings.length > 0) {
+      // Add updated previous findings first
+      const updatedPreviousFindings = previousMentoringFindings.map(finding => ({
+        ...finding,
+        // Mark these as being from previous session for document generation
+        SessionOrigin: currentSessionNumber - 1,
+        UpdatedInSession: currentSessionNumber
+      }));
+      cumulativeFindings = [...updatedPreviousFindings];
+    }
+
+    // Add current session's new findings
+    const currentFindings = formData.MENTORING_FINDINGS_JSON.map(finding => ({
+      ...finding,
+      SessionOrigin: currentSessionNumber
+    }));
+
+    cumulativeFindings = [...cumulativeFindings, ...currentFindings];
+
+    console.log(`📊 Built cumulative findings for Sesi ${currentSessionNumber}:`, {
+      previousCount: previousMentoringFindings.length,
+      currentCount: formData.MENTORING_FINDINGS_JSON.length,
+      totalCount: cumulativeFindings.length
     });
 
-    // Add frontend timeout protection (35 seconds for dual AppScript calls)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 35000);
+    return cumulativeFindings;
+  };
 
-    let response;
-    try {
-      response = await fetch('/api/submitMajuReportum', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(dataToSend),
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-    } catch (fetchError) {
-      clearTimeout(timeoutId);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-      if (fetchError.name === 'AbortError') {
-        throw new Error('⏱️ Request timeout - sila cuba lagi. Jika masalah berterusan, hubungi admin.');
-      }
-      throw fetchError;
+    // IMMEDIATELY disable button to prevent double-click
+    if (loading) {
+      console.warn('⚠️ Submission already in progress, ignoring duplicate click');
+      return;
+    }
+    setLoading(true);
+
+    // Validate form first
+    const validationErrors = validateForm();
+    if (validationErrors.length > 0) {
+      // Create a more user-friendly error message
+      const errorMessage = `❌ Sila lengkapkan medan yang diperlukan (${validationErrors.length} isu):\n\n• ${validationErrors.join('\n• ')}`;
+      setMessage(errorMessage);
+      setMessageType('error');
+
+      // Scroll to the top to show error message
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      setLoading(false); // Re-enable button if validation fails
+      return; // Stop submission if validation fails
     }
 
-    console.log('📥 Response status:', response.status);
-    console.log('📥 Response ok:', response.ok);
+    setMessage('');
+    setMessageType('');
+    setSubmissionStage({ stage: 'preparing', message: 'Preparing submission...', detail: '' });
 
-    // Safe JSON parsing with fallback
-    let result;
-    const contentType = response.headers.get('content-type');
+    console.log('🚀 Starting form submission...');
 
     try {
-      if (contentType && contentType.includes('application/json')) {
-        result = await response.json();
-        console.log('📄 Parsed response JSON:', result);
+      // Image upload phase - process all images first
+      console.log('📸 Starting batch image upload...');
+      const imageUrls = { gw360: '', sesi: [], premis: [], mia: '' };
+      const uploadPromises = [];
+
+      // Count total files for logging
+      const gw360Count = files.gw360 ? 1 : 0;
+      const sesiCount = files.sesi ? files.sesi.length : 0;
+      const premisCount = files.premis ? files.premis.length : 0;
+      const miaCount = miaProofFile ? 1 : 0;
+
+      console.log(`📊 Image URLs in submission:`);
+      console.log(`  - Sesi Images: ${sesiCount}`);
+      console.log(`  - Premis Images: ${premisCount}`);
+      console.log(`  - GW360 Image: ${gw360Count ? 'Present' : 'Missing'}`);
+
+      const folderId = formData.Folder_ID;
+      const menteeNameForUpload = formData.NAMA_MENTEE;
+      const sessionNumberForUpload = currentSessionNumber;
+
+      // Check if we have images to upload
+      const hasImagesToUpload = files.gw360 || (files.sesi && files.sesi.length > 0) || (files.premis && files.premis.length > 0) || miaProofFile;
+
+      if (!hasImagesToUpload) {
+        console.log('ℹ️ No images to upload, skipping upload phase');
       } else {
-        // Response is not JSON (likely HTML error page)
-        const text = await response.text();
-        console.error('❌ Non-JSON response:', text.substring(0, 200));
-        result = {
-          error: 'Server returned unexpected response. Please check Google Sheet to verify if report was saved.',
-          retryable: false,
-          serverResponse: text.substring(0, 200)
+        console.log('📋 Folder ID:', folderId);
+        console.log('📋 Mentee Name:', menteeNameForUpload);
+      }
+
+      // Upload images if we have any
+      if (hasImagesToUpload) {
+        // Upload GW360 image (single file)
+        if (files.gw360) {
+          uploadPromises.push(uploadImage(files.gw360, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => (imageUrls.gw360 = url)));
+        }
+
+        // Upload Sesi images (multiple files)
+        if (files.sesi && files.sesi.length > 0) {
+          files.sesi.forEach((file) => uploadPromises.push(uploadImage(file, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => imageUrls.sesi.push(url))));
+        }
+
+        // Upload Premis images (multiple files)
+        if (files.premis && files.premis.length > 0) {
+          files.premis.forEach((file) => uploadPromises.push(uploadImage(file, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => imageUrls.premis.push(url))));
+        }
+
+        // Upload MIA proof if present
+        if (miaProofFile) {
+          uploadPromises.push(uploadMiaProof(miaProofFile, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => (imageUrls.mia = url)));
+        }
+
+        // Wait for all uploads to complete
+        if (uploadPromises.length > 0) {
+          // Update stage: uploading images
+          setSubmissionStage({
+            stage: 'uploading',
+            message: 'Uploading images to Google Drive...',
+            detail: `Uploading ${uploadPromises.length} image${uploadPromises.length > 1 ? 's' : ''}`
+          });
+
+          console.log(`⏳ Waiting for ${uploadPromises.length} image uploads to complete...`);
+          await Promise.all(uploadPromises);
+          console.log('✅ All images uploaded successfully');
+        }
+
+        // Clear compression progress immediately when uploads complete
+        setCompressionProgress({ show: false, current: 0, total: 0, message: '', fileName: '' });
+      }
+
+      // ✅ MAKE SURE dataToSend is declared in the correct scope
+      let dataToSend = {}; // ← Declare it here at the top
+
+      // CONDITIONALLY BUILD dataToSend BASED ON MIA STATUS
+      if (isMIA) {
+        console.log('📋 Building MIA data to send...');
+
+        dataToSend = {
+          NAMA_MENTOR: formData.NAMA_MENTOR,
+          EMAIL_MENTOR: formData.EMAIL_MENTOR,
+          NAMA_MENTEE: formData.NAMA_MENTEE,
+          NAMA_BISNES: formData.NAMA_BISNES,
+          SESI_NUMBER: currentSessionNumber,
+          emel: formData.emel || '',
+          LOKASI_BISNES: '',
+          PRODUK_SERVIS: '',
+          NO_TELEFON: '',
+          TARIKH_SESI: '',
+          MOD_SESI: '',
+          LOKASI_F2F: '',
+          MASA_MULA: '',
+          MASA_TAMAT: '',
+          LATARBELAKANG_USAHAWAN: '',
+          DATA_KEWANGAN_BULANAN_JSON: [],
+          MENTORING_FINDINGS_JSON: [],
+          URL_GAMBAR_PREMIS_JSON: [],
+          URL_GAMBAR_SESI_JSON: [],
+          URL_GAMBAR_GW360: '',
+          Folder_ID: formData.Folder_ID,
+          Laporan_Maju_Doc_ID: '',
+          STATUS_PERNIAGAAN_KESELURUHAN: '',
+          RUMUSAN_DAN_LANGKAH_KEHADAPAN: '',
+          MIA_STATUS: 'MIA',
+          MIA_REASON: miaReason,
+          MIA_PROOF_URL: imageUrls.mia,
+          // UPWARD MOBILITY - Allow partial data for MIA submissions
+          UPWARD_MOBILITY_JSON: JSON.stringify({
+            UM_STATUS: formData.UPWARD_MOBILITY.UM_STATUS || '',
+            UM_KRITERIA_IMPROVEMENT: formData.UPWARD_MOBILITY.UM_KRITERIA_IMPROVEMENT || '',
+            UM_TARIKH_LAWATAN_PREMIS: formData.UPWARD_MOBILITY.UM_TARIKH_LAWATAN_PREMIS || '',
+            UM_AKAUN_BIMB: formData.UPWARD_MOBILITY.UM_AKAUN_BIMB || '',
+            UM_BIMB_BIZ: formData.UPWARD_MOBILITY.UM_BIMB_BIZ || '',
+            UM_AL_AWFAR: formData.UPWARD_MOBILITY.UM_AL_AWFAR || '',
+            UM_MERCHANT_TERMINAL: formData.UPWARD_MOBILITY.UM_MERCHANT_TERMINAL || '',
+            UM_FASILITI_LAIN: formData.UPWARD_MOBILITY.UM_FASILITI_LAIN || '',
+            UM_MESINKIRA: formData.UPWARD_MOBILITY.UM_MESINKIRA || '',
+            UM_PENDAPATAN_SEMASA: formData.UPWARD_MOBILITY.UM_PENDAPATAN_SEMASA || '',
+            UM_ULASAN_PENDAPATAN: formData.UPWARD_MOBILITY.UM_ULASAN_PENDAPATAN || '',
+            UM_PEKERJA_SEMASA: formData.UPWARD_MOBILITY.UM_PEKERJA_SEMASA || '',
+            UM_ULASAN_PEKERJA: formData.UPWARD_MOBILITY.UM_ULASAN_PEKERJA || '',
+            UM_ASET_BUKAN_TUNAI_SEMASA: formData.UPWARD_MOBILITY.UM_ASET_BUKAN_TUNAI_SEMASA || '',
+            UM_ULASAN_ASET_BUKAN_TUNAI: formData.UPWARD_MOBILITY.UM_ULASAN_ASET_BUKAN_TUNAI || '',
+            UM_ASET_TUNAI_SEMASA: formData.UPWARD_MOBILITY.UM_ASET_TUNAI_SEMASA || '',
+            UM_ULASAN_ASET_TUNAI: formData.UPWARD_MOBILITY.UM_ULASAN_ASET_TUNAI || '',
+            UM_SIMPANAN_SEMASA: formData.UPWARD_MOBILITY.UM_SIMPANAN_SEMASA || '',
+            UM_ULASAN_SIMPANAN: formData.UPWARD_MOBILITY.UM_ULASAN_SIMPANAN || '',
+            UM_ZAKAT_SEMASA: formData.UPWARD_MOBILITY.UM_ZAKAT_SEMASA || '',
+            UM_ULASAN_ZAKAT: formData.UPWARD_MOBILITY.UM_ULASAN_ZAKAT || '',
+            UM_DIGITAL_SEMASA: (formData.UPWARD_MOBILITY.UM_DIGITAL_SEMASA || []).join(', '),
+            UM_ULASAN_DIGITAL: formData.UPWARD_MOBILITY.UM_ULASAN_DIGITAL || '',
+            UM_MARKETING_SEMASA: (formData.UPWARD_MOBILITY.UM_MARKETING_SEMASA || []).join(', '),
+            UM_ULASAN_MARKETING: formData.UPWARD_MOBILITY.UM_ULASAN_MARKETING || '',
+          }),
+        };
+      } else {
+        console.log('📋 Building regular report data to send...');
+
+        dataToSend = {
+          NAMA_MENTOR: formData.NAMA_MENTOR,
+          EMAIL_MENTOR: formData.EMAIL_MENTOR,
+          NAMA_MENTEE: formData.NAMA_MENTEE,
+          NAMA_BISNES: formData.NAMA_BISNES,
+          SESI_NUMBER: currentSessionNumber,
+          emel: formData.emel || '',
+          LOKASI_BISNES: formData.LOKASI_BISNES,
+          PRODUK_SERVIS: formData.PRODUK_SERVIS,
+          NO_TELEFON: formData.NO_TELEFON,
+          TARIKH_SESI: formData.TARIKH_SESI,
+          MOD_SESI: formData.MOD_SESI,
+          LOKASI_F2F: formData.LOKASI_F2F,
+          MASA_MULA: formData.MASA_MULA,
+          MASA_TAMAT: formData.MASA_TAMAT,
+          LATARBELAKANG_USAHAWAN: currentSessionNumber === 1 ? formData.LATARBELAKANG_USAHAWAN : previousLatarBelakangUsahawan,
+          DATA_KEWANGAN_BULANAN_JSON: formData.DATA_KEWANGAN_BULANAN_JSON,
+          MENTORING_FINDINGS_JSON: buildCumulativeMentoringFindings(),
+          URL_GAMBAR_PREMIS_JSON: imageUrls.premis,
+          URL_GAMBAR_SESI_JSON: imageUrls.sesi,
+          URL_GAMBAR_GW360: imageUrls.gw360,
+          Folder_ID: formData.Folder_ID,
+          Laporan_Maju_Doc_ID: '',
+          STATUS_PERNIAGAAN_KESELURUHAN: formData.STATUS_PERNIAGAAN_KESELURUHAN || '',
+          RUMUSAN_DAN_LANGKAH_KEHADAPAN: formData.RUMUSAN_DAN_LANGKAH_KEHADAPAN || '',
+          MIA_STATUS: 'Tidak MIA',
+          MIA_REASON: '',
+          MIA_PROOF_URL: imageUrls.mia,
+          // UPWARD MOBILITY - Store as JSON for MAJU AppScript
+          UPWARD_MOBILITY_JSON: JSON.stringify({
+            UM_STATUS: formData.UPWARD_MOBILITY.UM_STATUS || '',
+            UM_KRITERIA_IMPROVEMENT: formData.UPWARD_MOBILITY.UM_KRITERIA_IMPROVEMENT || '',
+            UM_TARIKH_LAWATAN_PREMIS: formData.UPWARD_MOBILITY.UM_TARIKH_LAWATAN_PREMIS || '',
+            UM_AKAUN_BIMB: formData.UPWARD_MOBILITY.UM_AKAUN_BIMB || '',
+            UM_BIMB_BIZ: formData.UPWARD_MOBILITY.UM_BIMB_BIZ || '',
+            UM_AL_AWFAR: formData.UPWARD_MOBILITY.UM_AL_AWFAR || '',
+            UM_MERCHANT_TERMINAL: formData.UPWARD_MOBILITY.UM_MERCHANT_TERMINAL || '',
+            UM_FASILITI_LAIN: formData.UPWARD_MOBILITY.UM_FASILITI_LAIN || '',
+            UM_MESINKIRA: formData.UPWARD_MOBILITY.UM_MESINKIRA || '',
+            UM_PENDAPATAN_SEMASA: formData.UPWARD_MOBILITY.UM_PENDAPATAN_SEMASA || '',
+            UM_ULASAN_PENDAPATAN: formData.UPWARD_MOBILITY.UM_ULASAN_PENDAPATAN || '',
+            UM_PEKERJA_SEMASA: formData.UPWARD_MOBILITY.UM_PEKERJA_SEMASA || '',
+            UM_ULASAN_PEKERJA: formData.UPWARD_MOBILITY.UM_ULASAN_PEKERJA || '',
+            UM_ASET_BUKAN_TUNAI_SEMASA: formData.UPWARD_MOBILITY.UM_ASET_BUKAN_TUNAI_SEMASA || '',
+            UM_ULASAN_ASET_BUKAN_TUNAI: formData.UPWARD_MOBILITY.UM_ULASAN_ASET_BUKAN_TUNAI || '',
+            UM_ASET_TUNAI_SEMASA: formData.UPWARD_MOBILITY.UM_ASET_TUNAI_SEMASA || '',
+            UM_ULASAN_ASET_TUNAI: formData.UPWARD_MOBILITY.UM_ULASAN_ASET_TUNAI || '',
+            UM_SIMPANAN_SEMASA: formData.UPWARD_MOBILITY.UM_SIMPANAN_SEMASA || '',
+            UM_ULASAN_SIMPANAN: formData.UPWARD_MOBILITY.UM_ULASAN_SIMPANAN || '',
+            UM_ZAKAT_SEMASA: formData.UPWARD_MOBILITY.UM_ZAKAT_SEMASA || '',
+            UM_ULASAN_ZAKAT: formData.UPWARD_MOBILITY.UM_ULASAN_ZAKAT || '',
+            UM_DIGITAL_SEMASA: (formData.UPWARD_MOBILITY.UM_DIGITAL_SEMASA || []).join(', '),
+            UM_ULASAN_DIGITAL: formData.UPWARD_MOBILITY.UM_ULASAN_DIGITAL || '',
+            UM_MARKETING_SEMASA: (formData.UPWARD_MOBILITY.UM_MARKETING_SEMASA || []).join(', '),
+            UM_ULASAN_MARKETING: formData.UPWARD_MOBILITY.UM_ULASAN_MARKETING || '',
+          }),
         };
       }
-    } catch (parseError) {
-      console.error('❌ Failed to parse response:', parseError);
-      result = {
-        error: 'Unable to read server response. Please check Google Sheet to verify if report was saved.',
-        retryable: false
-      };
-    }
 
-    // Enhanced error message based on status code
-    if (!response.ok) {
-      let userMessage = result.error || result.message;
+      // ✅ Now dataToSend is properly defined and can be used
+      console.log('📤 Data to send:', dataToSend);
 
-      if (response.status === 504) {
-        userMessage = `⏱️ Server timeout - your images were uploaded, but we couldn't confirm if data was saved.\n\n` +
-                      `✓ Check Google Sheet to see if your report appears\n` +
-                      `✗ DO NOT submit again without checking\n` +
-                      `📞 Contact admin if report is missing`;
-      } else if (response.status === 408) {
-        userMessage = `${result.error || 'Request timeout'}\n\nYou can try submitting again.`;
-      }
+      // DEBUG: Check if images are present
+      console.log('🖼️ Image URLs in submission:');
+      console.log('  - Sesi Images:', dataToSend.URL_GAMBAR_SESI_JSON?.length || 0);
+      console.log('  - Premis Images:', dataToSend.URL_GAMBAR_PREMIS_JSON?.length || 0);
+      console.log('  - GW360 Image:', dataToSend.URL_GAMBAR_GW360 ? 'Present' : 'Missing');
 
-      if (result.retryable) {
-        throw new Error(`${userMessage} (Boleh cuba semula)`);
-      }
-      throw new Error(userMessage);
-    }
+      console.log('🌐 Submitting to /api/submitMajuReportum...');
 
-    // Handle success
-    if (response.ok && result.success === true) {
-      console.log('✅ [PHASE 5] Submission successful!');
-      console.log('📋 [PHASE 5] Success message:', result.message);
-
-      if (result.docUrl) {
-        console.log('📄 [PHASE 5] Document URL:', result.docUrl);
-      }
-
-      // ============================================================
-      // ⚠️ REMOVED: STANDALONE UM SHEET WRITE (NOW HANDLED BY BACKEND)
-      // ============================================================
-      // The backend submitMajuReportum.js already writes to UM sheet
-      // as part of the main submission flow (matching Bangkit implementation).
-      // This frontend call to /api/submit-upward-mobility was causing
-      // duplicate entries in the UM tab.
-      //
-      // For parity with Bangkit:
-      // ✅ UM write happens INSIDE submitMajuReportum.js
-      // ❌ No separate call to /api/submit-upward-mobility
-      //
-      // Note: /api/submit-upward-mobility is a STANDALONE endpoint
-      // for optional UM-only submissions (not linked to session reports).
-      // ============================================================
-      console.log('ℹ️ [PHASE 6] UM write handled by backend (no duplicate call)');
-
-      // Update stage: complete
+      // Update stage: saving to database
       setSubmissionStage({
-        stage: 'complete',
-        message: 'Report submitted successfully!',
-        detail: ''
+        stage: 'saving',
+        message: 'Saving report to Google Sheets & Upward Mobility...',
+        detail: 'Writing to MAJU and UM sheets. This may take up to 40 seconds'
       });
 
-      // Show success with row number for verification
-      const successMessage = `${result.message || '✅ Laporan berjaya dihantar!'}\n\n📊 Row Number: ${result.rowNumber || 'N/A'}\n\nSila semak Google Sheet untuk pengesahan.`;
+      // Add frontend timeout protection (35 seconds for dual AppScript calls)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 35000);
 
-      setMessage(successMessage);
-      setMessageType('success');
-
-      // Clear saved draft before resetting
+      let response;
       try {
-        const draftKey = getDraftKey(
-          formData.NAMA_MENTEE,
-          currentSessionNumber,
-          session?.user?.email
-        );
-        localStorage.removeItem(draftKey);
-        console.log('🗑️ [PHASE 5] Draft cleared after successful submission');
-      } catch (error) {
-        console.error('Failed to clear draft:', error);
+        response = await fetch('/api/submitMajuReportum', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(dataToSend),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+
+        if (fetchError.name === 'AbortError') {
+          throw new Error('⏱️ Request timeout - sila cuba lagi. Jika masalah berterusan, hubungi admin.');
+        }
+        throw fetchError;
       }
 
-      console.log('🔄 [PHASE 5] Resetting form...');
-      resetForm();
-      setSubmissionStage({ stage: '', message: '', detail: '' }); // Clear stage after reset
+      console.log('📥 Response status:', response.status);
+      console.log('📥 Response ok:', response.ok);
 
-      console.log('✅ [COMPLETE] Submission process completed successfully');
-      return;
+      // Safe JSON parsing with fallback
+      let result;
+      const contentType = response.headers.get('content-type');
 
-    } else if (result.partialSuccess) {
-      // Handle partial success (sheet saved but document failed)
-      console.warn('⚠️ [PHASE 5] Partial success - sheet saved but document failed');
+      try {
+        if (contentType && contentType.includes('application/json')) {
+          result = await response.json();
+          console.log('📄 Parsed response JSON:', result);
+        } else {
+          // Response is not JSON (likely HTML error page)
+          const text = await response.text();
+          console.error('❌ Non-JSON response:', text.substring(0, 200));
+          result = {
+            error: 'Server returned unexpected response. Please check Google Sheet to verify if report was saved.',
+            retryable: false,
+            serverResponse: text.substring(0, 200)
+          };
+        }
+      } catch (parseError) {
+        console.error('❌ Failed to parse response:', parseError);
+        result = {
+          error: 'Unable to read server response. Please check Google Sheet to verify if report was saved.',
+          retryable: false
+        };
+      }
 
-      // Update stage: show warning
+      // Enhanced error message based on status code
+      if (!response.ok) {
+        let userMessage = result.error || result.message;
+
+        if (response.status === 504) {
+          userMessage = `⏱️ Server timeout - your images were uploaded, but we couldn't confirm if data was saved.\n\n` +
+            `✓ Check Google Sheet to see if your report appears\n` +
+            `✗ DO NOT submit again without checking\n` +
+            `📞 Contact admin if report is missing`;
+        } else if (response.status === 408) {
+          userMessage = `${result.error || 'Request timeout'}\n\nYou can try submitting again.`;
+        }
+
+        if (result.retryable) {
+          throw new Error(`${userMessage} (Boleh cuba semula)`);
+        }
+        throw new Error(userMessage);
+      }
+
+      // Handle success
+      if (response.ok && result.success === true) {
+        console.log('✅ [PHASE 5] Submission successful!');
+        console.log('📋 [PHASE 5] Success message:', result.message);
+
+        if (result.docUrl) {
+          console.log('📄 [PHASE 5] Document URL:', result.docUrl);
+        }
+
+        // ============================================================
+        // ⚠️ REMOVED: STANDALONE UM SHEET WRITE (NOW HANDLED BY BACKEND)
+        // ============================================================
+        // The backend submitMajuReportum.js already writes to UM sheet
+        // as part of the main submission flow (matching Bangkit implementation).
+        // This frontend call to /api/submit-upward-mobility was causing
+        // duplicate entries in the UM tab.
+        //
+        // For parity with Bangkit:
+        // ✅ UM write happens INSIDE submitMajuReportum.js
+        // ❌ No separate call to /api/submit-upward-mobility
+        //
+        // Note: /api/submit-upward-mobility is a STANDALONE endpoint
+        // for optional UM-only submissions (not linked to session reports).
+        // ============================================================
+        console.log('ℹ️ [PHASE 6] UM write handled by backend (no duplicate call)');
+
+        // Update stage: complete
+        setSubmissionStage({
+          stage: 'complete',
+          message: 'Report submitted successfully!',
+          detail: ''
+        });
+
+        // Show success with row number for verification
+        const successMessage = `${result.message || '✅ Laporan berjaya dihantar!'}\n\n📊 Row Number: ${result.rowNumber || 'N/A'}\n\nSila semak Google Sheet untuk pengesahan.`;
+
+        setMessage(successMessage);
+        setMessageType('success');
+
+        // Clear saved draft before resetting
+        try {
+          const draftKey = getDraftKey(
+            formData.NAMA_MENTEE,
+            currentSessionNumber,
+            session?.user?.email
+          );
+          localStorage.removeItem(draftKey);
+          console.log('🗑️ [PHASE 5] Draft cleared after successful submission');
+        } catch (error) {
+          console.error('Failed to clear draft:', error);
+        }
+
+        console.log('🔄 [PHASE 5] Resetting form...');
+        resetForm();
+        setSubmissionStage({ stage: '', message: '', detail: '' }); // Clear stage after reset
+
+        console.log('✅ [COMPLETE] Submission process completed successfully');
+        return;
+
+      } else if (result.partialSuccess) {
+        // Handle partial success (sheet saved but document failed)
+        console.warn('⚠️ [PHASE 5] Partial success - sheet saved but document failed');
+
+        // Update stage: show warning
+        setSubmissionStage({
+          stage: 'warning',
+          message: 'Data saved but document generation timed out',
+          detail: 'Check the warning message below'
+        });
+
+        const partialMessage = `⚠️ ${result.error || 'Laporan separa berjaya'}\n\n` +
+          `✅ Data telah disimpan di Google Sheet\n` +
+          `❌ Dokumen gagal dicipta\n\n` +
+          `📊 Row Number: ${result.rowNumber}\n` +
+          `📝 Details: ${result.warning || result.message}\n\n` +
+          `💡 Sila hubungi admin dengan nombor row di atas untuk mencipta dokumen.`;
+
+        setMessage(partialMessage);
+        setMessageType('warning');
+
+        // Don't reset form completely - user might need to see data
+        console.log('⚠️ [PHASE 5] Partial success - form not reset');
+        // Don't return early - let finally block clear loading state
+
+      } else {
+        // Failure case
+        console.error('❌ [PHASE 5] Submission failed');
+        console.error('📊 [PHASE 5] Response status:', response.status);
+        console.error('📊 [PHASE 5] Result object:', result);
+
+        const errorMessage = result.error || result.message || 'Unknown error occurred';
+        const errorDetails = result.details || '';
+        const warningInfo = result.warning ? `\n⚠️ Warning: ${result.warning}` : '';
+        const rowInfo = result.rowNumber ? `\n📊 Row Number: ${result.rowNumber}` : '';
+
+        console.error('❌ [PHASE 5] Error message:', errorMessage);
+        if (errorDetails) {
+          console.error('❌ [PHASE 5] Error details:', errorDetails);
+        }
+
+        throw new Error(`${errorMessage}${warningInfo}${errorDetails ? '\n\nDetails: ' + errorDetails : ''}${rowInfo}`);
+      }
+
+    } catch (error) {
+      console.error('❌ Detailed submission error:', error);
+
+      // Determine stage-specific error message
+      let errorMessage = error.message;
+      let errorDetail = '';
+
+      if (submissionStage.stage === 'uploading') {
+        errorMessage = `❌ Image upload failed: ${error.message}`;
+        errorDetail = 'Check your internet connection and try again.';
+      } else if (submissionStage.stage === 'saving') {
+        errorMessage = `⚠️ ${error.message}`;
+        errorDetail = '';
+      }
+
       setSubmissionStage({
-        stage: 'warning',
-        message: 'Data saved but document generation timed out',
-        detail: 'Check the warning message below'
+        stage: 'error',
+        message: errorMessage,
+        detail: errorDetail
       });
 
-      const partialMessage = `⚠️ ${result.error || 'Laporan separa berjaya'}\n\n` +
-        `✅ Data telah disimpan di Google Sheet\n` +
-        `❌ Dokumen gagal dicipta\n\n` +
-        `📊 Row Number: ${result.rowNumber}\n` +
-        `📝 Details: ${result.warning || result.message}\n\n` +
-        `💡 Sila hubungi admin dengan nombor row di atas untuk mencipta dokumen.`;
-
-      setMessage(partialMessage);
-      setMessageType('warning');
-
-      // Don't reset form completely - user might need to see data
-      console.log('⚠️ [PHASE 5] Partial success - form not reset');
-      // Don't return early - let finally block clear loading state
-
-    } else {
-      // Failure case
-      console.error('❌ [PHASE 5] Submission failed');
-      console.error('📊 [PHASE 5] Response status:', response.status);
-      console.error('📊 [PHASE 5] Result object:', result);
-
-      const errorMessage = result.error || result.message || 'Unknown error occurred';
-      const errorDetails = result.details || '';
-      const warningInfo = result.warning ? `\n⚠️ Warning: ${result.warning}` : '';
-      const rowInfo = result.rowNumber ? `\n📊 Row Number: ${result.rowNumber}` : '';
-
-      console.error('❌ [PHASE 5] Error message:', errorMessage);
-      if (errorDetails) {
-        console.error('❌ [PHASE 5] Error details:', errorDetails);
-      }
-
-      throw new Error(`${errorMessage}${warningInfo}${errorDetails ? '\n\nDetails: ' + errorDetails : ''}${rowInfo}`);
+      setMessage(`Failed to submit Laporan: ${error.message}`);
+      setMessageType('error');
+    } finally {
+      setLoading(false);
     }
-
-  } catch (error) {
-    console.error('❌ Detailed submission error:', error);
-
-    // Determine stage-specific error message
-    let errorMessage = error.message;
-    let errorDetail = '';
-
-    if (submissionStage.stage === 'uploading') {
-      errorMessage = `❌ Image upload failed: ${error.message}`;
-      errorDetail = 'Check your internet connection and try again.';
-    } else if (submissionStage.stage === 'saving') {
-      errorMessage = `⚠️ ${error.message}`;
-      errorDetail = '';
-    }
-
-    setSubmissionStage({
-      stage: 'error',
-      message: errorMessage,
-      detail: errorDetail
-    });
-
-    setMessage(`Failed to submit Laporan: ${error.message}`);
-    setMessageType('error');
-  } finally {
-    setLoading(false);
-  }
-};
+  };
   // Early returns for authentication and session limits
   if (!session) {
     return (
@@ -1366,8 +1258,8 @@ const handleSubmit = async (e) => {
             <InfoCard
               title={
                 messageType === 'success' ? 'Success' :
-                messageType === 'warning' ? 'Partial Success' :
-                'Error'
+                  messageType === 'warning' ? 'Partial Success' :
+                    'Error'
               }
               type={messageType}
             >
@@ -1574,110 +1466,110 @@ Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun la
                       'January', 'February', 'March', 'April', 'May', 'June',
                       'July', 'August', 'September', 'October', 'November', 'December'
                     ];
-                    
+
                     // Parse existing Bulan value (e.g., "January 2024" or handle legacy formats)
                     const bulanParts = (data.Bulan || '').split(' ');
                     const selectedMonth = bulanParts[0] || '';
                     const selectedYear = bulanParts[1] || currentYear.toString();
-                    
+
                     return (
-                    <div key={index} className="border p-4 mb-4 rounded-md bg-gray-50">
-                      <h4 className="font-semibold text-gray-700 mb-2">Bulan #{index + 1}</h4>
-                      
-                      {/* Month and Year Dropdowns Side by Side */}
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Bulan
-                        </label>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <select
-                              name="Month"
-                              value={selectedMonth}
-                              onChange={(e) => {
-                                const newBulan = `${e.target.value} ${selectedYear}`;
-                                handleDynamicChange('DATA_KEWANGAN_BULANAN_JSON', index, 'Bulan', newBulan);
-                              }}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
-                            >
-                              <option value="">Select Month</option>
-                              {monthOptions.map((month) => (
-                                <option key={month} value={month}>{month}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <select
-                              name="Year"
-                              value={selectedYear}
-                              onChange={(e) => {
-                                const newBulan = `${selectedMonth} ${e.target.value}`;
-                                handleDynamicChange('DATA_KEWANGAN_BULANAN_JSON', index, 'Bulan', newBulan);
-                              }}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
-                            >
-                              <option value="">Select Year</option>
-                              {yearOptions.map((year) => (
-                                <option key={year} value={year}>{year}</option>
-                              ))}
-                            </select>
+                      <div key={index} className="border p-4 mb-4 rounded-md bg-gray-50">
+                        <h4 className="font-semibold text-gray-700 mb-2">Bulan #{index + 1}</h4>
+
+                        {/* Month and Year Dropdowns Side by Side */}
+                        <div className="mb-4">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Bulan
+                          </label>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <select
+                                name="Month"
+                                value={selectedMonth}
+                                onChange={(e) => {
+                                  const newBulan = `${e.target.value} ${selectedYear}`;
+                                  handleDynamicChange('DATA_KEWANGAN_BULANAN_JSON', index, 'Bulan', newBulan);
+                                }}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                              >
+                                <option value="">Select Month</option>
+                                {monthOptions.map((month) => (
+                                  <option key={month} value={month}>{month}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <select
+                                name="Year"
+                                value={selectedYear}
+                                onChange={(e) => {
+                                  const newBulan = `${selectedMonth} ${e.target.value}`;
+                                  handleDynamicChange('DATA_KEWANGAN_BULANAN_JSON', index, 'Bulan', newBulan);
+                                }}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                              >
+                                <option value="">Select Year</option>
+                                {yearOptions.map((year) => (
+                                  <option key={year} value={year}>{year}</option>
+                                ))}
+                              </select>
+                            </div>
                           </div>
                         </div>
+
+                        <InputField
+                          label="Jumlah Jualan (RM)"
+                          name="Jumlah Jualan"
+                          type="number"
+                          value={data['Jumlah Jualan'] || ''}
+                          onChange={(e) =>
+                            handleDynamicChange('DATA_KEWANGAN_BULANAN_JSON', index, 'Jumlah Jualan', parseFloat(e.target.value) || 0)
+                          }
+                        />
+                        <InputField
+                          label="Kos Jualan (RM)"
+                          name="Kos Jualan"
+                          type="number"
+                          value={data['Kos Jualan'] || ''}
+                          onChange={(e) =>
+                            handleDynamicChange('DATA_KEWANGAN_BULANAN_JSON', index, 'Kos Jualan', parseFloat(e.target.value) || 0)
+                          }
+                        />
+                        <InputField
+                          label="Perbelanjaan Tetap (RM)"
+                          name="Perbelanjaan Tetap"
+                          type="number"
+                          value={data['Perbelanjaan Tetap'] || ''}
+                          onChange={(e) =>
+                            handleDynamicChange('DATA_KEWANGAN_BULANAN_JSON', index, 'Perbelanjaan Tetap', parseFloat(e.target.value) || 0)
+                          }
+                        />
+                        <InputField
+                          label="Lebihan Tunai (RM)"
+                          name="Lebihan Tunai"
+                          type="number"
+                          value={data['Lebihan Tunai'] || ''}
+                          onChange={(e) =>
+                            handleDynamicChange('DATA_KEWANGAN_BULANAN_JSON', index, 'Lebihan Tunai', parseFloat(e.target.value) || 0)
+                          }
+                        />
+                        <TextArea
+                          label="Ulasan Mentor"
+                          name="Ulasan Mentor"
+                          value={data['Ulasan Mentor'] || ''}
+                          onChange={(e) =>
+                            handleDynamicChange('DATA_KEWANGAN_BULANAN_JSON', index, 'Ulasan Mentor', e.target.value)
+                          }
+                          rows={2}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeRow('DATA_KEWANGAN_BULANAN_JSON', index)}
+                          className="mt-2 bg-red-500 text-white px-3 py-1 rounded-md text-sm hover:bg-red-600"
+                        >
+                          Remove Bulan
+                        </button>
                       </div>
-                      
-                      <InputField
-                        label="Jumlah Jualan (RM)"
-                        name="Jumlah Jualan"
-                        type="number"
-                        value={data['Jumlah Jualan'] || ''}
-                        onChange={(e) =>
-                          handleDynamicChange('DATA_KEWANGAN_BULANAN_JSON', index, 'Jumlah Jualan', parseFloat(e.target.value) || 0)
-                        }
-                      />
-                      <InputField
-                        label="Kos Jualan (RM)"
-                        name="Kos Jualan"
-                        type="number"
-                        value={data['Kos Jualan'] || ''}
-                        onChange={(e) =>
-                          handleDynamicChange('DATA_KEWANGAN_BULANAN_JSON', index, 'Kos Jualan', parseFloat(e.target.value) || 0)
-                        }
-                      />
-                      <InputField
-                        label="Perbelanjaan Tetap (RM)"
-                        name="Perbelanjaan Tetap"
-                        type="number"
-                        value={data['Perbelanjaan Tetap'] || ''}
-                        onChange={(e) =>
-                          handleDynamicChange('DATA_KEWANGAN_BULANAN_JSON', index, 'Perbelanjaan Tetap', parseFloat(e.target.value) || 0)
-                        }
-                      />
-                      <InputField
-                        label="Lebihan Tunai (RM)"
-                        name="Lebihan Tunai"
-                        type="number"
-                        value={data['Lebihan Tunai'] || ''}
-                        onChange={(e) =>
-                          handleDynamicChange('DATA_KEWANGAN_BULANAN_JSON', index, 'Lebihan Tunai', parseFloat(e.target.value) || 0)
-                        }
-                      />
-                      <TextArea
-                        label="Ulasan Mentor"
-                        name="Ulasan Mentor"
-                        value={data['Ulasan Mentor'] || ''}
-                        onChange={(e) =>
-                          handleDynamicChange('DATA_KEWANGAN_BULANAN_JSON', index, 'Ulasan Mentor', e.target.value)
-                        }
-                        rows={2}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeRow('DATA_KEWANGAN_BULANAN_JSON', index)}
-                        className="mt-2 bg-red-500 text-white px-3 py-1 rounded-md text-sm hover:bg-red-600"
-                      >
-                        Remove Bulan
-                      </button>
-                    </div>
                     );
                   })}
                   <button
@@ -1715,7 +1607,7 @@ Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun la
                       <p className="text-sm text-blue-700 mb-4">
                         <strong>Sila pilih untuk kemaskini:</strong> Samada <em>Kemajuan</em> (jika ada progress) atau <em>Cabaran</em> (jika ada halangan) untuk setiap tindakan. Tidak perlu isi kedua-duanya.
                       </p>
-                      
+
                       {previousMentoringFindings.map((finding, findingIndex) => (
                         finding['Pelan Tindakan'] && Array.isArray(finding['Pelan Tindakan']) && finding['Pelan Tindakan'].length > 0 && (
                           <div key={findingIndex} className="bg-white p-4 mb-4 rounded-lg border">
@@ -1725,7 +1617,7 @@ Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun la
                             <p className="text-sm text-gray-600 mb-4">
                               Hasil Diharapkan: {finding['Hasil yang Diharapkan']}
                             </p>
-                            
+
                             {finding['Pelan Tindakan'].map((plan, planIndex) => (
                               <div key={planIndex} className="bg-gray-50 p-3 mb-3 rounded border-l-4 border-orange-400">
                                 <div className="mb-2">
@@ -1735,7 +1627,7 @@ Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun la
                                     Jangkaan Siap: {plan['Jangkaan tarikh siap'] || 'N/A'}
                                   </p>
                                 </div>
-                                
+
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
                                   <TextArea
                                     label="✅ Kemajuan (Progress) - Pilihan 1"
@@ -1752,7 +1644,7 @@ Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun la
                                     rows={3}
                                     placeholder="Pilih ini jika ada kemajuan untuk tindakan ini..."
                                   />
-                                  
+
                                   <TextArea
                                     label="⚠️ Cabaran (Challenges) - Pilihan 2"
                                     name={`cabaran_${findingIndex}_${planIndex}`}
@@ -1774,7 +1666,7 @@ Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun la
                           </div>
                         )
                       ))}
-                      
+
                       <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
                         <p className="text-sm text-yellow-800">
                           💡 <strong>Tip:</strong> Kemaskini progress dan cabaran ini akan dimasukkan ke dalam dokumen laporan untuk menunjukkan perkembangan dari sesi ke sesi.
@@ -2116,761 +2008,430 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
               </div>
 
               {/* --- Section 4: Bank Islam & Fintech --- */}
+              {/* --- Section 4: Bank Islam & Fintech --- */}
               <div className="bg-white p-6 rounded-lg shadow-sm border-l-4 border-orange-500">
                 <Section title={
                   <div className="flex items-center justify-between">
-                    <span>Bahagian 4: Penggunaan Saluran Bank Islam & Fintech</span>
+                    <span>{UPWARD_MOBILITY_SECTIONS.SECTION_4.title}</span>
                     <span className="ml-auto px-3 py-1 text-xs font-semibold text-white bg-orange-500 rounded-full uppercase tracking-wide">
                       UPWARD MOBILITY
                     </span>
                   </div>
                 }>
                   <div className="space-y-4">
-                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                      <div className="font-semibold text-gray-700 mb-2">1. Penggunaan Akaun Semasa BIMB (Current Account)</div>
-                      <div className="text-sm text-gray-600 mb-3">
-                        <p className="mb-1"><strong>Klik Yes</strong> - Jika usahawan menggunakan secara aktif untuk transaksi bisnes.</p>
-                        <p><strong>Klik No</strong> - Jika usahawan hanya menggunakan untuk membayar pembiayaan atau tidak aktif.</p>
-                      </div>
-                      <div className="flex gap-4">
-                        <label className="flex items-center cursor-pointer">
-                          <input
-                            type="radio"
-                            name="UM_AKAUN_BIMB"
-                            value="Ya"
-                            checked={formData.UPWARD_MOBILITY.UM_AKAUN_BIMB === 'Ya'}
-                            onChange={(e) => handleUMChange('UM_AKAUN_BIMB', e.target.value)}
-                            className="mr-2"
-                          />
-                          <span>Yes</span>
-                        </label>
-                        <label className="flex items-center cursor-pointer">
-                          <input
-                            type="radio"
-                            name="UM_AKAUN_BIMB"
-                            value="Tidak"
-                            checked={formData.UPWARD_MOBILITY.UM_AKAUN_BIMB === 'Tidak'}
-                            onChange={(e) => handleUMChange('UM_AKAUN_BIMB', e.target.value)}
-                            className="mr-2"
-                          />
-                          <span>No</span>
-                        </label>
-                      </div>
-                    </div>
-
-                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                      <div className="font-semibold text-gray-700 mb-2">2. Penggunaan BIMB Biz</div>
-                      <div className="text-sm text-gray-600 mb-3">
-                        <p>Aplikasi perbankan mudah alih yang membolehkan usahawan mengurus perniagaan harian mereka dengan cepat dan selamat.</p>
-                      </div>
-                      <div className="flex gap-4">
-                        <label className="flex items-center cursor-pointer">
-                          <input
-                            type="radio"
-                            name="UM_BIMB_BIZ"
-                            value="Ya"
-                            checked={formData.UPWARD_MOBILITY.UM_BIMB_BIZ === 'Ya'}
-                            onChange={(e) => handleUMChange('UM_BIMB_BIZ', e.target.value)}
-                            className="mr-2"
-                          />
-                          <span>Yes</span>
-                        </label>
-                        <label className="flex items-center cursor-pointer">
-                          <input
-                            type="radio"
-                            name="UM_BIMB_BIZ"
-                            value="Tidak"
-                            checked={formData.UPWARD_MOBILITY.UM_BIMB_BIZ === 'Tidak'}
-                            onChange={(e) => handleUMChange('UM_BIMB_BIZ', e.target.value)}
-                            className="mr-2"
-                          />
-                          <span>No</span>
-                        </label>
-                      </div>
-                    </div>
-
-                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                      <div className="font-semibold text-gray-700 mb-2">3. Buka akaun Al-Awfar (Opened Al-Awfar Account)</div>
-                      <div className="text-sm text-gray-600 mb-3">
-                        <p className="mb-1"><strong>Klik Yes</strong> - Jika usahawan membuka akaun Al-Awfar.</p>
-                        <p><strong>Klik No</strong> - Jika usahawan tidak membuka akaun Al-Awfar.</p>
-                      </div>
-                      <div className="flex gap-4">
-                        <label className="flex items-center cursor-pointer">
-                          <input
-                            type="radio"
-                            name="UM_AL_AWFAR"
-                            value="Ya"
-                            checked={formData.UPWARD_MOBILITY.UM_AL_AWFAR === 'Ya'}
-                            onChange={(e) => handleUMChange('UM_AL_AWFAR', e.target.value)}
-                            className="mr-2"
-                          />
-                          <span>Yes</span>
-                        </label>
-                        <label className="flex items-center cursor-pointer">
-                          <input
-                            type="radio"
-                            name="UM_AL_AWFAR"
-                            value="Tidak"
-                            checked={formData.UPWARD_MOBILITY.UM_AL_AWFAR === 'Tidak'}
-                            onChange={(e) => handleUMChange('UM_AL_AWFAR', e.target.value)}
-                            className="mr-2"
-                          />
-                          <span>No</span>
-                        </label>
-                      </div>
-                    </div>
-
-                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                      <div className="font-semibold text-gray-700 mb-2">4. Penggunaan BIMB Merchant Terminal/ Pay2phone</div>
-                      <div className="text-sm text-gray-600 mb-3">
-                        <p className="mb-1">Aplikasi Bank Islam yang membenarkan usahawan menerima pembayaran tanpa sentuh kad kredit & kad debit melalui telefon bimbit android usahawan yang menggunakan Teknologi NFC.</p>
-                        <p className="mb-1"><strong>Klik Yes</strong> - Jika usahawan ada menggunakan walaupun jarang-jarang.</p>
-                        <p><strong>Klik No</strong> - Jika usahawan tidak pernah menggunakan / tidak tersedia.</p>
-                      </div>
-                      <div className="flex gap-4">
-                        <label className="flex items-center cursor-pointer">
-                          <input
-                            type="radio"
-                            name="UM_MERCHANT_TERMINAL"
-                            value="Ya"
-                            checked={formData.UPWARD_MOBILITY.UM_MERCHANT_TERMINAL === 'Ya'}
-                            onChange={(e) => handleUMChange('UM_MERCHANT_TERMINAL', e.target.value)}
-                            className="mr-2"
-                          />
-                          <span>Yes</span>
-                        </label>
-                        <label className="flex items-center cursor-pointer">
-                          <input
-                            type="radio"
-                            name="UM_MERCHANT_TERMINAL"
-                            value="Tidak"
-                            checked={formData.UPWARD_MOBILITY.UM_MERCHANT_TERMINAL === 'Tidak'}
-                            onChange={(e) => handleUMChange('UM_MERCHANT_TERMINAL', e.target.value)}
-                            className="mr-2"
-                          />
-                          <span>No</span>
-                        </label>
-                      </div>
-                    </div>
-
-                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                      <div className="font-semibold text-gray-700 mb-2">5. Lain-lain Fasiliti BIMB (Other BIMB Facilities)</div>
-                      <div className="text-sm text-gray-600 mb-3">
-                        <p className="mb-1">Fasiliti yang ditawarkan oleh BIMB untuk bisnes sahaja seperti kad kredit bisnes dan lain-lain.</p>
-                        <p className="mb-1"><strong>Klik Yes</strong> - Jika ada menggunakan fasiliti BIMB yang lain untuk bisnes usahawan SAHAJA SELEPAS mendapat pembiayaan daripada BIMB (contoh kad kredit perniagaan dan lain-lain yang melibatkan BISNES SAHAJA, bukan peribadi).</p>
-                        <p><strong>Klik No</strong> - Jika tidak menggunakan mana-mana servis / fasiliti BIMB SELEPAS mendapat pembiayaan.</p>
-                      </div>
-                      <div className="flex gap-4">
-                        <label className="flex items-center cursor-pointer">
-                          <input
-                            type="radio"
-                            name="UM_FASILITI_LAIN"
-                            value="Ya"
-                            checked={formData.UPWARD_MOBILITY.UM_FASILITI_LAIN === 'Ya'}
-                            onChange={(e) => handleUMChange('UM_FASILITI_LAIN', e.target.value)}
-                            className="mr-2"
-                          />
-                          <span>Yes</span>
-                        </label>
-                        <label className="flex items-center cursor-pointer">
-                          <input
-                            type="radio"
-                            name="UM_FASILITI_LAIN"
-                            value="Tidak"
-                            checked={formData.UPWARD_MOBILITY.UM_FASILITI_LAIN === 'Tidak'}
-                            onChange={(e) => handleUMChange('UM_FASILITI_LAIN', e.target.value)}
-                            className="mr-2"
-                          />
-                          <span>No</span>
-                        </label>
-                      </div>
-                    </div>
-
-                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                      <div className="font-semibold text-gray-700 mb-2">6. Melanggan aplikasi MesinKira (Subscribed Mesinkira Apps)</div>
-                      <div className="text-sm text-gray-600 mb-3">
-                        <p className="mb-1"><strong>Klik Yes</strong> - Jika ada melanggan aplikasi MesinKira walaupun tidak pernah atau jarang digunakan.</p>
-                        <p><strong>Klik No</strong> - Tidak pernah subscribe aplikasi MesinKira.</p>
-                      </div>
-                      <div className="flex gap-4">
-                        <label className="flex items-center cursor-pointer">
-                          <input
-                            type="radio"
-                            name="UM_MESINKIRA"
-                            value="Ya"
-                            checked={formData.UPWARD_MOBILITY.UM_MESINKIRA === 'Ya'}
-                            onChange={(e) => handleUMChange('UM_MESINKIRA', e.target.value)}
-                            className="mr-2"
-                          />
-                          <span>Yes</span>
-                        </label>
-                        <label className="flex items-center cursor-pointer">
-                          <input
-                            type="radio"
-                            name="UM_MESINKIRA"
-                            value="Tidak"
-                            checked={formData.UPWARD_MOBILITY.UM_MESINKIRA === 'Tidak'}
-                            onChange={(e) => handleUMChange('UM_MESINKIRA', e.target.value)}
-                            className="mr-2"
-                          />
-                          <span>No</span>
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                </Section>
-              </div>
-
-              {/* --- Section 5: Situasi Kewangan --- */}
-              <div className="bg-white p-6 rounded-lg shadow-sm border-l-4 border-orange-500">
-                <Section title={
-                  <div className="flex items-center justify-between">
-                    <span>Bahagian 5: Situasi Kewangan Perniagaan (Semasa)</span>
-                    <span className="ml-auto px-3 py-1 text-xs font-semibold text-white bg-orange-500 rounded-full uppercase tracking-wide">
-                      UPWARD MOBILITY
-                    </span>
-                  </div>
-                }>
-                  <InfoCard message="💡 Masukkan maklumat kewangan SEMASA sahaja. Sistem akan bandingkan dengan sesi-sesi lepas untuk track kemajuan." />
-
-                  <div className="space-y-6">
-                    {/* Pendapatan */}
-                    <div className="border-l-4 border-orange-300 pl-4">
-                      <InputField
-                        label="Jumlah Pendapatan Perniagaan Semasa (RM sebulan)"
-                        type="number"
-                        name="UM_PENDAPATAN_SEMASA"
-                        value={formData.UPWARD_MOBILITY.UM_PENDAPATAN_SEMASA}
-                        onChange={(e) => handleUMChange('UM_PENDAPATAN_SEMASA', e.target.value)}
-                        placeholder="Cth: 8000"
-                        step="0.01"
-                      />
-                      <div className="mt-3 bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                        <TextArea
-                          label="Ulasan Mentor *"
-                          name="UM_ULASAN_PENDAPATAN"
-                          value={formData.UPWARD_MOBILITY.UM_ULASAN_PENDAPATAN}
-                          onChange={(e) => handleUMChange('UM_ULASAN_PENDAPATAN', e.target.value)}
-                          rows={2}
-                          placeholder="Cth: Pendapatan meningkat berbanding sesi lepas. Tambahan pelanggan dari online marketing."
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    {/* Bilangan Pekerja */}
-                    <div className="border-l-4 border-orange-300 pl-4">
-                      <InputField
-                        label="Bilangan Pekerja Semasa"
-                        type="number"
-                        name="UM_PEKERJA_SEMASA"
-                        value={formData.UPWARD_MOBILITY.UM_PEKERJA_SEMASA}
-                        onChange={(e) => handleUMChange('UM_PEKERJA_SEMASA', e.target.value)}
-                        placeholder="Cth: 2"
-                      />
-                      <div className="mt-3 bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                        <TextArea
-                          label="Ulasan Mentor *"
-                          name="UM_ULASAN_PEKERJA"
-                          value={formData.UPWARD_MOBILITY.UM_ULASAN_PEKERJA}
-                          onChange={(e) => handleUMChange('UM_ULASAN_PEKERJA', e.target.value)}
-                          rows={2}
-                          placeholder="Cth: Tambah 1 pekerja part-time untuk bantu packaging."
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    {/* Nilai Aset Bukan Tunai */}
-                    <div className="border-l-4 border-orange-300 pl-4">
-                      <InputField
-                        label="Nilai Aset Bukan Tunai Semasa (RM)"
-                        type="number"
-                        name="UM_ASET_BUKAN_TUNAI_SEMASA"
-                        value={formData.UPWARD_MOBILITY.UM_ASET_BUKAN_TUNAI_SEMASA}
-                        onChange={(e) => handleUMChange('UM_ASET_BUKAN_TUNAI_SEMASA', e.target.value)}
-                        placeholder="Cth: 15000"
-                        step="0.01"
-                      />
-                      <div className="mt-3 bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                        <TextArea
-                          label="Ulasan Mentor *"
-                          name="UM_ULASAN_ASET_BUKAN_TUNAI"
-                          value={formData.UPWARD_MOBILITY.UM_ULASAN_ASET_BUKAN_TUNAI}
-                          onChange={(e) => handleUMChange('UM_ULASAN_ASET_BUKAN_TUNAI', e.target.value)}
-                          rows={2}
-                          placeholder="Cth: Beli mesin baru guna geran BIMB."
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    {/* Nilai Aset Tunai */}
-                    <div className="border-l-4 border-orange-300 pl-4">
-                      <InputField
-                        label="Nilai Aset Tunai Semasa (RM)"
-                        type="number"
-                        name="UM_ASET_TUNAI_SEMASA"
-                        value={formData.UPWARD_MOBILITY.UM_ASET_TUNAI_SEMASA}
-                        onChange={(e) => handleUMChange('UM_ASET_TUNAI_SEMASA', e.target.value)}
-                        placeholder="Cth: 5000"
-                        step="0.01"
-                      />
-                      <div className="mt-3 bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                        <TextArea
-                          label="Ulasan Mentor *"
-                          name="UM_ULASAN_ASET_TUNAI"
-                          value={formData.UPWARD_MOBILITY.UM_ULASAN_ASET_TUNAI}
-                          onChange={(e) => handleUMChange('UM_ULASAN_ASET_TUNAI', e.target.value)}
-                          rows={2}
-                          placeholder="Cth: Cash flow lebih baik berbanding bulan lepas."
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    {/* Simpanan */}
-                    <div className="border-l-4 border-orange-300 pl-4">
-                      <InputField
-                        label="Simpanan Perniagaan Semasa (RM)"
-                        type="number"
-                        name="UM_SIMPANAN_SEMASA"
-                        value={formData.UPWARD_MOBILITY.UM_SIMPANAN_SEMASA}
-                        onChange={(e) => handleUMChange('UM_SIMPANAN_SEMASA', e.target.value)}
-                        placeholder="Cth: 3000"
-                        step="0.01"
-                      />
-                      <div className="mt-3 bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                        <TextArea
-                          label="Ulasan Mentor *"
-                          name="UM_ULASAN_SIMPANAN"
-                          value={formData.UPWARD_MOBILITY.UM_ULASAN_SIMPANAN}
-                          onChange={(e) => handleUMChange('UM_ULASAN_SIMPANAN', e.target.value)}
-                          rows={2}
-                          placeholder="Cth: Usahawan mula ada simpanan kecemasan."
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    {/* Zakat */}
-                    <div className="border-l-4 border-orange-300 pl-4">
-                      <div className="mb-2">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Pembayaran Zakat Perniagaan Semasa (Ya/Tidak)
-                        </label>
+                    {UPWARD_MOBILITY_SECTIONS.SECTION_4.items.map((item) => (
+                      <div key={item.id} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                        <div className="font-semibold text-gray-700 mb-2">{item.title}</div>
+                        <div className="text-sm text-gray-600 mb-3">
+                          {item.desc.split('\n').map((line, i) => (
+                            <p key={i} className="mb-1">
+                              {line.includes('Klik Yes') || line.includes('Klik No') ? (
+                                <><strong>{line.split('-')[0]}</strong> -{line.split('-').slice(1).join('-')}</>
+                              ) : line}
+                            </p>
+                          ))}
+                        </div>
                         <div className="flex gap-4">
                           <label className="flex items-center cursor-pointer">
                             <input
                               type="radio"
-                              name="UM_ZAKAT_SEMASA"
                               value="Ya"
-                              checked={formData.UPWARD_MOBILITY.UM_ZAKAT_SEMASA === 'Ya'}
-                              onChange={(e) => handleUMChange('UM_ZAKAT_SEMASA', e.target.value)}
+                              checked={formData.UPWARD_MOBILITY[item.id] === 'Ya'}
+                              onChange={(e) => handleUMChange(item.id, e.target.value)}
                               className="mr-2"
                             />
-                            <span>Ya</span>
+                            <span>Yes</span>
                           </label>
                           <label className="flex items-center cursor-pointer">
                             <input
                               type="radio"
-                              name="UM_ZAKAT_SEMASA"
                               value="Tidak"
-                              checked={formData.UPWARD_MOBILITY.UM_ZAKAT_SEMASA === 'Tidak'}
-                              onChange={(e) => handleUMChange('UM_ZAKAT_SEMASA', e.target.value)}
+                              checked={formData.UPWARD_MOBILITY[item.id] === 'Tidak'}
+                              onChange={(e) => handleUMChange(item.id, e.target.value)}
                               className="mr-2"
                             />
-                            <span>Tidak</span>
+                            <span>No</span>
                           </label>
                         </div>
                       </div>
-                      <div className="mt-3 bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                        <TextArea
-                          label="Ulasan Mentor *"
-                          name="UM_ULASAN_ZAKAT"
-                          value={formData.UPWARD_MOBILITY.UM_ULASAN_ZAKAT}
-                          onChange={(e) => handleUMChange('UM_ULASAN_ZAKAT', e.target.value)}
-                          rows={2}
-                          placeholder="Cth: Usahawan bayar zakat RM500 untuk tahun ini."
-                          required
-                        />
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 </Section>
               </div>
 
-              {/* --- Section 6: Digital & Marketing --- */}
+              {/* --- Section 5: Situasi Kewangan Perniagaan (Semasa) --- */}
               <div className="bg-white p-6 rounded-lg shadow-sm border-l-4 border-orange-500">
                 <Section title={
                   <div className="flex items-center justify-between">
-                    <span>Bahagian 6: Digitalisasi & Pemasaran Online (Semasa)</span>
+                    <span>{UPWARD_MOBILITY_SECTIONS.SECTION_5.title}</span>
+                    <span className="ml-auto px-3 py-1 text-xs font-semibold text-white bg-orange-500 rounded-full uppercase tracking-wide">
+                      UPWARD MOBILITY
+                    </span>
+                  </div>
+                }>
+                  <InfoCard>
+                    {UPWARD_MOBILITY_SECTIONS.SECTION_5.infoMessage}
+                  </InfoCard>
+
+                  <div className="space-y-6">
+                    {UPWARD_MOBILITY_SECTIONS.SECTION_5.items.map((item) => (
+                      <div key={item.field} className="border-l-4 border-orange-300 pl-4">
+                        {item.type === 'radio_yes_no' ? (
+                          <div className="mb-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              {item.label} <span className="text-red-500">*</span>
+                            </label>
+                            <div className="flex gap-4">
+                              <label className="flex items-center cursor-pointer">
+                                <input
+                                  type="radio"
+                                  value="Ya"
+                                  checked={formData.UPWARD_MOBILITY[item.field] === 'Ya'}
+                                  onChange={(e) => handleUMChange(item.field, e.target.value)}
+                                  className="mr-2"
+                                />
+                                <span>Ya</span>
+                              </label>
+                              <label className="flex items-center cursor-pointer">
+                                <input
+                                  type="radio"
+                                  value="Tidak"
+                                  checked={formData.UPWARD_MOBILITY[item.field] === 'Tidak'}
+                                  onChange={(e) => handleUMChange(item.field, e.target.value)}
+                                  className="mr-2"
+                                />
+                                <span>Tidak</span>
+                              </label>
+                            </div>
+                          </div>
+                        ) : (
+                          <InputField
+                            label={item.label + ' *'}
+                            type="number"
+                            value={formData.UPWARD_MOBILITY[item.field]}
+                            onChange={(e) => handleUMChange(item.field, e.target.value)}
+                            placeholder={item.placeholder}
+                            step="0.01"
+                            required
+                          />
+                        )}
+                        <div className="mt-3 bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                          <TextArea
+                            label={item.ulasanLabel}
+                            value={formData.UPWARD_MOBILITY[item.ulasanField]}
+                            onChange={(e) => handleUMChange(item.ulasanField, e.target.value)}
+                            rows={2}
+                            placeholder={item.ulasanPlaceholder}
+                            required
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Section>
+              </div>
+
+              {/* --- Section 6: Digitalisasi & Pemasaran Online (Semasa) --- */}
+              <div className="bg-white p-6 rounded-lg shadow-sm border-l-4 border-orange-500">
+                <Section title={
+                  <div className="flex items-center justify-between">
+                    <span>{UPWARD_MOBILITY_SECTIONS.SECTION_6.title}</span>
                     <span className="ml-auto px-3 py-1 text-xs font-semibold text-white bg-orange-500 rounded-full uppercase tracking-wide">
                       UPWARD MOBILITY
                     </span>
                   </div>
                 }>
                   <div className="space-y-6">
-                    {/* Penggunaan Digital */}
+                    {/* Digital */}
                     <div className="border-l-4 border-orange-300 pl-4">
                       <label className="block text-sm font-medium text-gray-700 mb-3">
-                        Penggunaan Digital Semasa
+                        {UPWARD_MOBILITY_SECTIONS.SECTION_6.digital.label} <span className="text-red-500">*</span>
                       </label>
                       <div className="space-y-2">
-                        <label className="flex items-center p-2 hover:bg-orange-50 rounded cursor-pointer">
-                          <input
-                            type="checkbox"
-                            value="WhatsApp Business"
-                            checked={(formData.UPWARD_MOBILITY.UM_DIGITAL_SEMASA || []).includes('WhatsApp Business')}
-                            onChange={(e) => handleUMCheckboxChange('UM_DIGITAL_SEMASA', 'WhatsApp Business', e.target.checked)}
-                            className="mr-3"
-                          />
-                          <span>WhatsApp Business</span>
-                        </label>
-                        <label className="flex items-center p-2 hover:bg-orange-50 rounded cursor-pointer">
-                          <input
-                            type="checkbox"
-                            value="Facebook Page / Instagram Page"
-                            checked={(formData.UPWARD_MOBILITY.UM_DIGITAL_SEMASA || []).includes('Facebook Page / Instagram Page')}
-                            onChange={(e) => handleUMCheckboxChange('UM_DIGITAL_SEMASA', 'Facebook Page / Instagram Page', e.target.checked)}
-                            className="mr-3"
-                          />
-                          <span>Facebook Page / Instagram Page</span>
-                        </label>
-                        <label className="flex items-center p-2 hover:bg-orange-50 rounded cursor-pointer">
-                          <input
-                            type="checkbox"
-                            value="Website Sendiri"
-                            checked={(formData.UPWARD_MOBILITY.UM_DIGITAL_SEMASA || []).includes('Website Sendiri')}
-                            onChange={(e) => handleUMCheckboxChange('UM_DIGITAL_SEMASA', 'Website Sendiri', e.target.checked)}
-                            className="mr-3"
-                          />
-                          <span>Website Sendiri</span>
-                        </label>
-                        <label className="flex items-center p-2 hover:bg-orange-50 rounded cursor-pointer">
-                          <input
-                            type="checkbox"
-                            value="Payment Gateway Online"
-                            checked={(formData.UPWARD_MOBILITY.UM_DIGITAL_SEMASA || []).includes('Payment Gateway Online')}
-                            onChange={(e) => handleUMCheckboxChange('UM_DIGITAL_SEMASA', 'Payment Gateway Online', e.target.checked)}
-                            className="mr-3"
-                          />
-                          <span>Payment Gateway Online</span>
-                        </label>
-                        <label className="flex items-center p-2 hover:bg-orange-50 rounded cursor-pointer">
-                          <input
-                            type="checkbox"
-                            value="Sistem Perakaunan Digital"
-                            checked={(formData.UPWARD_MOBILITY.UM_DIGITAL_SEMASA || []).includes('Sistem Perakaunan Digital')}
-                            onChange={(e) => handleUMCheckboxChange('UM_DIGITAL_SEMASA', 'Sistem Perakaunan Digital', e.target.checked)}
-                            className="mr-3"
-                          />
-                          <span>Sistem Perakaunan Digital</span>
-                        </label>
-                      </div>
-                      <div className="mt-3 bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                        <TextArea
-                          label="Ulasan Mentor (Penggunaan Digital) *"
-                          name="UM_ULASAN_DIGITAL"
-                          value={formData.UPWARD_MOBILITY.UM_ULASAN_DIGITAL}
-                          onChange={(e) => handleUMChange('UM_ULASAN_DIGITAL', e.target.value)}
-                          rows={2}
-                          placeholder="Cth: Usahawan sudah mula guna WhatsApp Business dan social media dengan konsisten."
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    {/* Jualan & Pemasaran */}
-                    <div className="border-l-4 border-orange-300 pl-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-3">
-                        Jualan & Pemasaran Online Semasa
-                      </label>
-                      <div className="space-y-2">
-                        <label className="flex items-center p-2 hover:bg-orange-50 rounded cursor-pointer">
-                          <input
-                            type="checkbox"
-                            value="Jualan Bisnes secara Online (e-commerce)"
-                            checked={(formData.UPWARD_MOBILITY.UM_MARKETING_SEMASA || []).includes('Jualan Bisnes secara Online (e-commerce)')}
-                            onChange={(e) => handleUMCheckboxChange('UM_MARKETING_SEMASA', 'Jualan Bisnes secara Online (e-commerce)', e.target.checked)}
-                            className="mr-3"
-                          />
-                          <span>Jualan Bisnes secara Online (e-commerce)</span>
-                        </label>
-                        <label className="flex items-center p-2 hover:bg-orange-50 rounded cursor-pointer">
-                          <input
-                            type="checkbox"
-                            value="Pemasaran secara Online dan Live (Ads, Live)"
-                            checked={(formData.UPWARD_MOBILITY.UM_MARKETING_SEMASA || []).includes('Pemasaran secara Online dan Live (Ads, Live)')}
-                            onChange={(e) => handleUMCheckboxChange('UM_MARKETING_SEMASA', 'Pemasaran secara Online dan Live (Ads, Live)', e.target.checked)}
-                            className="mr-3"
-                          />
-                          <span>Pemasaran secara Online dan Live (Ads, Live)</span>
-                        </label>
-                        <label className="flex items-center p-2 hover:bg-orange-50 rounded cursor-pointer">
-                          <input
-                            type="checkbox"
-                            value="Perniagaan campuran (Online & Premis)"
-                            checked={(formData.UPWARD_MOBILITY.UM_MARKETING_SEMASA || []).includes('Perniagaan campuran (Online & Premis)')}
-                            onChange={(e) => handleUMCheckboxChange('UM_MARKETING_SEMASA', 'Perniagaan campuran (Online & Premis)', e.target.checked)}
-                            className="mr-3"
-                          />
-                          <span>Perniagaan campuran (Online & Premis)</span>
-                        </label>
-                        <label className="flex items-center p-2 hover:bg-orange-50 rounded cursor-pointer">
-                          <input
-                            type="checkbox"
-                            value="Premis / Kedai fizikal"
-                            checked={(formData.UPWARD_MOBILITY.UM_MARKETING_SEMASA || []).includes('Premis / Kedai fizikal')}
-                            onChange={(e) => handleUMCheckboxChange('UM_MARKETING_SEMASA', 'Premis / Kedai fizikal', e.target.checked)}
-                            className="mr-3"
-                          />
-                          <span>Premis / Kedai fizikal</span>
-                        </label>
-                      </div>
-                      <div className="mt-3 bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-                        <TextArea
-                          label="Ulasan Mentor (Jualan dan Pemasaran) *"
-                          name="UM_ULASAN_MARKETING"
-                          value={formData.UPWARD_MOBILITY.UM_ULASAN_MARKETING}
-                          onChange={(e) => handleUMChange('UM_ULASAN_MARKETING', e.target.value)}
-                          rows={2}
-                          placeholder="Cth: 40% daripada jualan kini datang dari online. Usahawan aktif buat FB live setiap minggu."
-                          required
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </Section>
-              </div>
-
-              {/* --- Lampiran Gambar --- */}
-              <div className="bg-white p-6 rounded-lg shadow-sm">
-                <Section title="Lampiran Gambar">
-                  {currentSessionNumber === 1 && (
-                    <FileInput
-                      label="Gambar GW360 (Sesi 1 Sahaja)"
-                      name="URL_GAMBAR_GW360"
-                      onFileChange={(e) => handleFileChange('gw360', e.target.files)}
-                      multiple={false}
-                      required={currentSessionNumber === 1}
-                      isImageUpload={true}
-                    />
-                  )}
-                  {formData.URL_GAMBAR_GW360 && currentSessionNumber === 1 && (
-                    <div className="mt-2">
-                      <p className="text-sm text-gray-600">
-                        Uploaded GW360:{' '}
-                        <a
-                          href={formData.URL_GAMBAR_GW360}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-500 hover:underline"
-                        >
-                          View Image
-                        </a>
-                      </p>
-                    </div>
-                  )}
-
-                  <FileInput
-                    label="Gambar Sesi (Pelbagai Gambar)"
-                    name="URL_GAMBAR_SESI_JSON"
-                    onFileChange={(e) => handleFileChange('sesi', e.target.files, true)}
-                    multiple={true}
-                    required
-                    isImageUpload={true}
-                  />
-                  {formData.URL_GAMBAR_SESI_JSON.length > 0 && (
-                    <div className="mt-2">
-                      <p className="text-sm text-gray-600">Uploaded Sesi Images:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {formData.URL_GAMBAR_SESI_JSON.map((url, index) => (
-                          <a
-                            key={index}
-                            href={url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-500 hover:underline text-sm"
-                          >
-                            Image {index + 1}
-                          </a>
+                        {UPWARD_MOBILITY_SECTIONS.SECTION_6.digital.options.map((opt) => (
+                          <label key={opt} className="flex items-center p-2 hover:bg-orange-50 rounded cursor-pointer">
+                            <input
+                              type="checkbox"
+                              value={opt}
+                              checked={(formData.UPWARD_MOBILITY[UPWARD_MOBILITY_SECTIONS.SECTION_6.digital.field] || []).includes(opt)}
+                              onChange={(e) => handleUMCheckboxChange(UPWARD_MOBILITY_SECTIONS.SECTION_6.digital.field, opt, e.target.checked)}
+                              className="mr-3"
+                            />
+                            <span>{opt}</span>
+                          </label>
                         ))}
                       </div>
-                    </div>
-                  )}
-
-                  {!hasPremisPhotosUploaded ? (
-                    <div>
-                      <label className="flex items-center mt-4">
-                        <input
-                          type="checkbox"
-                          className="form-checkbox"
-                          checked={lawatanPremisChecked}
-                          onChange={() => setLawatanPremisChecked(!lawatanPremisChecked)}
+                      <div className="mt-3 bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                        <TextArea
+                          label={UPWARD_MOBILITY_SECTIONS.SECTION_6.digital.ulasanLabel}
+                          value={formData.UPWARD_MOBILITY[UPWARD_MOBILITY_SECTIONS.SECTION_6.digital.ulasanField]}
+                          onChange={(e) => handleUMChange(UPWARD_MOBILITY_SECTIONS.SECTION_6.digital.ulasanField, e.target.value)}
+                          rows={2}
+                          placeholder={UPWARD_MOBILITY_SECTIONS.SECTION_6.digital.ulasanPlaceholder}
+                          required
                         />
-                        <span className="ml-2 text-gray-700">Lawatan Premis Telah Dijalankan?</span>
-                      </label>
-                      {lawatanPremisChecked && (
-                        <div>
-                          <FileInput
-                            label="Gambar Lawatan Premis *"
-                            name="URL_GAMBAR_PREMIS_JSON"
-                            onFileChange={(e) => handleFileChange('premis', e.target.files, true)}
-                            multiple={true}
-                            required={lawatanPremisChecked}
-                            isImageUpload={true}
-                          />
-                          <p className="mt-1 text-sm text-gray-600 italic">
-                            Gambar bahagian depan premis bisnes mentee, Gambar-gambar ruang dalam bisnes mentee, Gambar-gambar aset yang ada (terutama yang dibeli menggunakan geran BIMB), selfie depan premise
-                          </p>
-                        </div>
-                      )}
-                      {formData.URL_GAMBAR_PREMIS_JSON.length > 0 && lawatanPremisChecked && (
-                        <div className="mt-2">
-                          <p className="text-sm text-gray-600">Uploaded Premis Images:</p>
-                          <div className="flex flex-wrap gap-2">
-                            {formData.URL_GAMBAR_PREMIS_JSON.map((url, index) => (
-                              <a
-                                key={index}
-                                href={url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-500 hover:underline text-sm"
-                              >
-                                Image {index + 1}
-                              </a>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                      </div>
                     </div>
-                  ) : (
-                    <InfoCard title="Lawatan Premis Status" type="info">
-                      Lawatan Premis telah direkodkan.
-                    </InfoCard>
-                  )}
+
+                    {/* Marketing */}
+                    <div className="border-l-4 border-orange-300 pl-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                        {UPWARD_MOBILITY_SECTIONS.SECTION_6.marketing.label} <span className="text-red-500">*</span>
+                      </label>
+                      <div className="space-y-2">
+                        {UPWARD_MOBILITY_SECTIONS.SECTION_6.marketing.options.map((opt) => (
+                          <label key={opt} className="flex items-center p-2 hover:bg-orange-50 rounded cursor-pointer">
+                            <input
+                              type="checkbox"
+                              value={opt}
+                              checked={(formData.UPWARD_MOBILITY[UPWARD_MOBILITY_SECTIONS.SECTION_6.marketing.field] || []).includes(opt)}
+                              onChange={(e) => handleUMCheckboxChange(UPWARD_MOBILITY_SECTIONS.SECTION_6.marketing.field, opt, e.target.checked)}
+                              className="mr-3"
+                            />
+                            <span>{opt}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="mt-3 bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                        <TextArea
+                          label={UPWARD_MOBILITY_SECTIONS.SECTION_6.marketing.ulasanLabel}
+                          value={formData.UPWARD_MOBILITY[UPWARD_MOBILITY_SECTIONS.SECTION_6.marketing.ulasanField]}
+                          onChange={(e) => handleUMChange(UPWARD_MOBILITY_SECTIONS.SECTION_6.marketing.ulasanField, e.target.value)}
+                          rows={2}
+                          placeholder={UPWARD_MOBILITY_SECTIONS.SECTION_6.marketing.ulasanPlaceholder}
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </Section>
               </div>
 
-              {/* --- Bahagian Upward Mobility --- */}
-              {(currentSessionNumber === 2 || currentSessionNumber === 4) && (
-                <div className="bg-white p-6 rounded-lg shadow-sm">
-                  <Section title="Bahagian Upward Mobility">
-                    <InfoCard title="Peringatan Penting" type="info">
-                      <p>[SESI 2 & 4 SAHAJA] Sila lengkapkan borang Forms Upward Mobility di pautan berikut:</p>
-                      <a
-                        href="/upward-mobility"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline font-medium"
-                      >
-                        Link to Upward Mobility Google Form
-                      </a>
-                    </InfoCard>
-                  </Section>
-                </div>
-              )}
-            </>
+
+
+      <div className="bg-white p-6 rounded-lg shadow-sm">
+        <Section title="Lampiran Gambar">
+          {currentSessionNumber === 1 && (
+            <FileInput
+              label="Gambar GW360 (Sesi 1 Sahaja)"
+              name="URL_GAMBAR_GW360"
+              onFileChange={(e) => handleFileChange('gw360', e.target.files)}
+              multiple={false}
+              required={currentSessionNumber === 1}
+              isImageUpload={true}
+            />
+          )}
+          {formData.URL_GAMBAR_GW360 && currentSessionNumber === 1 && (
+            <div className="mt-2">
+              <p className="text-sm text-gray-600">
+                Uploaded GW360:{' '}
+                <a
+                  href={formData.URL_GAMBAR_GW360}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-500 hover:underline"
+                >
+                  View Image
+                </a>
+              </p>
+            </div>
           )}
 
-          {/* Submit area: white card with centered buttons */}
-          <div className="bg-white p-6 rounded-lg shadow-sm">
-            {/* Compression Progress Indicator */}
-            {compressionProgress.show && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                <div className="flex items-center space-x-3">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-blue-900">
-                      📸 Compressing: {compressionProgress.fileName}
-                    </p>
-                    <p className="text-xs text-blue-700">
-                      Step {compressionProgress.current}/{compressionProgress.total}: {compressionProgress.message}
-                    </p>
-                    <div className="w-full bg-blue-200 rounded-full h-2 mt-2">
-                      <div
-                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${(compressionProgress.current / compressionProgress.total) * 100}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                </div>
+          <FileInput
+            label="Gambar Sesi (Pelbagai Gambar)"
+            name="URL_GAMBAR_SESI_JSON"
+            onFileChange={(e) => handleFileChange('sesi', e.target.files, true)}
+            multiple={true}
+            required
+            isImageUpload={true}
+          />
+          {formData.URL_GAMBAR_SESI_JSON.length > 0 && (
+            <div className="mt-2">
+              <p className="text-sm text-gray-600">Uploaded Sesi Images:</p>
+              <div className="flex flex-wrap gap-2">
+                {formData.URL_GAMBAR_SESI_JSON.map((url, index) => (
+                  <a
+                    key={index}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-500 hover:underline text-sm"
+                  >
+                    Image {index + 1}
+                  </a>
+                ))}
               </div>
-            )}
-
-            {/* Submission Stage Progress Indicator */}
-            {submissionStage.stage && submissionStage.stage !== 'complete' && !compressionProgress.show && (
-              <div className={`border rounded-lg p-4 mb-4 ${
-                submissionStage.stage === 'error'
-                  ? 'bg-red-50 border-red-200'
-                  : submissionStage.stage === 'warning'
-                  ? 'bg-yellow-50 border-yellow-200'
-                  : 'bg-blue-50 border-blue-200'
-              }`}>
-                <div className="flex items-center space-x-3">
-                  {submissionStage.stage !== 'error' && submissionStage.stage !== 'warning' && (
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                  )}
-                  {submissionStage.stage === 'error' && (
-                    <div className="text-red-600 text-2xl">⚠️</div>
-                  )}
-                  {submissionStage.stage === 'warning' && (
-                    <div className="text-yellow-600 text-2xl">⚠️</div>
-                  )}
-                  <div className="flex-1">
-                    <p className={`text-sm font-medium ${
-                      submissionStage.stage === 'error'
-                        ? 'text-red-900'
-                        : submissionStage.stage === 'warning'
-                        ? 'text-yellow-900'
-                        : 'text-blue-900'
-                    }`}>
-                      {submissionStage.message}
-                    </p>
-                    {submissionStage.detail && (
-                      <p className={`text-xs mt-1 ${
-                        submissionStage.stage === 'error'
-                          ? 'text-red-700'
-                          : submissionStage.stage === 'warning'
-                          ? 'text-yellow-700'
-                          : 'text-blue-700'
-                      }`}>
-                        {submissionStage.detail}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <button
-                type="button"
-                onClick={resetForm}
-                className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
-                disabled={loading || compressionProgress.show}
-              >
-                Reset Form
-              </button>
-              <button
-                type="submit"
-                className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400"
-                disabled={loading || compressionProgress.show}
-              >
-                {compressionProgress.show ? '🔄 Compressing Images...' : loading ? '📤 Submitting...' : 'Submit Laporan Maju'}
-              </button>
             </div>
-            {saveStatus && (
-              <div className="mt-2 text-xs text-gray-500 text-center">
-                {saveStatus}
-              </div>
-            )}
+          )}
+
+          {!hasPremisPhotosUploaded ? (
+            <div>
+              <label className="flex items-center mt-4">
+                <input
+                  type="checkbox"
+                  className="form-checkbox"
+                  checked={lawatanPremisChecked}
+                  onChange={() => setLawatanPremisChecked(!lawatanPremisChecked)}
+                />
+                <span className="ml-2 text-gray-700">Lawatan Premis Telah Dijalankan?</span>
+              </label>
+              {lawatanPremisChecked && (
+                <div>
+                  <FileInput
+                    label="Gambar Lawatan Premis *"
+                    name="URL_GAMBAR_PREMIS_JSON"
+                    onFileChange={(e) => handleFileChange('premis', e.target.files, true)}
+                    multiple={true}
+                    required={lawatanPremisChecked}
+                    isImageUpload={true}
+                  />
+                  <p className="mt-1 text-sm text-gray-600 italic">
+                    Gambar bahagian depan premis bisnes mentee, Gambar-gambar ruang dalam bisnes mentee, Gambar-gambar aset yang ada (terutama yang dibeli menggunakan geran BIMB), selfie depan premise
+                  </p>
+                </div>
+              )}
+              {formData.URL_GAMBAR_PREMIS_JSON.length > 0 && lawatanPremisChecked && (
+                <div className="mt-2">
+                  <p className="text-sm text-gray-600">Uploaded Premis Images:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {formData.URL_GAMBAR_PREMIS_JSON.map((url, index) => (
+                      <a
+                        key={index}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-500 hover:underline text-sm"
+                      >
+                        Image {index + 1}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <InfoCard title="Lawatan Premis Status" type="info">
+              Lawatan Premis telah direkodkan.
+            </InfoCard>
+          )}
+        </Section>
+      </div>
+
+      {/* --- Bahagian Upward Mobility --- */}
+      {(currentSessionNumber === 2 || currentSessionNumber === 4) && (
+        <div className="bg-white p-6 rounded-lg shadow-sm">
+          <Section title="Bahagian Upward Mobility">
+            <InfoCard title="Peringatan Penting" type="info">
+              <p>[SESI 2 & 4 SAHAJA] Sila lengkapkan borang Forms Upward Mobility di pautan berikut:</p>
+              <a
+                href="/upward-mobility"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline font-medium"
+              >
+                Link to Upward Mobility Google Form
+              </a>
+            </InfoCard>
+          </Section>
+        </div>
+      )}
+    </>
+  )
+}
+
+{/* Submit area: white card with centered buttons */ }
+<div className="bg-white p-6 rounded-lg shadow-sm">
+  {/* Compression Progress Indicator */}
+  {compressionProgress.show && (
+    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+      <div className="flex items-center space-x-3">
+        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+        <div className="flex-1">
+          <p className="text-sm font-medium text-blue-900">
+            📸 Compressing: {compressionProgress.fileName}
+          </p>
+          <p className="text-xs text-blue-700">
+            Step {compressionProgress.current}/{compressionProgress.total}: {compressionProgress.message}
+          </p>
+          <div className="w-full bg-blue-200 rounded-full h-2 mt-2">
+            <div
+              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${(compressionProgress.current / compressionProgress.total) * 100}%` }}
+            ></div>
           </div>
-        </form>
+        </div>
       </div>
     </div>
+  )}
+
+  {/* Submission Stage Progress Indicator */}
+  {submissionStage.stage && submissionStage.stage !== 'complete' && !compressionProgress.show && (
+    <div className={`border rounded-lg p-4 mb-4 ${submissionStage.stage === 'error'
+      ? 'bg-red-50 border-red-200'
+      : submissionStage.stage === 'warning'
+        ? 'bg-yellow-50 border-yellow-200'
+        : 'bg-blue-50 border-blue-200'
+      }`}>
+      <div className="flex items-center space-x-3">
+        {submissionStage.stage !== 'error' && submissionStage.stage !== 'warning' && (
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+        )}
+        {submissionStage.stage === 'error' && (
+          <div className="text-red-600 text-2xl">⚠️</div>
+        )}
+        {submissionStage.stage === 'warning' && (
+          <div className="text-yellow-600 text-2xl">⚠️</div>
+        )}
+        <div className="flex-1">
+          <p className={`text-sm font-medium ${submissionStage.stage === 'error'
+            ? 'text-red-900'
+            : submissionStage.stage === 'warning'
+              ? 'text-yellow-900'
+              : 'text-blue-900'
+            }`}>
+            {submissionStage.message}
+          </p>
+          {submissionStage.detail && (
+            <p className={`text-xs mt-1 ${submissionStage.stage === 'error'
+              ? 'text-red-700'
+              : submissionStage.stage === 'warning'
+                ? 'text-yellow-700'
+                : 'text-blue-700'
+              }`}>
+              {submissionStage.detail}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  )}
+
+  <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+    <button
+      type="button"
+      onClick={resetForm}
+      className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
+      disabled={loading || compressionProgress.show}
+    >
+      Reset Form
+    </button>
+    <button
+      type="submit"
+      className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400"
+      disabled={loading || compressionProgress.show}
+    >
+      {compressionProgress.show ? '🔄 Compressing Images...' : loading ? '📤 Submitting...' : 'Submit Laporan Maju'}
+    </button>
+  </div>
+  {saveStatus && (
+    <div className="mt-2 text-xs text-gray-500 text-center">
+      {saveStatus}
+    </div>
+  )}
+</div>
+        </form >
+      </div >
+    </div >
   );
 };
 

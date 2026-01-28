@@ -90,7 +90,7 @@ The script expects the following columns in the "mapping" tab:
 
 ### sync-bangkit-reports.js (Bangkit Session Reports Sync)
 
-Syncs Bangkit session reports from Google Sheets "V8" tab to Supabase `reports` and `sessions` tables.
+Syncs Bangkit session reports from Google Sheets "Bangkit" tab to Supabase `reports` and `sessions` tables.
 
 **Features:**
 - ✅ Resolves entrepreneur_id and mentor_id via name/email lookup
@@ -123,7 +123,7 @@ node scripts/sync-bangkit-reports.js --test
 node scripts/sync-bangkit-reports.js
 ```
 
-**V8 Sheet Structure (74 columns):**
+**Bangkit Sheet Structure (74 columns):**
 
 | Column Range | Description | Maps To |
 |-------------|-------------|---------|
@@ -176,7 +176,7 @@ node scripts/sync-bangkit-reports.js
 
 ### sync-maju-reports.js (Maju Session Reports Sync)
 
-Syncs Maju session reports from Google Sheets "LaporanMaju" tab to Supabase `reports` and `sessions` tables.
+Syncs Maju session reports from Google Sheets "LaporanMajuUM" tab to Supabase `reports` and `sessions` tables.
 
 **Features:**
 - ✅ Resolves entrepreneur_id and mentor_id via name/email lookup
@@ -200,7 +200,7 @@ npm run sync:maju:test
 npm run sync:maju
 ```
 
-**LaporanMaju Sheet Structure (30 columns):**
+**LaporanMajuUM Sheet Structure (30 columns):**
 
 | Column | Field | Maps To |
 |--------|-------|---------|
@@ -417,13 +417,13 @@ node scripts/sync-docurl.js --live   # live mode
 
 1. **Bangkit Reports:**
    - Queries `reports` table for records where `program='Bangkit'` AND `doc_url IS NULL`
-   - Fetches V8 sheet Column BB (DOC_URL)
+   - Fetches Bangkit sheet Column BB (DOC_URL)
    - For each missing doc_url, checks if sheet has value
    - Updates database if sheet has doc_url
 
 2. **Maju Reports:**
    - Queries `reports` table for records where `program='Maju'` AND `doc_url IS NULL`
-   - Fetches LaporanMaju sheet Column AA (Laporan_Maju_Doc_ID)
+   - Fetches LaporanMajuUM sheet Column AA (Laporan_Maju_Doc_ID)
    - For each missing doc_url, checks if sheet has value
    - Updates database if sheet has doc_url
 
@@ -433,19 +433,19 @@ node scripts/sync-docurl.js --live   # live mode
 🔗 Doc URL Backfill Sync
 🧪 DRY RUN MODE (use --live to actually update)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 BANGKIT (V8 Sheet → Column BB)
+📊 BANGKIT (Bangkit Sheet → Column BB)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Total reports in DB: 76
 Missing doc_url: 0
 ✅ All Bangkit reports have doc_url
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 MAJU (LaporanMaju → Column AA)
+📊 MAJU (LaporanMajuUM → Column AA)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Total reports in DB: 18
 Missing doc_url: 1
 
-📥 Fetching LaporanMaju sheet data...
+📥 Fetching LaporanMajuUM sheet data...
 
 🔍 Checking for doc URLs in sheet...
    [DRY RUN] Would update Row 5: Muhammad Muslim Bin Musa
@@ -569,8 +569,8 @@ node scripts/validate-sync.js
 **Validation Checks:**
 
 1. **Count Comparison**
-   - Bangkit: V8 sheet vs `reports WHERE program='Bangkit'`
-   - Maju: LaporanMaju sheet vs `reports WHERE program='Maju'`
+   - Bangkit: Bangkit sheet vs `reports WHERE program='Bangkit'`
+   - Maju: LaporanMajuUM sheet vs `reports WHERE program='Maju'`
    - UM: UM sheet vs `upward_mobility_reports`
    - Triggers CRITICAL if difference > 5 rows
    - Triggers WARNING if difference 1-5 rows

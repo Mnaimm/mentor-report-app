@@ -305,7 +305,7 @@ function parseMajuImageURLs(row) {
 }
 
 /**
- * Map complete LaporanMaju row to Maju report object
+ * Map complete LaporanMajuUM row to Maju report object
  * @param {Array} row - Sheet row data
  * @param {number} rowNumber - Row number in sheet (1-indexed)
  * @param {Object} resolvedEntities - {entrepreneur_id, mentor_id, session_id, folder_id}

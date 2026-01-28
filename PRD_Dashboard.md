@@ -68,7 +68,7 @@ The Mentor Dashboard provides mentors with a comprehensive view of their assigne
 ├──────────────────────────────────────────────────────┤
 │  Supabase PostgreSQL   │  Google Sheets              │
 │  ├─ users              │  ├─ V8 (Bangkit)            │
-│  ├─ entrepreneurs      │  ├─ LaporanMaju (Maju)      │
+│  ├─ entrepreneurs      │  ├─ LaporanMajuUM (Maju)      │
 │  ├─ mentor_assignments │  └─ UM (Separate sheet)     │
 │  └─ batch_rounds       │                             │
 └──────────────────────────────────────────────────────┘
@@ -699,7 +699,7 @@ const batchMatch = b.batch_name === batchName ||
 # Required
 NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=xxx
-GOOGLE_SHEET_ID=xxx            # For V8 and LaporanMaju sheets
+GOOGLE_SHEET_ID=xxx            # For Bangkit and LaporanMajuUM sheets
 GOOGLE_SHEET_ID_UM=xxx         # For UM forms sheet
 GOOGLE_SERVICE_ACCOUNT_EMAIL=xxx
 GOOGLE_PRIVATE_KEY=xxx

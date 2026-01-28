@@ -2,5 +2,5 @@
 export { default } from "next-auth/middleware";
 
 export const config = {
-  matcher: ["/", "/laporan-sesi", "/upward-mobility", "/growthwheel"],
+  matcher: ["/", "/laporan-sesi", "/laporan-bangkit", "/laporan-maju-um", "/upward-mobility", "/growthwheel"],
 };
