@@ -120,9 +120,9 @@ const mapBangkitDataToSheetRow = (data) => {
   row[65] = umData.UM_PEKERJA_SEMASA || '';             // BN UM_PEKERJA_SEMASA
   row[66] = umData.UM_ULASAN_PEKERJA || '';             // BO UM_ULASAN_PEKERJA
   row[67] = umData.UM_ASET_BUKAN_TUNAI_SEMASA || '';    // BP UM_ASET_BUKAN_TUNAI_SEMASA
-  row[68] = umData.UM_ULASAN_ASET_BUKAN_TUNAI || '';    // BQ UM_ULASAN_ASET_BUKAN_TUNAI
-  row[69] = umData.UM_ASET_TUNAI_SEMASA || '';          // BR UM_ASET_TUNAI_SEMASA
-  row[70] = umData.UM_ULASAN_ASET_TUNAI || '';          // BS UM_ULASAN_ASET_TUNAI
+  row[68] = umData.UM_PEKERJA_PARTTIME_SEMASA || '';    // BQ UM_PEKERJA_PARTTIME_SEMASA (New Slot)
+  row[69] = umData.UM_ULASAN_PEKERJA_PARTTIME || '';    // BR UM_ULASAN_PEKERJA_PARTTIME (New Slot)
+  row[70] = umData.UM_ULASAN_ASET_BUKAN_TUNAI || '';    // BS UM_ULASAN_ASET_BUKAN_TUNAI (Shifted)
   row[71] = umData.UM_SIMPANAN_SEMASA || '';            // BT UM_SIMPANAN_SEMASA
   row[72] = umData.UM_ULASAN_SIMPANAN || '';            // BU UM_ULASAN_SIMPANAN
   row[73] = umData.UM_ZAKAT_SEMASA || '';               // BV UM_ZAKAT_SEMASA
@@ -191,9 +191,9 @@ const mapUMToUpwardMobilitySheetRow = (reportData, umData) => {
   row[55] = umData.UM_PEKERJA_SEMASA || '';             // BD UM_PEKERJA_SEMASA
   row[56] = umData.UM_ULASAN_PEKERJA || '';             // BE UM_ULASAN_PEKERJA
   row[57] = umData.UM_ASET_BUKAN_TUNAI_SEMASA || '';    // BF UM_ASET_BUKAN_TUNAI_SEMASA
-  row[58] = umData.UM_ULASAN_ASET_BUKAN_TUNAI || '';    // BG UM_ULASAN_ASET_BUKAN_TUNAI
-  row[59] = umData.UM_ASET_TUNAI_SEMASA || '';          // BH UM_ASET_TUNAI_SEMASA
-  row[60] = umData.UM_ULASAN_ASET_TUNAI || '';          // BI UM_ULASAN_ASET_TUNAI
+  row[58] = umData.UM_PEKERJA_PARTTIME_SEMASA || '';    // BG UM_PEKERJA_PARTTIME_SEMASA (New Slot)
+  row[59] = umData.UM_ULASAN_PEKERJA_PARTTIME || '';    // BH UM_ULASAN_PEKERJA_PARTTIME (New Slot)
+  row[60] = umData.UM_ULASAN_ASET_BUKAN_TUNAI || '';    // BI UM_ULASAN_ASET_BUKAN_TUNAI (Shifted)
   row[61] = umData.UM_SIMPANAN_SEMASA || '';            // BJ UM_SIMPANAN_SEMASA
   row[62] = umData.UM_ULASAN_SIMPANAN || '';            // BK UM_ULASAN_SIMPANAN
   row[63] = umData.UM_ZAKAT_SEMASA || '';               // BL UM_ZAKAT_SEMASA
@@ -256,7 +256,7 @@ export default async function handler(req, res) {
       range = `${bangkitTab}!A1`; // Bangkit tab (columns A-CB: 0-81)
       rowData = mapBangkitDataToSheetRow(reportData);
       if (!spreadsheetId) {
-          throw new Error('Missing GOOGLE_SHEETS_REPORT_ID environment variable for Bangkit program.');
+        throw new Error('Missing GOOGLE_SHEETS_REPORT_ID environment variable for Bangkit program.');
       }
       console.log('🔗 Bangkit Sheet ID:', spreadsheetId, '- Tab:', bangkitTab);
     } else {
@@ -606,11 +606,11 @@ export default async function handler(req, res) {
         }
         if (umData.UM_ULASAN_ASET_BUKAN_TUNAI) umSupabasePayload.ulasan_aset_bukan_tunai = umData.UM_ULASAN_ASET_BUKAN_TUNAI;
 
-        if (umData.UM_ASET_TUNAI_SEMASA) {
-          const parsed = parseFloat(umData.UM_ASET_TUNAI_SEMASA);
-          if (!isNaN(parsed)) umSupabasePayload.aset_tunai_semasa = parsed;
+        if (umData.UM_PEKERJA_PARTTIME_SEMASA) {
+          const parsed = parseInt(umData.UM_PEKERJA_PARTTIME_SEMASA);
+          if (!isNaN(parsed)) umSupabasePayload.pekerja_parttime_semasa = parsed;
         }
-        if (umData.UM_ULASAN_ASET_TUNAI) umSupabasePayload.ulasan_aset_tunai = umData.UM_ULASAN_ASET_TUNAI;
+        if (umData.UM_ULASAN_PEKERJA_PARTTIME) umSupabasePayload.ulasan_pekerja_parttime = umData.UM_ULASAN_PEKERJA_PARTTIME;
 
         if (umData.UM_SIMPANAN_SEMASA) {
           const parsed = parseFloat(umData.UM_SIMPANAN_SEMASA);

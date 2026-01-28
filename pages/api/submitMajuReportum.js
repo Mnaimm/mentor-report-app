@@ -169,7 +169,7 @@ export default async function handler(req, res) {
       // ============================================================
       // RESOLVE ENTREPRENEUR_ID (required NOT NULL foreign key)
       // ============================================================
-      const entrepreneurEmail = 
+      const entrepreneurEmail =
         reportData.emel ||
         reportData.emailUsahawan ||
         reportData.entrepreneurEmail;
@@ -282,11 +282,11 @@ export default async function handler(req, res) {
 
       supabaseSuccess = true;
       supabaseRecordId = insertedData[0]?.id || null;
-      
+
       if (!supabaseRecordId) {
         throw new Error('Reports table insert succeeded but ID is missing');
       }
-      
+
       console.log(`✅ Supabase dual-write successful. Record ID: ${supabaseRecordId}`);
 
       // Log success to dual_write_monitoring
@@ -429,11 +429,11 @@ export default async function handler(req, res) {
         }
         if (umData.UM_ULASAN_ASET_BUKAN_TUNAI) umSupabasePayload.ulasan_aset_bukan_tunai = umData.UM_ULASAN_ASET_BUKAN_TUNAI;
 
-        if (umData.UM_ASET_TUNAI_SEMASA) {
-          const parsed = parseFloat(umData.UM_ASET_TUNAI_SEMASA);
-          if (!isNaN(parsed)) umSupabasePayload.aset_tunai_semasa = parsed;
+        if (umData.UM_PEKERJA_PARTTIME_SEMASA) {
+          const parsed = parseInt(umData.UM_PEKERJA_PARTTIME_SEMASA);
+          if (!isNaN(parsed)) umSupabasePayload.pekerja_parttime_semasa = parsed;
         }
-        if (umData.UM_ULASAN_ASET_TUNAI) umSupabasePayload.ulasan_aset_tunai = umData.UM_ULASAN_ASET_TUNAI;
+        if (umData.UM_ULASAN_PEKERJA_PARTTIME) umSupabasePayload.ulasan_pekerja_parttime = umData.UM_ULASAN_PEKERJA_PARTTIME;
 
         if (umData.UM_SIMPANAN_SEMASA) {
           const parsed = parseFloat(umData.UM_SIMPANAN_SEMASA);
@@ -543,7 +543,7 @@ export default async function handler(req, res) {
     const responseMessage = umSheetRowNumber
       ? 'Laporan MAJU & Upward Mobility berjaya dihantar! Dokumen akan dicipta secara automatik dalam masa 1-2 minit.'
       : 'Laporan MAJU berjaya dihantar! Dokumen akan dicipta secara automatik dalam masa 1-2 minit.' +
-        (reportData.MIA_STATUS !== 'MIA' && reportData.UPWARD_MOBILITY_JSON ? ' (Nota: UM data tidak berjaya disimpan ke UM tab)' : '');
+      (reportData.MIA_STATUS !== 'MIA' && reportData.UPWARD_MOBILITY_JSON ? ' (Nota: UM data tidak berjaya disimpan ke UM tab)' : '');
 
     return res.status(200).json({
       success: true,
@@ -607,7 +607,7 @@ export default async function handler(req, res) {
 function mapMajuDataToSheetRow(data) {
   // This MUST match the order of getLaporanMajuColumnHeaders() in Apps Script
   const timestamp = new Date().toLocaleString('en-MY', { timeZone: 'Asia/Kuala_Lumpur' });
-  
+
   // Parse UM data if available (similar to Bangkit)
   let umData = {};
   if (data.MIA_STATUS !== 'MIA' && data.UPWARD_MOBILITY_JSON) {
@@ -673,9 +673,9 @@ function mapMajuDataToSheetRow(data) {
     umData.UM_PEKERJA_SEMASA || '',              // 41 UM_PEKERJA_SEMASA
     umData.UM_ULASAN_PEKERJA || '',              // 42 UM_ULASAN_PEKERJA
     umData.UM_ASET_BUKAN_TUNAI_SEMASA || '',     // 43 UM_ASET_BUKAN_TUNAI_SEMASA
-    umData.UM_ULASAN_ASET_BUKAN_TUNAI || '',     // 44 UM_ULASAN_ASET_BUKAN_TUNAI
-    umData.UM_ASET_TUNAI_SEMASA || '',           // 45 UM_ASET_TUNAI_SEMASA
-    umData.UM_ULASAN_ASET_TUNAI || '',           // 46 UM_ULASAN_ASET_TUNAI
+    umData.UM_PEKERJA_PARTTIME_SEMASA || '',     // 44 UM_PEKERJA_PARTTIME_SEMASA
+    umData.UM_ULASAN_PEKERJA_PARTTIME || '',     // 45 UM_ULASAN_PEKERJA_PARTTIME
+    umData.UM_ULASAN_ASET_BUKAN_TUNAI || '',     // 46 UM_ULASAN_ASET_BUKAN_TUNAI
     umData.UM_SIMPANAN_SEMASA || '',             // 47 UM_SIMPANAN_SEMASA
     umData.UM_ULASAN_SIMPANAN || '',             // 48 UM_ULASAN_SIMPANAN
     umData.UM_ZAKAT_SEMASA || '',                // 49 UM_ZAKAT_SEMASA
@@ -689,10 +689,10 @@ function mapMajuDataToSheetRow(data) {
     umData.UM_MARKETING_SEMASA || '',            // 53 UM_MARKETING_SEMASA
     umData.UM_ULASAN_MARKETING || '',            // 54 UM_ULASAN_MARKETING
 
-    // Note: The sheet has duplicate headers (UM_PENDAPATAN_SEMASA at 55, UM_ASET_TUNAI_SEMASA at 56)
-    // We'll fill these with the same values to maintain compatibility
+    // Note: The sheet has duplicate headers
+    // We'll fill these with the same values to maintain compatibility where needed or leave blank
     umData.UM_PENDAPATAN_SEMASA || '',           // 55 UM_PENDAPATAN_SEMASA (duplicate)
-    umData.UM_ASET_TUNAI_SEMASA || '',           // 56 UM_ASET_TUNAI_SEMASA (duplicate)
+    umData.UM_ASET_BUKAN_TUNAI_SEMASA || '',     // 56 UM_ASET_TUNAI_SEMASA (duplicate slot replaced)
 
     // UM Section 6: Premises Visit Date (1 field)
     umData.UM_TARIKH_LAWATAN_PREMIS || '',       // 57 UM_TARIKH_LAWATAN_PREMIS
@@ -746,9 +746,9 @@ function mapUMDataToSheetRow(reportData, umData) {
   row[55] = umData.UM_PEKERJA_SEMASA || '';             // BD UM_PEKERJA_SEMASA
   row[56] = umData.UM_ULASAN_PEKERJA || '';             // BE UM_ULASAN_PEKERJA
   row[57] = umData.UM_ASET_BUKAN_TUNAI_SEMASA || '';    // BF UM_ASET_BUKAN_TUNAI_SEMASA
-  row[58] = umData.UM_ULASAN_ASET_BUKAN_TUNAI || '';    // BG UM_ULASAN_ASET_BUKAN_TUNAI
-  row[59] = umData.UM_ASET_TUNAI_SEMASA || '';          // BH UM_ASET_TUNAI_SEMASA
-  row[60] = umData.UM_ULASAN_ASET_TUNAI || '';          // BI UM_ULASAN_ASET_TUNAI
+  row[58] = umData.UM_PEKERJA_PARTTIME_SEMASA || '';    // BG UM_PEKERJA_PARTTIME_SEMASA (New Slot)
+  row[59] = umData.UM_ULASAN_PEKERJA_PARTTIME || '';    // BH UM_ULASAN_PEKERJA_PARTTIME (New Slot)
+  row[60] = umData.UM_ULASAN_ASET_BUKAN_TUNAI || '';    // BI UM_ULASAN_ASET_BUKAN_TUNAI (Shifted)
   row[61] = umData.UM_SIMPANAN_SEMASA || '';            // BJ UM_SIMPANAN_SEMASA
   row[62] = umData.UM_ULASAN_SIMPANAN || '';            // BK UM_ULASAN_SIMPANAN
   row[63] = umData.UM_ZAKAT_SEMASA || '';               // BL UM_ZAKAT_SEMASA
