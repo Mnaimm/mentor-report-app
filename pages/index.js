@@ -1,4 +1,3 @@
-// pages/index.js
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSession, signIn, signOut } from "next-auth/react";
@@ -19,11 +18,11 @@ const ToolCard = ({ href, title, description }) => (
 const StatCard = ({ label, value, sublabel = null, color = "blue" }) => {
   const colorClasses = {
     blue: "text-blue-600",
-    green: "text-green-600", 
+    green: "text-green-600",
     orange: "text-orange-600",
     red: "text-red-600"
   };
-  
+
   return (
     <div className="bg-white rounded-xl shadow-md p-6 text-center">
       <div className={`text-3xl font-extrabold ${colorClasses[color]}`}>{value}</div>
@@ -110,82 +109,6 @@ const MiaSection = ({ miaMentees }) => {
             </div>
           ))}
       </div>
-    </div>
-  );
-};
-
-const UmSection = ({ batch, session, sessionLabel, totalMentees, submitted, pending, pendingMentees, noReportsYet }) => {
-  const [expanded, setExpanded] = useState(false);
-
-  // Special display for batches with no reports submitted yet
-  if (noReportsYet) {
-    return (
-      <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl shadow-md p-6 mb-4 border-l-4 border-orange-500">
-        <h4 className="text-lg font-bold text-orange-700 mb-3">
-          {batch} - Borang Upward Mobility ({sessionLabel})
-        </h4>
-        <div className="flex items-start gap-3 p-4 bg-white rounded-lg border border-orange-200">
-          <div className="text-3xl">⚠️</div>
-          <div>
-            <p className="font-semibold text-gray-800 mb-1">
-              Tiada laporan {sessionLabel} dihantar lagi.
-            </p>
-            <p className="text-sm text-gray-600">
-              Sila hantar laporan {sessionLabel} terlebih dahulu sebelum mengisi Borang Upward Mobility.
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Normal display for batches with reports submitted
-  return (
-    <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl shadow-md p-6 mb-4 border-l-4 border-purple-500">
-      <div className="flex justify-between items-center mb-3">
-        <h4 className="text-lg font-bold text-purple-700">
-          {batch} - Borang Upward Mobility ({sessionLabel})
-        </h4>
-        <div className="text-right">
-          <div className="text-2xl font-bold text-purple-600">
-            {submitted}/{totalMentees}
-          </div>
-          <div className="text-xs text-gray-500">Borang Dihantar</div>
-        </div>
-      </div>
-
-      <div className="flex gap-4 mb-3">
-        <div className="flex-1">
-          <div className="text-sm text-gray-600">✅ Sudah Hantar</div>
-          <div className="text-xl font-semibold text-green-600">{submitted}</div>
-        </div>
-        <div className="flex-1">
-          <div className="text-sm text-gray-600">⏳ Belum Hantar</div>
-          <div className="text-xl font-semibold text-orange-600">{pending}</div>
-        </div>
-      </div>
-
-      {pending > 0 && (
-        <div>
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="text-sm text-purple-600 hover:text-purple-800 font-medium flex items-center gap-1"
-          >
-            {expanded ? '▼' : '▶'}
-            {expanded ? 'Sembunyikan' : 'Lihat'} Senarai Belum Hantar ({pending})
-          </button>
-
-          {expanded && (
-            <div className="mt-3 p-3 bg-white rounded border border-purple-200">
-              <ul className="list-disc list-inside space-y-1 text-sm text-gray-700">
-                {pendingMentees.map((mentee, idx) => (
-                  <li key={idx}>{mentee}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 };
@@ -422,7 +345,7 @@ export default function HomePage() {
 
             {/* Admin check for restricted features */}
             {(() => {
-              const isAdmin = session?.user?.email && 
+              const isAdmin = session?.user?.email &&
                 process.env.NEXT_PUBLIC_ADMIN_EMAILS
                   ?.split(',')
                   .map(e => e.trim())
@@ -443,12 +366,12 @@ export default function HomePage() {
                 description="Isi laporan kemajuan untuk usahawan anda."
               />
               {(() => {
-                const isAdmin = session?.user?.email && 
+                const isAdmin = session?.user?.email &&
                   process.env.NEXT_PUBLIC_ADMIN_EMAILS
                     ?.split(',')
                     .map(e => e.trim())
                     .includes(session.user.email);
-                
+
                 return isAdmin ? (
                   <ToolCard
                     href="/upward-mobility"
@@ -467,32 +390,7 @@ export default function HomePage() {
             {/* MIA Section - Dedicated section for MIA mentees */}
             {stats?.miaMentees && <MiaSection miaMentees={stats.miaMentees} />}
 
-            {/* Upward Mobility Forms - Only show for batches in Session 2 or 4 */}
-            {stats?.upwardMobilityStats && stats.upwardMobilityStats.length > 0 && (
-              <div className="mt-10 mb-8">
-                <h3 className="text-2xl font-bold mb-4 text-purple-700">
-                  Borang Upward Mobility
-                </h3>
-                <p className="text-sm text-gray-600 mb-4">
-                  * Borang Upward Mobility wajib dihantar selepas Sesi 2 dan Sesi 4
-                </p>
-                {stats.upwardMobilityStats
-                  .sort((a, b) => a.batch.localeCompare(b.batch))
-                  .map((umStat) => (
-                    <UmSection
-                      key={`${umStat.batch}-${umStat.session}`}
-                      batch={umStat.batch}
-                      session={umStat.session}
-                      sessionLabel={umStat.sessionLabel}
-                      totalMentees={umStat.totalMentees}
-                      submitted={umStat.submitted}
-                      pending={umStat.pending}
-                      pendingMentees={umStat.pendingMentees}
-                      noReportsYet={umStat.noReportsYet}
-                    />
-                  ))}
-              </div>
-            )}
+            {/* Upward Mobility Forms - REMOVED per user request (legacy tracking) */}
 
             {/* Per-batch tables */}
             {stats && stats.menteesByBatch && Object.keys(stats.menteesByBatch).length > 0 && (

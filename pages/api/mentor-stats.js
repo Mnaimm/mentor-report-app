@@ -99,61 +99,11 @@ export default async function handler(req, res) {
       console.warn(`⚠️ [${debugInfo.requestId}] LaporanMajuUM sheet not found, skipping Maju reports`);
     }
 
-    // Read Upward Mobility forms
-    console.log('📋 Reading Upward Mobility forms...');
-    let umRows = [];
-    try {
-      const umSheetId = process.env.GOOGLE_SHEET_ID_UM;
-      console.log('🔑 GOOGLE_SHEET_ID_UM:', umSheetId ? `${umSheetId.substring(0, 20)}...` : 'NOT SET');
 
-      if (umSheetId) {
-        console.log('📡 Attempting to read UM sheet from:', umSheetId);
-        const { sheets } = client;
-        const umData = await sheets.spreadsheets.values.get({
-          spreadsheetId: umSheetId,
-          range: 'UM!A:Z', // Read all columns from UM tab
-        });
-
-        console.log('📦 UM sheet raw data received, rows:', umData.data.values?.length || 0);
-        const umRawRows = umData.data.values || [];
-
-        if (umRawRows.length > 1) {
-          const umHeaders = umRawRows[0];
-          console.log('📋 UM Sheet has', umRawRows.length - 1, 'data rows');
-          console.log('📋 UM Sheet columns:', umHeaders);
-
-          umRows = umRawRows.slice(1).map(row => {
-            const obj = {};
-            umHeaders.forEach((header, idx) => {
-              obj[header] = row[idx] || '';
-            });
-            return obj;
-          });
-          console.log(`✅ Loaded ${umRows.length} UM form submissions`);
-
-          // Debug: Show sample entries
-          console.log('📋 Sample UM entries:', umRows.slice(0, 3).map(row => ({
-            batch: row['Batch.'],
-            menteeName: row['Nama Penuh Usahawan.'],
-            menteeEmail: row['Email Usahawan'] || row['Email Address Usahawan'] || 'N/A',
-            session: row['Sesi Mentoring.']
-          })));
-        } else if (umRawRows.length === 1) {
-          console.warn('⚠️ UM sheet has headers but no data rows');
-        } else {
-          console.warn('⚠️ UM sheet is completely empty');
-        }
-      } else {
-        console.warn('⚠️ UM sheet ID not configured in environment (GOOGLE_SHEET_ID_UM)');
-      }
-    } catch (error) {
-      console.error('❌ Error reading UM sheet:', error.message);
-      console.error('❌ Full error:', error);
-    }
 
     const sheetsEndTime = Date.now();
     console.log(`⏱️ [${debugInfo.requestId}] Google Sheets data fetched in ${sheetsEndTime - sheetsStartTime}ms`);
-    console.log(`📋 [${debugInfo.requestId}] Data counts: mapping=${mappingSheet.length}, bangkit=${bangkitSheet.length}, maju=${majuSheet.length}, batches=${batchSheet.length}, um=${umRows.length}`);
+    console.log(`📋 [${debugInfo.requestId}] Data counts: mapping=${mappingSheet.length}, bangkit=${bangkitSheet.length}, maju=${majuSheet.length}, batches=${batchSheet.length}`);
 
     // 2) Find mentor's batch and current round info
     const mentorMappings = mappingSheet.filter(row => {
@@ -572,7 +522,7 @@ export default async function handler(req, res) {
     const allTimePerMenteeSessions = Object.fromEntries(
       Object.entries(allTimeSessionsByMentee).map(([k, v]) => [k, v.size])
     );
-    
+
     const currentRoundPerMenteeSessions = Object.fromEntries(
       Object.entries(currentRoundSessionsByMentee).map(([k, v]) => [k, v.size])
     );
@@ -600,155 +550,6 @@ export default async function handler(req, res) {
     }).length;
 
     const currentPeriodPending = menteesInActiveBatches - currentRoundReportedMentees.size;
-
-    // Process UM forms per batch
-    console.log('\n📊 Processing Upward Mobility forms...');
-    const umSubmissionsByBatch = new Map(); // batch-session → Set of mentee names who submitted UM
-
-    for (const umRow of umRows) {
-      const batch = umRow['Batch.'];
-      const umMenteeName = umRow['Nama Penuh Usahawan.'];
-      const umMenteeEmail = (umRow['Email Usahawan'] || umRow['Email Address Usahawan'] || '').toLowerCase().trim();
-      const sesiMentoring = umRow['Sesi Mentoring.']; // "Sesi 2" or "Sesi 4"
-
-      if (!batch || !sesiMentoring) {
-        console.log('⚠️ Skipping UM row with missing batch/session:', { batch, sesiMentoring });
-        continue;
-      }
-
-      // Try to find the mentee name from our mapping using email
-      let menteeName = umMenteeName;
-      if (umMenteeEmail && menteeEmailToName[umMenteeEmail]) {
-        menteeName = menteeEmailToName[umMenteeEmail];
-        console.log(`✅ Matched UM by email: "${umMenteeName}" (${umMenteeEmail}) → "${menteeName}"`);
-      } else if (!umMenteeEmail) {
-        console.log(`⚠️ UM row has no email, using name as-is: "${umMenteeName}"`);
-      } else {
-        console.log(`⚠️ UM email not found in mapping: ${umMenteeEmail}, trying name match for "${umMenteeName}"`);
-      }
-
-      if (!menteeName) {
-        console.log('⚠️ Skipping UM row - no valid mentee identifier');
-        continue;
-      }
-
-      // Extract session number: "Sesi 2" → "2"
-      const sessionNum = normalizeRoundNumber(sesiMentoring);
-      if (!sessionNum) {
-        console.log('⚠️ Could not extract session number from:', sesiMentoring);
-        continue;
-      }
-
-      // Create key: batch + session
-      const key = `${batch}-Session${sessionNum}`;
-
-      if (!umSubmissionsByBatch.has(key)) {
-        umSubmissionsByBatch.set(key, new Set());
-      }
-      umSubmissionsByBatch.get(key).add(menteeName);
-    }
-
-    console.log('📊 UM submissions processed:', umSubmissionsByBatch.size, 'batch-session combinations');
-    console.log('🗂️ UM submissions grouped by batch-session:');
-    Array.from(umSubmissionsByBatch.entries()).forEach(([key, names]) => {
-      console.log(`  ${key}: ${names.size} mentees -`, Array.from(names).slice(0, 3).join(', '));
-    });
-
-    // Calculate UM completion for active batches
-    const umStatsByBatch = [];
-
-    for (const batchInfo of activeBatchInfos) {
-      const batch = batchInfo.batch;
-      const roundNum = normalizeRoundNumber(batchInfo.roundLabel);
-
-      // Only track UM for Session 2 and Session 4
-      if (roundNum !== '2' && roundNum !== '4') {
-        continue;
-      }
-
-      // CRITICAL FIX: Get only mentees who have SUBMITTED reports for THIS session
-      // Build list of mentees who submitted this session's reports
-      const menteesWithSessionReports = new Set();
-
-      for (const [menteeName, sessions] of sessionsByMentee) {
-        const menteeBatch = menteeToBatch[menteeName];
-
-        // Check if this mentee belongs to the current batch
-        if (menteeBatch !== batch) continue;
-
-        // Check if mentee has submitted reports for THIS session
-        for (const session of sessions) {
-          if (session.batch === batch &&
-              normalizeRoundNumber(session.sessionNumber) === roundNum &&
-              session.status.toLowerCase() === 'selesai') {
-            menteesWithSessionReports.add(menteeName);
-            break; // Found a report for this session, no need to check more
-          }
-        }
-      }
-
-      // Convert Set to Array for easier manipulation
-      const menteesEligibleForUM = Array.from(menteesWithSessionReports);
-      const totalMentees = menteesEligibleForUM.length;
-
-      console.log(`\n🔍 UM Stats for ${batch} Session ${roundNum}:`);
-      console.log(`  - Total assigned in batch: ${menteesByBatch?.[batch]?.length || 0}`);
-      console.log(`  - Submitted Sesi ${roundNum} reports: ${menteesEligibleForUM.length}`);
-      console.log(`  - Mentees who submitted reports:`, menteesEligibleForUM);
-
-      // Check if any reports have been submitted for this session
-      if (menteesEligibleForUM.length === 0) {
-        // No reports submitted yet - add warning entry instead of stats
-        console.log(`⚠️ ${batch} Session ${roundNum}: No reports submitted yet`);
-
-        umStatsByBatch.push({
-          batch: batch,
-          session: roundNum,
-          sessionLabel: `Sesi ${roundNum}`,
-          totalMentees: 0,
-          submitted: 0,
-          pending: 0,
-          pendingMentees: [],
-          noReportsYet: true  // Flag to trigger warning display
-        });
-
-        continue; // Skip normal calculation
-      }
-
-      // Check how many have submitted UM for this session
-      const umKey = `${batch}-Session${roundNum}`;
-      const submittedSet = umSubmissionsByBatch.get(umKey) || new Set();
-
-      console.log(`  - UM key: ${umKey}`);
-      console.log(`  - UM submitters found:`, Array.from(submittedSet));
-
-      // Count how many of the eligible mentees have submitted UM
-      const submittedCount = menteesEligibleForUM.filter(name =>
-        submittedSet.has(name)
-      ).length;
-
-      const pendingCount = totalMentees - submittedCount;
-
-      // List of mentees who submitted reports but NOT UM
-      const pendingMentees = menteesEligibleForUM.filter(name =>
-        !submittedSet.has(name)
-      );
-
-      console.log(`  - Match count: ${submittedCount}/${totalMentees}`);
-      console.log(`  ✅ UM submissions found: ${submittedCount}/${totalMentees}`);
-
-      umStatsByBatch.push({
-        batch: batch,
-        session: roundNum,
-        sessionLabel: `Sesi ${roundNum}`,
-        totalMentees: totalMentees,
-        submitted: submittedCount,
-        pending: pendingCount,
-        pendingMentees: pendingMentees
-      });
-    }
-
-    console.log('📈 UM stats calculated for', umStatsByBatch.length, 'batches');
 
     // 6) Response
     const responseData = {
@@ -783,8 +584,7 @@ export default async function handler(req, res) {
       // Detailed MIA list for dedicated section
       miaMentees: miaMenteesList,
 
-      // Upward Mobility form tracking
-      upwardMobilityStats: umStatsByBatch,
+
 
       source: {
         activeBatchInfos, // Include all active batches
@@ -796,8 +596,7 @@ export default async function handler(req, res) {
         ...debugInfo,
         processingTimeMs: Date.now() - sheetsEndTime,
         totalTimeMs: Date.now() - new Date(debugInfo.timestamp).getTime(),
-        umFormsLoaded: umRows.length,
-        umBatchesTracked: umStatsByBatch.length,
+
         impersonation: {
           isImpersonating,
           realUser: realUserEmail,
