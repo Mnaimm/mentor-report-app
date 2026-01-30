@@ -265,7 +265,7 @@ export default function LaporanSesiPage() {
               setFilteredMentees([]);
             } else {
               setFilteredMentees(
-                mappingData.filter((m) => m.Mentor_Email === session.user.email)
+                mappingData.filter((m) => m.Mentor_Email === session?.user?.email)
               );
             }
           }
@@ -496,6 +496,12 @@ export default function LaporanSesiPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Safety Check: Ensure session is valid
+    if (status !== 'authenticated' || !session?.user) {
+      setError('Sesi tidak sah atau telah tamat tempoh. Sila refresh page atau log masuk semula.');
+      return;
+    }
 
     // IMMEDIATELY disable button to prevent double-click
     if (isSubmitting) {
@@ -822,8 +828,8 @@ export default function LaporanSesiPage() {
         sesiLaporan: currentSession,
         usahawan: selectedMentee.Usahawan,
         namaSyarikat: selectedMentee.Nama_Syarikat,
-        namaMentor: session.user.name,
-        mentorEmail: session.user.email,
+        namaMentor: session?.user?.name || '',
+        mentorEmail: session?.user?.email || '',
         emailUsahawan: selectedMentee?.Emel || '', // Use 'Emel' (transformed key from backend)
         imageUrls,
         premisDilawatChecked: !!formState.sesi?.premisDilawat,

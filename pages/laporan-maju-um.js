@@ -59,7 +59,7 @@ const EnhancedTextArea = ({ label, name, value, onChange, helperText, rows = 5, 
 };
 
 const LaporanMajuPage = () => {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const isAdmin = session?.user?.email && process.env.NEXT_PUBLIC_ADMIN_EMAILS?.includes(session.user.email);
 
   const initialFormState = {
@@ -168,7 +168,7 @@ const LaporanMajuPage = () => {
         mentorEmail = selectedMentorData.Mentor_Email;
       }
     } else if (!isAdmin && session?.user?.email) {
-      const loggedInMentorData = allMenteesMapping.find(m => m.Mentor_Email === session.user.email);
+      const loggedInMentorData = allMenteesMapping.find(m => m.Mentor_Email === session?.user?.email);
       if (loggedInMentorData) {
         mentorName = loggedInMentorData.Mentor;
         mentorEmail = loggedInMentorData.Mentor_Email;
@@ -188,7 +188,7 @@ const LaporanMajuPage = () => {
     if (isAdmin && selectedMentorEmail) {
       menteesToDisplay = allMenteesMapping.filter(m => m.Mentor_Email === selectedMentorEmail);
     } else if (!isAdmin && session?.user?.email) {
-      menteesToDisplay = allMenteesMapping.filter(m => m.Mentor_Email === session.user.email);
+      menteesToDisplay = allMenteesMapping.filter(m => m.Mentor_Email === session?.user?.email);
     }
     setFilteredMenteesForDropdown(menteesToDisplay);
   }, [allMenteesMapping, selectedMentorEmail, isAdmin, session]);
@@ -713,6 +713,14 @@ const LaporanMajuPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Safety Check: Ensure session is valid
+    if (status !== 'authenticated' || !session?.user) {
+      setMessage('Sesi tidak sah atau telah tamat tempoh. Sila refresh page atau log masuk semula.');
+      setMessageType('error');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
 
     // IMMEDIATELY disable button to prevent double-click
     if (loading) {
@@ -2209,226 +2217,226 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
 
 
 
-      <div className="bg-white p-6 rounded-lg shadow-sm">
-        <Section title="Lampiran Gambar">
-          {currentSessionNumber === 1 && (
-            <FileInput
-              label="Gambar GW360 (Sesi 1 Sahaja)"
-              name="URL_GAMBAR_GW360"
-              onFileChange={(e) => handleFileChange('gw360', e.target.files)}
-              multiple={false}
-              required={currentSessionNumber === 1}
-              isImageUpload={true}
-            />
-          )}
-          {formData.URL_GAMBAR_GW360 && currentSessionNumber === 1 && (
-            <div className="mt-2">
-              <p className="text-sm text-gray-600">
-                Uploaded GW360:{' '}
-                <a
-                  href={formData.URL_GAMBAR_GW360}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-500 hover:underline"
-                >
-                  View Image
-                </a>
-              </p>
-            </div>
-          )}
+              <div className="bg-white p-6 rounded-lg shadow-sm">
+                <Section title="Lampiran Gambar">
+                  {currentSessionNumber === 1 && (
+                    <FileInput
+                      label="Gambar GW360 (Sesi 1 Sahaja)"
+                      name="URL_GAMBAR_GW360"
+                      onFileChange={(e) => handleFileChange('gw360', e.target.files)}
+                      multiple={false}
+                      required={currentSessionNumber === 1}
+                      isImageUpload={true}
+                    />
+                  )}
+                  {formData.URL_GAMBAR_GW360 && currentSessionNumber === 1 && (
+                    <div className="mt-2">
+                      <p className="text-sm text-gray-600">
+                        Uploaded GW360:{' '}
+                        <a
+                          href={formData.URL_GAMBAR_GW360}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-500 hover:underline"
+                        >
+                          View Image
+                        </a>
+                      </p>
+                    </div>
+                  )}
 
-          <FileInput
-            label="Gambar Sesi (Pelbagai Gambar)"
-            name="URL_GAMBAR_SESI_JSON"
-            onFileChange={(e) => handleFileChange('sesi', e.target.files, true)}
-            multiple={true}
-            required
-            isImageUpload={true}
-          />
-          {formData.URL_GAMBAR_SESI_JSON.length > 0 && (
-            <div className="mt-2">
-              <p className="text-sm text-gray-600">Uploaded Sesi Images:</p>
-              <div className="flex flex-wrap gap-2">
-                {formData.URL_GAMBAR_SESI_JSON.map((url, index) => (
-                  <a
-                    key={index}
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-500 hover:underline text-sm"
-                  >
-                    Image {index + 1}
-                  </a>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {!hasPremisPhotosUploaded ? (
-            <div>
-              <label className="flex items-center mt-4">
-                <input
-                  type="checkbox"
-                  className="form-checkbox"
-                  checked={lawatanPremisChecked}
-                  onChange={() => setLawatanPremisChecked(!lawatanPremisChecked)}
-                />
-                <span className="ml-2 text-gray-700">Lawatan Premis Telah Dijalankan?</span>
-              </label>
-              {lawatanPremisChecked && (
-                <div>
                   <FileInput
-                    label="Gambar Lawatan Premis *"
-                    name="URL_GAMBAR_PREMIS_JSON"
-                    onFileChange={(e) => handleFileChange('premis', e.target.files, true)}
+                    label="Gambar Sesi (Pelbagai Gambar)"
+                    name="URL_GAMBAR_SESI_JSON"
+                    onFileChange={(e) => handleFileChange('sesi', e.target.files, true)}
                     multiple={true}
-                    required={lawatanPremisChecked}
+                    required
                     isImageUpload={true}
                   />
-                  <p className="mt-1 text-sm text-gray-600 italic">
-                    Gambar bahagian depan premis bisnes mentee, Gambar-gambar ruang dalam bisnes mentee, Gambar-gambar aset yang ada (terutama yang dibeli menggunakan geran BIMB), selfie depan premise
-                  </p>
-                </div>
-              )}
-              {formData.URL_GAMBAR_PREMIS_JSON.length > 0 && lawatanPremisChecked && (
-                <div className="mt-2">
-                  <p className="text-sm text-gray-600">Uploaded Premis Images:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {formData.URL_GAMBAR_PREMIS_JSON.map((url, index) => (
+                  {formData.URL_GAMBAR_SESI_JSON.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-sm text-gray-600">Uploaded Sesi Images:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {formData.URL_GAMBAR_SESI_JSON.map((url, index) => (
+                          <a
+                            key={index}
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-500 hover:underline text-sm"
+                          >
+                            Image {index + 1}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {!hasPremisPhotosUploaded ? (
+                    <div>
+                      <label className="flex items-center mt-4">
+                        <input
+                          type="checkbox"
+                          className="form-checkbox"
+                          checked={lawatanPremisChecked}
+                          onChange={() => setLawatanPremisChecked(!lawatanPremisChecked)}
+                        />
+                        <span className="ml-2 text-gray-700">Lawatan Premis Telah Dijalankan?</span>
+                      </label>
+                      {lawatanPremisChecked && (
+                        <div>
+                          <FileInput
+                            label="Gambar Lawatan Premis *"
+                            name="URL_GAMBAR_PREMIS_JSON"
+                            onFileChange={(e) => handleFileChange('premis', e.target.files, true)}
+                            multiple={true}
+                            required={lawatanPremisChecked}
+                            isImageUpload={true}
+                          />
+                          <p className="mt-1 text-sm text-gray-600 italic">
+                            Gambar bahagian depan premis bisnes mentee, Gambar-gambar ruang dalam bisnes mentee, Gambar-gambar aset yang ada (terutama yang dibeli menggunakan geran BIMB), selfie depan premise
+                          </p>
+                        </div>
+                      )}
+                      {formData.URL_GAMBAR_PREMIS_JSON.length > 0 && lawatanPremisChecked && (
+                        <div className="mt-2">
+                          <p className="text-sm text-gray-600">Uploaded Premis Images:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {formData.URL_GAMBAR_PREMIS_JSON.map((url, index) => (
+                              <a
+                                key={index}
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-500 hover:underline text-sm"
+                              >
+                                Image {index + 1}
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <InfoCard title="Lawatan Premis Status" type="info">
+                      Lawatan Premis telah direkodkan.
+                    </InfoCard>
+                  )}
+                </Section>
+              </div>
+
+              {/* --- Bahagian Upward Mobility --- */}
+              {(currentSessionNumber === 2 || currentSessionNumber === 4) && (
+                <div className="bg-white p-6 rounded-lg shadow-sm">
+                  <Section title="Bahagian Upward Mobility">
+                    <InfoCard title="Peringatan Penting" type="info">
+                      <p>[SESI 2 & 4 SAHAJA] Sila lengkapkan borang Forms Upward Mobility di pautan berikut:</p>
                       <a
-                        key={index}
-                        href={url}
+                        href="/upward-mobility"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-500 hover:underline text-sm"
+                        className="text-blue-600 hover:underline font-medium"
                       >
-                        Image {index + 1}
+                        Link to Upward Mobility Google Form
                       </a>
-                    ))}
-                  </div>
+                    </InfoCard>
+                  </Section>
                 </div>
               )}
-            </div>
-          ) : (
-            <InfoCard title="Lawatan Premis Status" type="info">
-              Lawatan Premis telah direkodkan.
-            </InfoCard>
-          )}
-        </Section>
-      </div>
+            </>
+          )
+          }
 
-      {/* --- Bahagian Upward Mobility --- */}
-      {(currentSessionNumber === 2 || currentSessionNumber === 4) && (
-        <div className="bg-white p-6 rounded-lg shadow-sm">
-          <Section title="Bahagian Upward Mobility">
-            <InfoCard title="Peringatan Penting" type="info">
-              <p>[SESI 2 & 4 SAHAJA] Sila lengkapkan borang Forms Upward Mobility di pautan berikut:</p>
-              <a
-                href="/upward-mobility"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:underline font-medium"
+          {/* Submit area: white card with centered buttons */}
+          <div className="bg-white p-6 rounded-lg shadow-sm">
+            {/* Compression Progress Indicator */}
+            {compressionProgress.show && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <div className="flex items-center space-x-3">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-blue-900">
+                      📸 Compressing: {compressionProgress.fileName}
+                    </p>
+                    <p className="text-xs text-blue-700">
+                      Step {compressionProgress.current}/{compressionProgress.total}: {compressionProgress.message}
+                    </p>
+                    <div className="w-full bg-blue-200 rounded-full h-2 mt-2">
+                      <div
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${(compressionProgress.current / compressionProgress.total) * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Submission Stage Progress Indicator */}
+            {submissionStage.stage && submissionStage.stage !== 'complete' && !compressionProgress.show && (
+              <div className={`border rounded-lg p-4 mb-4 ${submissionStage.stage === 'error'
+                ? 'bg-red-50 border-red-200'
+                : submissionStage.stage === 'warning'
+                  ? 'bg-yellow-50 border-yellow-200'
+                  : 'bg-blue-50 border-blue-200'
+                }`}>
+                <div className="flex items-center space-x-3">
+                  {submissionStage.stage !== 'error' && submissionStage.stage !== 'warning' && (
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  )}
+                  {submissionStage.stage === 'error' && (
+                    <div className="text-red-600 text-2xl">⚠️</div>
+                  )}
+                  {submissionStage.stage === 'warning' && (
+                    <div className="text-yellow-600 text-2xl">⚠️</div>
+                  )}
+                  <div className="flex-1">
+                    <p className={`text-sm font-medium ${submissionStage.stage === 'error'
+                      ? 'text-red-900'
+                      : submissionStage.stage === 'warning'
+                        ? 'text-yellow-900'
+                        : 'text-blue-900'
+                      }`}>
+                      {submissionStage.message}
+                    </p>
+                    {submissionStage.detail && (
+                      <p className={`text-xs mt-1 ${submissionStage.stage === 'error'
+                        ? 'text-red-700'
+                        : submissionStage.stage === 'warning'
+                          ? 'text-yellow-700'
+                          : 'text-blue-700'
+                        }`}>
+                        {submissionStage.detail}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <button
+                type="button"
+                onClick={resetForm}
+                className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
+                disabled={loading || compressionProgress.show}
               >
-                Link to Upward Mobility Google Form
-              </a>
-            </InfoCard>
-          </Section>
-        </div>
-      )}
-    </>
-  )
-}
-
-{/* Submit area: white card with centered buttons */ }
-<div className="bg-white p-6 rounded-lg shadow-sm">
-  {/* Compression Progress Indicator */}
-  {compressionProgress.show && (
-    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-      <div className="flex items-center space-x-3">
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-        <div className="flex-1">
-          <p className="text-sm font-medium text-blue-900">
-            📸 Compressing: {compressionProgress.fileName}
-          </p>
-          <p className="text-xs text-blue-700">
-            Step {compressionProgress.current}/{compressionProgress.total}: {compressionProgress.message}
-          </p>
-          <div className="w-full bg-blue-200 rounded-full h-2 mt-2">
-            <div
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${(compressionProgress.current / compressionProgress.total) * 100}%` }}
-            ></div>
+                Reset Form
+              </button>
+              <button
+                type="submit"
+                className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400"
+                disabled={loading || compressionProgress.show}
+              >
+                {compressionProgress.show ? '🔄 Compressing Images...' : loading ? '📤 Submitting...' : 'Submit Laporan Maju'}
+              </button>
+            </div>
+            {saveStatus && (
+              <div className="mt-2 text-xs text-gray-500 text-center">
+                {saveStatus}
+              </div>
+            )}
           </div>
-        </div>
-      </div>
-    </div>
-  )}
-
-  {/* Submission Stage Progress Indicator */}
-  {submissionStage.stage && submissionStage.stage !== 'complete' && !compressionProgress.show && (
-    <div className={`border rounded-lg p-4 mb-4 ${submissionStage.stage === 'error'
-      ? 'bg-red-50 border-red-200'
-      : submissionStage.stage === 'warning'
-        ? 'bg-yellow-50 border-yellow-200'
-        : 'bg-blue-50 border-blue-200'
-      }`}>
-      <div className="flex items-center space-x-3">
-        {submissionStage.stage !== 'error' && submissionStage.stage !== 'warning' && (
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-        )}
-        {submissionStage.stage === 'error' && (
-          <div className="text-red-600 text-2xl">⚠️</div>
-        )}
-        {submissionStage.stage === 'warning' && (
-          <div className="text-yellow-600 text-2xl">⚠️</div>
-        )}
-        <div className="flex-1">
-          <p className={`text-sm font-medium ${submissionStage.stage === 'error'
-            ? 'text-red-900'
-            : submissionStage.stage === 'warning'
-              ? 'text-yellow-900'
-              : 'text-blue-900'
-            }`}>
-            {submissionStage.message}
-          </p>
-          {submissionStage.detail && (
-            <p className={`text-xs mt-1 ${submissionStage.stage === 'error'
-              ? 'text-red-700'
-              : submissionStage.stage === 'warning'
-                ? 'text-yellow-700'
-                : 'text-blue-700'
-              }`}>
-              {submissionStage.detail}
-            </p>
-          )}
-        </div>
-      </div>
-    </div>
-  )}
-
-  <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-    <button
-      type="button"
-      onClick={resetForm}
-      className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
-      disabled={loading || compressionProgress.show}
-    >
-      Reset Form
-    </button>
-    <button
-      type="submit"
-      className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400"
-      disabled={loading || compressionProgress.show}
-    >
-      {compressionProgress.show ? '🔄 Compressing Images...' : loading ? '📤 Submitting...' : 'Submit Laporan Maju'}
-    </button>
-  </div>
-  {saveStatus && (
-    <div className="mt-2 text-xs text-gray-500 text-center">
-      {saveStatus}
-    </div>
-  )}
-</div>
         </form >
       </div >
     </div >
