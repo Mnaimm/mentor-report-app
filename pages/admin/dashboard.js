@@ -115,11 +115,10 @@ const StatusBadge = ({ status }) => {
   const isOnTrack = status === 'on_track';
   return (
     <span
-      className={`px-3 py-1 rounded-full text-xs font-semibold ${
-        isOnTrack
-          ? 'bg-green-100 text-green-800'
-          : 'bg-red-100 text-red-800'
-      }`}
+      className={`px-3 py-1 rounded-full text-xs font-semibold ${isOnTrack
+        ? 'bg-green-100 text-green-800'
+        : 'bg-red-100 text-red-800'
+        }`}
     >
       {isOnTrack ? '✓ On Track' : '⚠ At Risk'}
     </span>
@@ -220,34 +219,28 @@ const MentorDetailModal = ({ mentor, onClose }) => {
                 <div className="mb-4">
                   <h5 className="font-semibold text-gray-700 mb-3">📋 Upward Mobility Forms</h5>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Session 2 UM */}
-                    {batch.upwardMobility.session2Required && (
-                      <UmSection
-                        batch={batch.batchName}
-                        session={2}
-                        sessionLabel="Sesi 2"
-                        totalMentees={batch.upwardMobility.session2.required}
-                        submitted={batch.upwardMobility.session2.submitted}
-                        pending={batch.upwardMobility.session2.pending}
-                        pendingMentees={batch.upwardMobility.session2.pendingMentees}
-                        noReportsYet={batch.sessionReports.session2.submitted === 0}
-                        mentorName={null}
-                      />
-                    )}
-                    {/* Session 4 UM */}
-                    {batch.upwardMobility.session4Required && (
-                      <UmSection
-                        batch={batch.batchName}
-                        session={4}
-                        sessionLabel="Sesi 4"
-                        totalMentees={batch.upwardMobility.session4.required}
-                        submitted={batch.upwardMobility.session4.submitted}
-                        pending={batch.upwardMobility.session4.pending}
-                        pendingMentees={batch.upwardMobility.session4.pendingMentees}
-                        noReportsYet={batch.sessionReports.session4.submitted === 0}
-                        mentorName={null}
-                      />
-                    )}
+                    {[1, 2, 3, 4].map(sessionNum => {
+                      const sessionKey = `session${sessionNum}`;
+                      const requiredKey = `session${sessionNum}Required`;
+                      const isRequired = batch.upwardMobility[requiredKey];
+
+                      if (!isRequired && !batch.upwardMobility[sessionKey]?.submitted) return null;
+
+                      return (
+                        <UmSection
+                          key={sessionNum}
+                          batch={batch.batchName}
+                          session={sessionNum}
+                          sessionLabel={`Sesi ${sessionNum}`}
+                          totalMentees={batch.upwardMobility[sessionKey]?.required || 0}
+                          submitted={batch.upwardMobility[sessionKey]?.submitted || 0}
+                          pending={batch.upwardMobility[sessionKey]?.pending || 0}
+                          pendingMentees={batch.upwardMobility[sessionKey]?.pendingMentees || []}
+                          noReportsYet={batch.sessionReports[sessionKey]?.submitted === 0}
+                          mentorName={null}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -378,58 +371,78 @@ export default function AdminProgressDashboard({ userEmail, isReadOnlyUser, acce
   // Get unique batches for filter
   const uniqueBatches = data?.mentors
     ? [...new Set(data.mentors.flatMap((m) => m.batches.map((b) => b.batchName)))]
-        .sort()
+      .sort()
     : [];
 
   // Filter and sort mentors
   const filteredMentors = data?.mentors
     ? data.mentors
-        .filter((mentor) => {
-          // Search filter
-          if (searchQuery) {
-            const query = searchQuery.toLowerCase();
-            if (
-              !mentor.mentorName.toLowerCase().includes(query) &&
-              !mentor.mentorEmail.toLowerCase().includes(query)
-            ) {
-              return false;
-            }
+      .filter((mentor) => {
+        // Search filter
+        if (searchQuery) {
+          const query = searchQuery.toLowerCase();
+          if (
+            !mentor.mentorName.toLowerCase().includes(query) &&
+            !mentor.mentorEmail.toLowerCase().includes(query)
+          ) {
+            return false;
           }
+        }
 
-          // Batch filter
-          if (filterBatch !== 'all') {
-            if (!mentor.batches.some((b) => b.batchName === filterBatch)) {
-              return false;
-            }
+        // Batch filter
+        if (filterBatch !== 'all') {
+          if (!mentor.batches.some((b) => b.batchName === filterBatch)) {
+            return false;
           }
+        }
 
-          // Status filter
-          if (filterStatus !== 'all') {
-            const overallCompletion =
-              (mentor.umCompletionRate + mentor.reportCompletionRate) / 2;
-            const isOnTrack = overallCompletion >= 50;
-            if (filterStatus === 'on_track' && !isOnTrack) return false;
-            if (filterStatus === 'at_risk' && isOnTrack) return false;
-          }
+        // Status filter
+        if (filterStatus !== 'all') {
+          const overallCompletion =
+            (mentor.umCompletionRate + mentor.reportCompletionRate) / 2;
+          const isOnTrack = overallCompletion >= 50;
+          if (filterStatus === 'on_track' && !isOnTrack) return false;
+          if (filterStatus === 'at_risk' && isOnTrack) return false;
+        }
 
-          return true;
-        })
-        .sort((a, b) => {
-          switch (sortBy) {
-            case 'name':
-              return a.mentorName.localeCompare(b.mentorName);
-            case 'um_progress':
-              return b.umCompletionRate - a.umCompletionRate;
-            case 'report_progress':
-              return b.reportCompletionRate - a.reportCompletionRate;
-            case 'overall':
-              const aOverall = (a.umCompletionRate + a.reportCompletionRate) / 2;
-              const bOverall = (b.umCompletionRate + b.reportCompletionRate) / 2;
-              return bOverall - aOverall;
-            default:
-              return 0;
+        return true;
+      })
+      .map(mentor => {
+        // RECALCULATE STATS IF BATCH SELECTED
+        if (filterBatch !== 'all') {
+          const batchData = mentor.batches.find(b => b.batchName === filterBatch);
+          if (batchData) {
+            return {
+              ...mentor,
+              totalUMSubmitted: batchData.totalUMSubmitted,
+              totalUMRequired: batchData.totalUMRequired,
+              umCompletionRate: batchData.totalUMRequired > 0
+                ? Math.round((batchData.totalUMSubmitted / batchData.totalUMRequired) * 100)
+                : 0,
+              totalReportsSubmitted: batchData.overallProgress.totalSubmitted,
+              totalReportsRequired: batchData.overallProgress.totalRequired,
+              reportCompletionRate: batchData.overallProgress.percentComplete,
+            };
           }
-        })
+        }
+        return mentor;
+      })
+      .sort((a, b) => {
+        switch (sortBy) {
+          case 'name':
+            return a.mentorName.localeCompare(b.mentorName);
+          case 'um_progress':
+            return b.umCompletionRate - a.umCompletionRate;
+          case 'report_progress':
+            return b.reportCompletionRate - a.reportCompletionRate;
+          case 'overall':
+            const aOverall = (a.umCompletionRate + a.reportCompletionRate) / 2;
+            const bOverall = (b.umCompletionRate + b.reportCompletionRate) / 2;
+            return bOverall - aOverall;
+          default:
+            return 0;
+        }
+      })
     : [];
 
   // Pagination
@@ -669,11 +682,10 @@ export default function AdminProgressDashboard({ userEmail, isReadOnlyUser, acce
               <button
                 key={option.value}
                 onClick={() => setSortBy(option.value)}
-                className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                  sortBy === option.value
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
+                className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${sortBy === option.value
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
               >
                 {option.label}
               </button>
@@ -736,14 +748,16 @@ export default function AdminProgressDashboard({ userEmail, isReadOnlyUser, acce
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-wrap gap-1">
-                          {mentor.batches.map((batch, bIdx) => (
-                            <span
-                              key={bIdx}
-                              className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
-                            >
-                              {batch.batchName}
-                            </span>
-                          ))}
+                          {mentor.batches
+                            .filter(batch => filterBatch === 'all' || batch.batchName === filterBatch)
+                            .map((batch, bIdx) => (
+                              <span
+                                key={bIdx}
+                                className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
+                              >
+                                {batch.batchName}
+                              </span>
+                            ))}
                         </div>
                       </td>
                       <td className="px-6 py-4">

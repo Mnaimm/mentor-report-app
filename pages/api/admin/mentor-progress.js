@@ -57,7 +57,9 @@ export default async function handler(req, res) {
     let mappingData = null;
     let batchRoundsData = null;
     let umData = null;
-    let sessionsData = null;
+    // New Data Sources
+    let bangkitData = null;
+    let majuData = null;
 
     // 4. GOOGLE SHEETS AUTHENTICATION
     let sheets = null;
@@ -87,8 +89,8 @@ export default async function handler(req, res) {
     // 5. FETCH DATA WITH GRACEFUL DEGRADATION
     const fetchPromises = [];
 
-    // Fetch mentor-mentee mappings from Google Sheets
     if (sheets) {
+      // A. Fetch Mapping
       fetchPromises.push(
         sheets.spreadsheets.values
           .get({
@@ -109,7 +111,7 @@ export default async function handler(req, res) {
           })
       );
 
-      // Fetch UM form submissions from Google Sheets
+      // B. Fetch UM Data
       fetchPromises.push(
         sheets.spreadsheets.values
           .get({
@@ -129,9 +131,47 @@ export default async function handler(req, res) {
             console.error('❌ UM fetch failed:', error);
           })
       );
+
+      // C. Fetch Bangkit Reports
+      if (process.env.GOOGLE_SHEETS_REPORT_ID) {
+        fetchPromises.push(
+          sheets.spreadsheets.values
+            .get({
+              spreadsheetId: process.env.GOOGLE_SHEETS_REPORT_ID,
+              range: `${process.env.Bangkit_TAB || 'Bangkit'}!A:K`, // Fetch A-K (enough for Email, Status, Mentee)
+            })
+            .then((data) => {
+              bangkitData = data;
+              console.log('✅ Bangkit reports fetched');
+            })
+            .catch((error) => {
+              console.error('❌ Bangkit fetch failed:', error);
+              // Non-critical if separate ID used
+            })
+        );
+      }
+
+      // D. Fetch Maju Reports
+      const majuId = process.env.GOOGLE_SHEETS_MAJU_REPORT_ID || process.env.GOOGLE_SHEETS_REPORT_ID;
+      if (majuId) {
+        fetchPromises.push(
+          sheets.spreadsheets.values
+            .get({
+              spreadsheetId: majuId,
+              range: 'LaporanMaju!A:AC', // Need up to AC for MIA status
+            })
+            .then((data) => {
+              majuData = data;
+              console.log('✅ Maju reports fetched');
+            })
+            .catch((error) => {
+              console.error('❌ Maju fetch failed:', error);
+            })
+        );
+      }
     }
 
-    // Fetch batch rounds from Supabase
+    // E. Fetch Batch Rounds (Supabase)
     fetchPromises.push(
       supabase
         .from('batch_rounds')
@@ -150,70 +190,23 @@ export default async function handler(req, res) {
         })
     );
 
-    // Fetch sessions WITHOUT joins (joins might be failing)
-    // We'll manually join the data later
+    /* 
+    // F. Fetch Reports (Supabase) - FUTURE USE / VERIFICATION ONLY
+    // We are deliberately bypassing this for now as per user request to rely on Sheets.
+    // Also corrected table name from 'sessions' to 'reports'.
     fetchPromises.push(
       supabase
-        .from('sessions')
-        .select('*')
-        .order('session_date', { ascending: true })
-        .then((result) => {
-          sessionsData = result;
-          console.log('✅ Sessions data fetched (without joins)');
-        })
-        .catch((error) => {
-          errors.push({
-            source: 'Sessions',
-            message: 'Failed to fetch sessions data',
-            details: error.message,
-          });
-          console.error('❌ Sessions fetch failed:', error);
-        })
+        .from('reports') 
+        .select('id, created_at')
+        .limit(1) // Just a connectivity check
+        .then(() => console.log('✅ DB Connectivity Check (Reports table) Passed'))
+        .catch(err => console.warn('⚠️ DB Check Failed:', err.message))
     );
-
-    // Fetch users separately
-    let usersData = null;
-    fetchPromises.push(
-      supabase
-        .from('users')
-        .select('id, email, name')
-        .then((result) => {
-          usersData = result;
-          console.log('✅ Users data fetched');
-        })
-        .catch((error) => {
-          errors.push({
-            source: 'Users',
-            message: 'Failed to fetch users data',
-            details: error.message,
-          });
-          console.error('❌ Users fetch failed:', error);
-        })
-    );
-
-    // Fetch entrepreneurs separately
-    let entrepreneursData = null;
-    fetchPromises.push(
-      supabase
-        .from('entrepreneurs')
-        .select('id, name, email, cohort, program')
-        .then((result) => {
-          entrepreneursData = result;
-          console.log('✅ Entrepreneurs data fetched');
-        })
-        .catch((error) => {
-          errors.push({
-            source: 'Entrepreneurs',
-            message: 'Failed to fetch entrepreneurs data',
-            details: error.message,
-          });
-          console.error('❌ Entrepreneurs fetch failed:', error);
-        })
-    );
+    */
 
     await Promise.all(fetchPromises);
 
-    // Check if we have critical data
+    // Check critical data
     if (!mappingData || !mappingData.data || !mappingData.data.values) {
       return res.status(500).json({
         success: false,
@@ -224,21 +217,16 @@ export default async function handler(req, res) {
 
     // 6. PROCESS MAPPING DATA
     const mappingRows = mappingData.data.values || [];
-    if (mappingRows.length < 2) {
-      return res.status(404).json({
-        success: false,
-        error: 'No mapping data found',
-        errors,
-      });
-    }
-
     // Group mentees by mentor
     const mentorMenteeMap = {};
+    // Lookup map to find Batch by Mentee Name + Mentor Email
+    const menteeBatchLookup = {};
+
     mappingRows.slice(1).forEach((row) => {
       const mentorEmail = (row[3] || '').toLowerCase().trim();
       const mentorName = row[2] || '';
       const batch = row[0] || '';
-      const menteeName = row[4] || '';
+      const menteeName = (row[4] || '').trim();
       const businessName = row[5] || '';
       const email = row[9] || '';
 
@@ -266,472 +254,267 @@ export default async function handler(req, res) {
         email: email,
       });
 
-      // Add to overall mentees list (for unique count)
       if (!mentorMenteeMap[mentorEmail].mentees.includes(menteeName)) {
         mentorMenteeMap[mentorEmail].mentees.push(menteeName);
       }
+
+      // Build lookup
+      const lookupKey = `${mentorEmail}:${menteeName.toLowerCase()}`;
+      menteeBatchLookup[lookupKey] = batch;
     });
 
-    console.log(`📊 Processed ${Object.keys(mentorMenteeMap).length} mentors`);
+    console.log(`📊 Processed ${Object.keys(mentorMenteeMap).length} mentors from mapping`);
 
     // 7. PROCESS UM DATA
     const umRows = umData?.data?.values || [];
     const umSubmissions = {};
 
     if (umRows.length > 1) {
-      // Headers: A=Timestamp, B=Email, C=Program, D=Batch, E=Session, F=Mentor, G=Entrepreneur
       umRows.slice(1).forEach((row) => {
-        const mentorEmail = (row[1] || '').toLowerCase().trim(); // Column B
-        const batch = row[3] || ''; // Column D
-        const session = row[4] || ''; // Column E (e.g., "Sesi Mentoring 2")
-        const entrepreneur = row[6] || ''; // Column G
-
-        const sessionNum = session.match(/\d+/)?.[0]; // Extract number from "Sesi Mentoring 2"
+        const mentorEmail = (row[1] || '').toLowerCase().trim();
+        const batch = row[3] || '';
+        const session = row[4] || '';
+        const entrepreneur = row[6] || '';
+        const sessionNum = session.match(/\d+/)?.[0];
 
         if (!mentorEmail || !sessionNum || !entrepreneur) return;
 
         const key = `${mentorEmail}:${batch}`;
         if (!umSubmissions[key]) {
           umSubmissions[key] = {
+            session1: new Set(),
             session2: new Set(),
+            session3: new Set(),
             session4: new Set(),
           };
         }
 
-        if (sessionNum === '2') {
-          umSubmissions[key].session2.add(entrepreneur);
-        } else if (sessionNum === '4') {
-          umSubmissions[key].session4.add(entrepreneur);
+        // Store submission for relevant session
+        if (sessionNum >= 1 && sessionNum <= 4) {
+          umSubmissions[key][`session${sessionNum}`].add(entrepreneur);
         }
       });
-
-      console.log(`📋 Processed ${umRows.length - 1} UM form submissions`);
-    } else {
-      console.warn('⚠️ No UM data available');
     }
 
-    // 8. MANUALLY JOIN SESSIONS WITH USERS AND ENTREPRENEURS
-    const sessions = sessionsData?.data || [];
-    const users = usersData?.data || [];
-    const entrepreneurs = entrepreneursData?.data || [];
+    // 8. COMBINE BANGKIT AND MAJU DATA INTO A UNIFIED SESSION LIST
+    const unifiedSessions = [];
 
-    // Create lookup maps for fast joining
-    const usersMap = {};
-    users.forEach(user => {
-      usersMap[user.id] = user;
-    });
+    // Process Bangkit
+    if (bangkitData?.data?.values?.length > 1) {
+      const bRows = bangkitData.data.values;
+      console.log(`Processing ${bRows.length - 1} Bangkit rows...`);
+      // Headers: A=Timestamp, B=Email, C=StatusSesi, D=SesiLaporan, ... H=NamaUsahawan
+      bRows.slice(1).forEach(row => {
+        const mentorEmail = (row[1] || '').toLowerCase().trim();
+        const status = (row[2] || '').toLowerCase(); // 'Selesai' or 'MIA'
+        const sessionStr = row[3] || ''; // 'Sesi #1'
+        const sessionNum = sessionStr.match(/\d+/)?.[0];
+        const menteeName = (row[7] || '').trim(); // Column H (index 7) - Verify if header changed? assuming H is name
 
-    const entrepreneursMap = {};
-    entrepreneurs.forEach(entrepreneur => {
-      entrepreneursMap[entrepreneur.id] = entrepreneur;
-    });
+        if (!mentorEmail || !menteeName) return;
 
-    console.log('\n=== DATA FETCHED ===');
-    console.log('Sessions:', sessions.length);
-    console.log('Users:', users.length);
-    console.log('Entrepreneurs:', entrepreneurs.length);
+        const isMIA = status.includes('mia');
+        const isCompleted = status.includes('seles') || status.includes('done') || status.includes('complet');
 
-    // Manually join sessions with users and entrepreneurs
-    const joinedSessions = sessions.map(session => ({
-      ...session,
-      users: usersMap[session.mentor_id] || null,
-      entrepreneurs: entrepreneursMap[session.entrepreneur_id] || null,
-    }));
-
-    // 9. PROCESS SESSION REPORTS DATA (CHRONOLOGICAL SESSION NUMBER DETECTION)
-    const sessionReportsByMentor = {};
-    const sessionsByMentee = {}; // Track sessions per mentee for chronological ordering
-
-    // === DEBUGGING: RAW SESSION DATA ===
-    console.log('\n=== DEBUGGING SESSION REPORTS ===');
-    console.log('Total sessions fetched:', joinedSessions.length);
-    if (joinedSessions.length > 0) {
-      console.log('Sample session data:', JSON.stringify({
-        id: joinedSessions[0]?.id,
-        mentor_id: joinedSessions[0]?.mentor_id,
-        entrepreneur_id: joinedSessions[0]?.entrepreneur_id,
-        entrepreneur_name: joinedSessions[0]?.entrepreneurs?.name,
-        cohort: joinedSessions[0]?.entrepreneurs?.cohort,
-        mentor_email: joinedSessions[0]?.users?.email,
-        session_date: joinedSessions[0]?.session_date,
-        Status: joinedSessions[0]?.Status,
-        status: joinedSessions[0]?.status,
-      }, null, 2));
-    }
-
-    // Check status field variations
-    const statusFields = joinedSessions.map(s => ({
-      Status: s.Status,
-      status: s.status,
-      combined: s.Status || s.status
-    }));
-    console.log('Status field samples (first 5):', statusFields.slice(0, 5));
-
-    const uniqueStatuses = [...new Set(joinedSessions.map(s => (s.Status || s.status || '').toLowerCase()))];
-    console.log('Unique status values:', uniqueStatuses);
-
-    // Helper function to find matching batch from mapping
-    const findMatchingBatch = (sessionBatch, mentorEmail) => {
-      if (!sessionBatch || !mentorEmail) return null;
-
-      const mentorData = mentorMenteeMap[mentorEmail];
-      if (!mentorData) return null;
-
-      // Extract batch number from session batch (e.g., "Batch 4" -> "4")
-      const batchNumberMatch = sessionBatch.match(/\d+/);
-      if (!batchNumberMatch) return sessionBatch; // Return as-is if no number found
-
-      const batchNumber = batchNumberMatch[0];
-
-      // Find matching batch in mapping that contains this number
-      const mappingBatches = Object.keys(mentorData.batches);
-      const matchedBatch = mappingBatches.find(mappingBatch => {
-        // Check if mapping batch contains the same batch number
-        return mappingBatch.includes(`Batch ${batchNumber}`);
+        if (isCompleted || isMIA) {
+          unifiedSessions.push({
+            mentorEmail,
+            menteeName,
+            sessionNumber: sessionNum,
+            isMIA,
+            source: 'Bangkit'
+          });
+        }
       });
+    }
 
-      return matchedBatch || sessionBatch; // Return matched batch or original
-    };
+    // Process Maju
+    if (majuData?.data?.values?.length > 1) {
+      const mRows = majuData.data.values;
+      console.log(`Processing ${mRows.length - 1} Maju rows...`);
+      // Headers: A=Time, B=NameMentor, C=EmailMentor, D=NameMentee, ... J(9)=SesiNum, ... AC(28)=MIA_Status
+      mRows.slice(1).forEach(row => {
+        const mentorEmail = (row[2] || '').toLowerCase().trim(); // C
+        const menteeName = (row[3] || '').trim(); // D
+        const sessionNum = row[9] || ''; // J
+        const miaStatus = (row[28] || '').toLowerCase(); // AC
 
-    // First, group all completed sessions by mentee
-    joinedSessions.forEach((session) => {
-      const entrepreneurId = session.entrepreneur_id;
-      const entrepreneurName = session.entrepreneurs?.name;
-      const sessionBatch = session.entrepreneurs?.cohort;
-      const mentorEmail = session.users?.email?.toLowerCase().trim();
-      const sessionDate = session.session_date;
-      const sessionNumber = session.session_number; // Use actual session number from DB
-      const status = (session.Status || session.status || '').toLowerCase();
+        if (!mentorEmail || !menteeName) return;
 
-      if (!entrepreneurId || !entrepreneurName || !mentorEmail || !sessionBatch) {
-        console.log('⚠️ Skipping session - missing data:', {
-          hasEntrepreneurId: !!entrepreneurId,
-          hasEntrepreneurName: !!entrepreneurName,
-          hasMentorEmail: !!mentorEmail,
-          hasBatch: !!sessionBatch,
+        const isMIA = miaStatus.includes('mia');
+        // Maju default behavior: If in sheet, it's submitted
+        unifiedSessions.push({
+          mentorEmail,
+          menteeName,
+          sessionNumber: sessionNum,
+          isMIA,
+          source: 'Maju'
         });
+      });
+    }
+
+    // 9. AGGREGATE SESSIONS BY MENTOR
+    const sessionReportsByMentor = {};
+
+    unifiedSessions.forEach(session => {
+      if (!session.sessionNumber) return;
+
+      // Lookup Batch
+      const lookupKey = `${session.mentorEmail}:${session.menteeName.toLowerCase()}`;
+      const batch = menteeBatchLookup[lookupKey];
+
+      if (!batch) {
+        // console.warn(`No batch found for ${session.menteeName} (${session.mentorEmail})`);
         return;
       }
 
-      // More flexible status matching
-      const isCompleted =
-        status.includes('seles') ||
-        status.includes('complet') ||
-        status.includes('done') ||
-        status.includes('submit');
-
-      // Check for MIA status
-      const isMIA = status.includes('mia');
-
-      if (!isCompleted) return;
-
-      // Find matching batch from mapping sheet
-      const batch = findMatchingBatch(sessionBatch, mentorEmail);
-
-      // Group by mentee for chronological counting
-      if (!sessionsByMentee[entrepreneurId]) {
-        sessionsByMentee[entrepreneurId] = [];
+      const key = `${session.mentorEmail}:${batch}`;
+      if (!sessionReportsByMentor[key]) {
+        sessionReportsByMentor[key] = {
+          session1: new Set(),
+          session2: new Set(),
+          session3: new Set(),
+          session4: new Set(),
+          miaCount: 0,
+        };
       }
 
-      sessionsByMentee[entrepreneurId].push({
-        sessionDate,
-        sessionNumber, // Add actual session number from DB
-        entrepreneurName,
-        batch,
-        mentorEmail,
-        isMIA,
-        status,
-      });
+      // Add to Set (deduplication handled by Set)
+      if (session.sessionNumber >= 1 && session.sessionNumber <= 4) {
+        sessionReportsByMentor[key][`session${session.sessionNumber}`].add(session.menteeName);
+      }
+
+      if (session.isMIA) {
+        sessionReportsByMentor[key].miaCount++;
+      }
     });
 
-    console.log('Sessions grouped by mentee:', Object.keys(sessionsByMentee).length, 'mentees with sessions');
-    const beforeDedup = Object.values(sessionsByMentee).reduce((sum, sessions) => sum + sessions.length, 0);
-    console.log('Before deduplication:', beforeDedup, 'total sessions');
 
-    // Deduplicate sessions per mentee
-    Object.keys(sessionsByMentee).forEach((entrepreneurId) => {
-      const sessions = sessionsByMentee[entrepreneurId];
-
-      // Create unique key: sessionNumber + batch + mentorEmail
-      const uniqueSessions = new Map();
-
-      sessions.forEach(session => {
-        const uniqueKey = `${session.sessionNumber}-${session.batch}-${session.mentorEmail}`;
-
-        if (!uniqueSessions.has(uniqueKey)) {
-          // First occurrence - keep it
-          uniqueSessions.set(uniqueKey, session);
-        } else {
-          // Duplicate found - keep the one with later session_date
-          const existing = uniqueSessions.get(uniqueKey);
-          const existingDate = new Date(existing.sessionDate);
-          const newDate = new Date(session.sessionDate);
-
-          // Keep whichever has a later timestamp (in case dates differ slightly)
-          // If dates are same, just keep the first one
-          if (newDate > existingDate) {
-            uniqueSessions.set(uniqueKey, session);
-          }
-        }
-      });
-
-      // Replace with deduplicated sessions
-      sessionsByMentee[entrepreneurId] = Array.from(uniqueSessions.values());
-    });
-
-    const afterDedup = Object.values(sessionsByMentee).reduce((sum, sessions) => sum + sessions.length, 0);
-    console.log('After deduplication:', afterDedup, 'unique sessions');
-    console.log('Duplicates removed:', beforeDedup - afterDedup);
-
-    // Now, process each mentee's sessions using actual session numbers from DB
-    Object.values(sessionsByMentee).forEach((menteeSessions) => {
-      // Process each session using its actual session number
-      menteeSessions.forEach((session) => {
-        const sessionNumber = session.sessionNumber;
-
-        // Skip if no session number or invalid
-        if (!sessionNumber || sessionNumber < 1 || sessionNumber > 4) {
-          console.log('⚠️ Skipping session - invalid session_number:', {
-            entrepreneurName: session.entrepreneurName,
-            sessionNumber,
-            sessionDate: session.sessionDate,
-          });
-          return;
-        }
-
-        const key = `${session.mentorEmail}:${session.batch}`;
-        if (!sessionReportsByMentor[key]) {
-          sessionReportsByMentor[key] = {
-            session1: new Set(),
-            session2: new Set(),
-            session3: new Set(),
-            session4: new Set(),
-            miaCount: 0,
-          };
-        }
-
-        // Add to appropriate session set
-        sessionReportsByMentor[key][`session${sessionNumber}`].add(
-          session.entrepreneurName
-        );
-
-        // Track MIA
-        if (session.isMIA) {
-          sessionReportsByMentor[key].miaCount++;
-        }
-      });
-    });
-
-    console.log('Session Reports By Mentor - Keys:', Object.keys(sessionReportsByMentor));
-
-    // === DEBUGGING: SPECIFIC MENTOR ===
-    const debugEmail = 'naemmukhtar@gmail.com';
-    console.log(`\n=== DEBUGGING MENTOR: ${debugEmail} ===`);
-    const debugMentorSessions = joinedSessions.filter(s =>
-      s.users?.email?.toLowerCase().trim() === debugEmail
-    );
-    console.log('Sessions for this mentor:', debugMentorSessions.length);
-    console.log('Completed sessions for this mentor:', debugMentorSessions.filter(s => {
-      const status = (s.Status || s.status || '').toLowerCase();
-      return status.includes('seles') || status.includes('complet');
-    }).length);
-    console.log('Session numbers in data:', debugMentorSessions.map(s => ({
-      name: s.entrepreneurs?.name,
-      batch: s.entrepreneurs?.cohort,
-      session_number: s.session_number,
-      date: s.session_date,
-    })));
-
-    if (mentorMenteeMap[debugEmail]) {
-      console.log('Mentor batches:', Object.keys(mentorMenteeMap[debugEmail].batches));
-      console.log('Mentor mentees:', mentorMenteeMap[debugEmail].mentees);
-
-      Object.keys(mentorMenteeMap[debugEmail].batches).forEach(batchName => {
-        const key = `${debugEmail}:${batchName}`;
-        console.log(`\nKey: "${key}"`);
-        if (sessionReportsByMentor[key]) {
-          console.log('Session data:', {
-            session1: sessionReportsByMentor[key].session1.size,
-            session2: sessionReportsByMentor[key].session2.size,
-            session3: sessionReportsByMentor[key].session3.size,
-            session4: sessionReportsByMentor[key].session4.size,
-            session1Names: Array.from(sessionReportsByMentor[key].session1),
-            session2Names: Array.from(sessionReportsByMentor[key].session2),
-          });
-        } else {
-          console.log('❌ No session data found for this key!');
-        }
-      });
-    }
-
-    // Check batch name matching
-    console.log('\n=== BATCH NAME MATCHING ===');
-    const sessionsWithBatch = joinedSessions.filter(s => s.entrepreneurs?.cohort);
-    const uniqueBatchesInSessions = [...new Set(sessionsWithBatch.map(s => s.entrepreneurs.cohort))];
-    const uniqueBatchesInMapping = [...new Set(Object.values(mentorMenteeMap).flatMap(m => Object.keys(m.batches)))];
-    console.log('Batches in sessions table:', uniqueBatchesInSessions);
-    console.log('Batches in mapping sheet:', uniqueBatchesInMapping);
-
-    console.log(`📝 Processed ${joinedSessions.length} session reports`);
-
-    // 9. GET BATCH ROUNDS INFO
+    // 10. GET BATCH ROUNDS & SMART REQUIREMENTS
     const batchRounds = batchRoundsData?.data || [];
-    const getBatchRound = (batchName) => {
-      if (!batchRounds || batchRounds.length === 0) return null;
+
+    // Helper to get current Batch Round Info
+    const getBatchInfo = (batchName) => {
+      if (!batchRounds.length) return { currentRound: 1, roundStartDate: new Date() }; // Default
 
       const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      const rounds = batchRounds
+        .filter(b => batchName.includes(b.batch_name) || b.batch_name.includes(batchName))
+        .sort((a, b) => new Date(a.start_month) - new Date(b.start_month));
 
-      const matchingRounds = batchRounds.filter((b) => {
-        return (
-          b.batch_name === batchName ||
-          b.batch_name?.includes(batchName) ||
-          batchName?.includes(b.batch_name)
-        );
+      if (!rounds.length) return { currentRound: 1, roundStartDate: new Date() };
+
+      // Determine current round based on date
+      let current = rounds.find(r => {
+        const start = new Date(r.start_month);
+        const end = new Date(r.end_month);
+        return today >= start && today <= end;
       });
 
-      if (matchingRounds.length === 0) return null;
-
-      // Find current round
-      let currentRound = matchingRounds.find((b) => {
-        const startDate = new Date(b.start_month);
-        const endDate = new Date(b.end_month);
-        startDate.setHours(0, 0, 0, 0);
-        endDate.setHours(23, 59, 59, 999);
-        return today >= startDate && today <= endDate;
-      });
-
-      if (!currentRound) {
-        currentRound = matchingRounds
-          .filter((b) => new Date(b.start_month) > today)
-          .sort((a, b) => new Date(a.start_month) - new Date(b.start_month))[0];
+      // If not in a round, check if before first or after last
+      if (!current) {
+        if (today < new Date(rounds[0].start_month)) current = rounds[0]; // Future
+        else current = rounds[rounds.length - 1]; // Past/Finished
       }
 
-      if (!currentRound) {
-        currentRound = matchingRounds
-          .filter((b) => new Date(b.end_month) < today)
-          .sort((a, b) => new Date(b.end_month) - new Date(a.end_month))[0];
-      }
-
-      return currentRound
-        ? {
-            batch: currentRound.batch_name,
-            round: currentRound.round_name,
-            roundNumber: currentRound.round_number,
-          }
-        : null;
+      return {
+        currentRound: current.round_number,
+        currentRoundStart: new Date(current.start_month)
+      };
     };
 
-    // 10. BUILD MENTOR PROGRESS DATA
+
+    // 11. BUILD FINAL DATA
     const mentors = Object.entries(mentorMenteeMap).map(([email, mentorData]) => {
       const batches = Object.entries(mentorData.batches).map(
         ([batchName, batchData]) => {
-          const batchInfo = getBatchRound(batchName);
-          const currentRound = batchInfo?.roundNumber || 1;
+
+          const { currentRound } = getBatchInfo(batchName);
           const menteeCount = batchData.mentees.length;
 
-          const umKey = `${email}:${batchName}`;
-          const umData = umSubmissions[umKey] || {
-            session2: new Set(),
-            session4: new Set(),
+          const key = `${email}:${batchName}`;
+          const um = umSubmissions[key] || {
+            session1: new Set(), session2: new Set(), session3: new Set(), session4: new Set()
           };
-          const sessionData = sessionReportsByMentor[umKey] || {
-            session1: new Set(),
-            session2: new Set(),
-            session3: new Set(),
-            session4: new Set(),
-            miaCount: 0,
+          const reports = sessionReportsByMentor[key] || {
+            session1: new Set(), session2: new Set(), session3: new Set(), session4: new Set(), miaCount: 0
           };
 
-          // UM tracking
-          const session2Required = currentRound >= 2;
-          const session4Required = currentRound >= 4;
+          // --- SMART REQUIREMENT LOGIC (STRICT) ---
+          // Reuse common logic for both UM and Reports
+          // If session > currentRound (Future) -> Required = 0
+          // If session <= currentRound (Past or Current) -> Required = Mentee Count
 
-          const session2Submitted = umData.session2.size;
-          const session2Pending = session2Required
-            ? menteeCount - session2Submitted
-            : 0;
-          const session2PendingMentees = session2Required
-            ? batchData.mentees
-                .filter((m) => !umData.session2.has(m.name))
-                .map((m) => m.name)
-            : [];
+          const calcRequirements = (sessionNum, submittedSet) => {
+            const submittedCount = submittedSet.size;
+            let required = menteeCount;
 
-          const session4Submitted = umData.session4.size;
-          const session4Pending = session4Required
-            ? menteeCount - session4Submitted
-            : 0;
-          const session4PendingMentees = session4Required
-            ? batchData.mentees
-                .filter((m) => !umData.session4.has(m.name))
-                .map((m) => m.name)
-            : [];
+            if (sessionNum > currentRound) {
+              required = 0; // Future: Not required yet
+            }
+            // Else (Past or Current) -> Required is Mentee Count. STRICT.
 
-          // Session reports tracking
-          const totalUMRequired =
-            (session2Required ? menteeCount : 0) +
-            (session4Required ? menteeCount : 0);
-          const totalUMSubmitted = session2Submitted + session4Submitted;
+            return {
+              required,
+              submitted: submittedCount,
+              pending: Math.max(0, required - submittedCount),
+            };
+          };
 
-          const totalReportsRequired = menteeCount * 4; // 4 sessions per mentee
-          const totalReportsSubmitted =
-            sessionData.session1.size +
-            sessionData.session2.size +
-            sessionData.session3.size +
-            sessionData.session4.size;
+          const um1 = calcRequirements(1, um.session1);
+          const um2 = calcRequirements(2, um.session2);
+          const um3 = calcRequirements(3, um.session3);
+          const um4 = calcRequirements(4, um.session4);
+
+          const r1 = calcRequirements(1, reports.session1);
+          const r2 = calcRequirements(2, reports.session2);
+          const r3 = calcRequirements(3, reports.session3);
+          const r4 = calcRequirements(4, reports.session4);
+
+          // Total UM Required
+          const totalUMRequired = um1.required + um2.required + um3.required + um4.required;
+          const totalUMSubmitted = um1.submitted + um2.submitted + um3.submitted + um4.submitted;
+
+          // Total Reports Required
+          const totalReportsRequired = r1.required + r2.required + r3.required + r4.required;
+          const totalReportsSubmitted = r1.submitted + r2.submitted + r3.submitted + r4.submitted;
+
+          // Helper for pending UM mentees (only for current/active) (and reports!)
+          const getPendingMentees = (sessionNum, submittedSet) => {
+            if (sessionNum > currentRound) return []; // Future
+            // For Past/Current, show pending
+            return batchData.mentees
+              .filter(m => !submittedSet.has(m.name))
+              .map(m => m.name);
+          };
 
           return {
             batchName,
             currentRound,
             menteeCount,
-            miaCount: sessionData.miaCount,
+            miaCount: reports.miaCount,
             upwardMobility: {
-              session2Required,
-              session2: {
-                required: session2Required ? menteeCount : 0,
-                submitted: session2Submitted,
-                pending: session2Pending,
-                pendingMentees: session2PendingMentees,
-              },
-              session4Required,
-              session4: {
-                required: session4Required ? menteeCount : 0,
-                submitted: session4Submitted,
-                pending: session4Pending,
-                pendingMentees: session4PendingMentees,
-              },
+              session1: { ...um1, pendingMentees: getPendingMentees(1, um.session1) },
+              session2: { ...um2, pendingMentees: getPendingMentees(2, um.session2) },
+              session3: { ...um3, pendingMentees: getPendingMentees(3, um.session3) },
+              session4: { ...um4, pendingMentees: getPendingMentees(4, um.session4) },
+              session1Required: um1.required > 0,
+              session2Required: um2.required > 0,
+              session3Required: um3.required > 0,
+              session4Required: um4.required > 0,
             },
             sessionReports: {
-              session1: {
-                required: menteeCount,
-                submitted: sessionData.session1.size,
-                pending: menteeCount - sessionData.session1.size,
-              },
-              session2: {
-                required: menteeCount,
-                submitted: sessionData.session2.size,
-                pending: menteeCount - sessionData.session2.size,
-              },
-              session3: {
-                required: menteeCount,
-                submitted: sessionData.session3.size,
-                pending: menteeCount - sessionData.session3.size,
-              },
-              session4: {
-                required: menteeCount,
-                submitted: sessionData.session4.size,
-                pending: menteeCount - sessionData.session4.size,
-              },
+              session1: { ...r1, pendingMentees: getPendingMentees(1, reports.session1) },
+              session2: { ...r2, pendingMentees: getPendingMentees(2, reports.session2) },
+              session3: { ...r3, pendingMentees: getPendingMentees(3, reports.session3) },
+              session4: { ...r4, pendingMentees: getPendingMentees(4, reports.session4) },
             },
             overallProgress: {
               totalRequired: totalReportsRequired,
               totalSubmitted: totalReportsSubmitted,
-              percentComplete:
-                totalReportsRequired > 0
-                  ? Math.round(
-                      (totalReportsSubmitted / totalReportsRequired) * 100
-                    )
-                  : 0,
+              percentComplete: totalReportsRequired > 0
+                ? Math.round((totalReportsSubmitted / totalReportsRequired) * 100)
+                : 0,
             },
             totalUMRequired,
             totalUMSubmitted,
@@ -739,33 +522,15 @@ export default async function handler(req, res) {
         }
       );
 
-      // Calculate mentor-level totals
+      // Mentor totals
       const totalMentees = mentorData.mentees.length;
-      const totalUMRequired = batches.reduce(
-        (sum, b) => sum + b.totalUMRequired,
-        0
-      );
-      const totalUMSubmitted = batches.reduce(
-        (sum, b) => sum + b.totalUMSubmitted,
-        0
-      );
-      const totalReportsRequired = batches.reduce(
-        (sum, b) => sum + b.overallProgress.totalRequired,
-        0
-      );
-      const totalReportsSubmitted = batches.reduce(
-        (sum, b) => sum + b.overallProgress.totalSubmitted,
-        0
-      );
+      const totalUMRequired = batches.reduce((s, b) => s + b.totalUMRequired, 0);
+      const totalUMSubmitted = batches.reduce((s, b) => s + b.totalUMSubmitted, 0);
+      const totalReportsRequired = batches.reduce((s, b) => s + b.overallProgress.totalRequired, 0);
+      const totalReportsSubmitted = batches.reduce((s, b) => s + b.overallProgress.totalSubmitted, 0);
 
-      const umCompletionRate =
-        totalUMRequired > 0
-          ? Math.round((totalUMSubmitted / totalUMRequired) * 100)
-          : 0;
-      const reportCompletionRate =
-        totalReportsRequired > 0
-          ? Math.round((totalReportsSubmitted / totalReportsRequired) * 100)
-          : 0;
+      const umCompletionRate = totalUMRequired > 0 ? Math.round((totalUMSubmitted / totalUMRequired) * 100) : 0;
+      const reportCompletionRate = totalReportsRequired > 0 ? Math.round((totalReportsSubmitted / totalReportsRequired) * 100) : 0;
 
       return {
         mentorEmail: email,
@@ -781,86 +546,50 @@ export default async function handler(req, res) {
       };
     });
 
-    // Sort mentors by name
     mentors.sort((a, b) => a.mentorName.localeCompare(b.mentorName));
 
-    // 11. CALCULATE SYSTEM-WIDE SUMMARY
     const summary = {
       totalMentors: mentors.length,
       totalMentees: mentors.reduce((sum, m) => sum + m.totalMentees, 0),
-      totalUMFormsRequired: mentors.reduce(
-        (sum, m) => sum + m.totalUMRequired,
-        0
-      ),
-      totalUMFormsSubmitted: mentors.reduce(
-        (sum, m) => sum + m.totalUMSubmitted,
-        0
-      ),
+      totalUMFormsRequired: mentors.reduce((sum, m) => sum + m.totalUMRequired, 0),
+      totalUMFormsSubmitted: mentors.reduce((sum, m) => sum + m.totalUMSubmitted, 0),
+      // Recalc average rates
       umCompletionRate: 0,
-      totalSessionReportsRequired: mentors.reduce(
-        (sum, m) => sum + m.totalReportsRequired,
-        0
-      ),
-      totalSessionReportsSubmitted: mentors.reduce(
-        (sum, m) => sum + m.totalReportsSubmitted,
-        0
-      ),
       sessionReportCompletionRate: 0,
-      mentorsAtRisk: 0,
-      mentorsOnTrack: 0,
+      totalSessionReportsSubmitted: mentors.reduce((sum, m) => sum + m.totalReportsSubmitted, 0),
+      totalSessionReportsRequired: mentors.reduce((sum, m) => sum + m.totalReportsRequired, 0),
+      mentorsAtRisk: mentors.filter(m => (m.umCompletionRate + m.reportCompletionRate) / 2 < 50).length,
+      mentorsOnTrack: mentors.filter(m => (m.umCompletionRate + m.reportCompletionRate) / 2 >= 50).length,
     };
 
-    summary.umCompletionRate =
-      summary.totalUMFormsRequired > 0
-        ? Math.round(
-            (summary.totalUMFormsSubmitted / summary.totalUMFormsRequired) * 100
-          )
-        : 0;
+    if (summary.totalUMFormsRequired > 0) {
+      summary.umCompletionRate = Math.round((summary.totalUMFormsSubmitted / summary.totalUMFormsRequired) * 100);
+    }
+    else { summary.umCompletionRate = 100; } // Default if nothing required
 
-    summary.sessionReportCompletionRate =
-      summary.totalSessionReportsRequired > 0
-        ? Math.round(
-            (summary.totalSessionReportsSubmitted /
-              summary.totalSessionReportsRequired) *
-              100
-          )
-        : 0;
+    if (summary.totalSessionReportsRequired > 0) {
+      summary.sessionReportCompletionRate = Math.round((summary.totalSessionReportsSubmitted / summary.totalSessionReportsRequired) * 100);
+    }
+    else { summary.sessionReportCompletionRate = 100; } // Default if nothing required
 
-    // Calculate overall completion per mentor (average of UM and reports)
-    mentors.forEach((mentor) => {
-      const overallCompletion =
-        (mentor.umCompletionRate + mentor.reportCompletionRate) / 2;
-      if (overallCompletion < 50) {
-        summary.mentorsAtRisk++;
-      } else {
-        summary.mentorsOnTrack++;
-      }
-    });
-
-    // 12. PREPARE RESPONSE
-    const responseData = {
+    const response = {
       success: true,
-      mentors,
       summary,
-      timestamp: new Date().toISOString(),
-      errors: errors.length > 0 ? errors : undefined,
+      mentors,
       cached: false,
+      lastUpdated: new Date().toISOString(),
     };
 
-    // Update cache
-    cache.data = responseData;
-    cache.timestamp = Date.now();
+    // Update Cache
+    cache = {
+      data: response,
+      timestamp: Date.now()
+    };
 
-    console.log('✅ Data fetched and cached successfully');
+    return res.status(200).json(response);
 
-    // 13. RETURN RESPONSE
-    return res.status(200).json(responseData);
-  } catch (error) {
-    console.error('❌ Admin mentor progress error:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to fetch mentor progress',
-      details: error.message,
-    });
+  } catch (err) {
+    console.error('❌ API Error:', err);
+    return res.status(500).json({ error: err.message, stack: err.stack });
   }
 }
