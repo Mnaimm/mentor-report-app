@@ -35,7 +35,7 @@ The Mentor Reporting Tool is a comprehensive web-based application designed for 
 - **Styling:** Tailwind CSS
 - **Charts & Visualization:** Recharts (GrowthWheel assessments)
 - **Backend:** Next.js API Routes
-- **Data Storage:** Google Sheets integration
+- **Data Storage:** Hybrid - Google Sheets (Primary Legacy) & Supabase PostgreSQL (Dual-Write)
 - **File Storage:** Google Drive API
 - **Deployment:** Vercel (inferred from Next.js setup)
 
@@ -47,7 +47,8 @@ The Mentor Reporting Tool is a comprehensive web-based application designed for 
   "html-to-image": "Chart export functionality", 
   "file-saver": "File download capabilities",
   "google-auth-library": "Google API authentication",
-  "googleapis": "Google Sheets/Drive integration"
+  "googleapis": "Google Sheets/Drive integration",
+  "@supabase/supabase-js": "Database interaction"
 }
 ```
 
@@ -80,7 +81,7 @@ The Mentor Reporting Tool is a comprehensive web-based application designed for 
 
 ### 3.2 Main Reporting Modules
 
-#### 3.2.1 Laporan Sesi iTEKAD Bangkit (`/laporan-sesi`)
+#### 3.2.1 Laporan Sesi iTEKAD Bangkit (`/laporan-bangkit`)
 **Purpose:** Session-based reporting for Bangkit program mentees
 
 **Key Features:**
@@ -102,7 +103,7 @@ The Mentor Reporting Tool is a comprehensive web-based application designed for 
 - Financial performance metrics
 - Attendance and engagement tracking
 
-#### 3.2.2 Laporan Sesi iTEKAD Maju (`/laporan-maju`)
+#### 3.2.2 Laporan Sesi iTEKAD Maju (`/laporan-maju-um`)
 **Purpose:** Enhanced progress reporting for Maju program participants
 
 **Key Features:**
@@ -407,9 +408,9 @@ APPS_SCRIPT_URL=<Google Apps Script deployment URL>
 ## 12. Future Enhancement Opportunities
 
 ### 12.1 Technical Improvements
-- **Database Migration:** Move from Google Sheets to dedicated database
+- **Full Supabase Migration:** Complete the transition from Google Sheets to Supabase as the primary source of truth (Dual-Write already in place).
 - **Microservices Architecture:** Break down monolithic API structure
-- **Caching Layer:** Implement Redis or similar for performance
+- **Caching Layer:** Refine existing simple-cache implementation.
 - **Background Processing:** Async handling of file uploads and processing
 
 ### 12.2 Feature Enhancements
