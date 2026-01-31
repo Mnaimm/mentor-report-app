@@ -377,12 +377,30 @@ export default function LaporanSesiPage() {
         setCurrentSession(data.lastSession + 1);
         setMenteeStatus(data.status || '');
 
+        // Warn if Folder_ID is empty
+        if (!menteeData?.Folder_ID) {
+          console.warn('⚠️ WARNING: Folder_ID is empty for mentee:', menteeName);
+          console.warn('⚠️ This will prevent image uploads. Please add Folder_ID in the mapping sheet.');
+        }
+
         // --- Restore draft
         try {
           const draftKey = getDraftKey(menteeName, data.lastSession + 1, session?.user?.email);
           const saved = localStorage.getItem(draftKey);
           if (saved) {
             const parsed = JSON.parse(saved);
+
+            // Preserve critical fields from menteeData that shouldn't be overwritten by draft
+            const preservedFields = {
+              // Mapping-derived fields that must come from API
+              Folder_ID: menteeData?.Folder_ID,
+              Usahawan: menteeData?.Usahawan,
+              Nama_Syarikat: menteeData?.Nama_Syarikat,
+              Alamat: menteeData?.Alamat,
+              No_Tel: menteeData?.No_Tel,
+              Emel: menteeData?.Emel,
+            };
+
             setFormState(prev => ({
               ...prev,
               ...parsed,
@@ -391,7 +409,13 @@ export default function LaporanSesiPage() {
                 ? parsed.jualanTerkini
                 : (data.previousSales || prev.jualanTerkini),
             }));
+
+            // Re-apply preserved fields to selectedMentee after draft restoration
+            setSelectedMentee(prev => ({ ...prev, ...preservedFields }));
+
             setSaveStatus('Draft restored');
+            console.log('📄 Draft restored for:', menteeName, 'Sesi', data.lastSession + 1);
+            console.log('🔒 Preserved fields:', preservedFields);
           }
         } catch { }
         setAutosaveArmed(true);
@@ -633,7 +657,6 @@ export default function LaporanSesiPage() {
       const imageUrls = { growthwheel: '', profil: '', sesi: [], premis: [], mia: '' };
       const uploadPromises = [];
       const folderId = selectedMentee.Folder_ID;
-      if (!folderId) throw new Error(`Folder ID tidak ditemui untuk usahawan: ${selectedMentee.Usahawan}`);
 
       // REPLACE WITH THIS (uses smart upload for large images):
       // Replace the entire uploadImage function and remove smartUploadImage/uploadImageDirect
@@ -784,6 +807,16 @@ export default function LaporanSesiPage() {
       const menteeNameForUpload = selectedMentee.Usahawan;
       const sessionNumberForUpload = currentSession;
 
+      // Check if we have images to upload
+      const hasImagesToUpload = files.mia || files.gw || files.profil ||
+                                (files.sesi && files.sesi.length > 0) ||
+                                (files.premis && files.premis.length > 0);
+
+      // Validate folderId before attempting uploads
+      if (hasImagesToUpload && !folderId) {
+        throw new Error(`Folder ID tidak ditemui untuk usahawan: ${menteeNameForUpload}. Sila hubungi admin untuk menambah Folder ID dalam mapping sheet.`);
+      }
+
       if (isMIA) {
         if (files.mia) uploadPromises.push(uploadImage(files.mia, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => (imageUrls.mia = url)));
       } else if (currentSession === 1) {
@@ -799,6 +832,10 @@ export default function LaporanSesiPage() {
         if ((files.premis?.length || 0) > 0) {
           files.premis.forEach((file) => uploadPromises.push(uploadImage(file, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => imageUrls.premis.push(url))));
         }
+      }
+
+      if (!hasImagesToUpload) {
+        console.log('ℹ️ No images to upload, skipping upload phase');
       }
 
       // Update stage: uploading images
