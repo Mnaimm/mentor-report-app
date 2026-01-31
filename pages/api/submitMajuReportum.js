@@ -3,6 +3,7 @@ import { google } from 'googleapis';
 import cache from '../../lib/simple-cache';
 import { supabase } from '../../lib/supabaseClient';
 
+
 /** Extract the row number from "SheetName!A37:T37" */
 function getRowNumberFromUpdatedRange(updatedRange) {
   const m = String(updatedRange).match(/![A-Z]+(\d+):/);
@@ -155,6 +156,8 @@ export default async function handler(req, res) {
 
     // Document will be generated automatically by Apps Script time-driven trigger
     console.log(`✅ Data saved to ${laporanMajuTab} row ${newRowNumber}. Document will be generated automatically.`);
+
+
 
     // ============================================================
     // DUAL-WRITE TO SUPABASE (NON-BLOCKING)

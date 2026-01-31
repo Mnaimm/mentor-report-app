@@ -3,6 +3,7 @@ import { google } from 'googleapis';
 import cache from '../../lib/simple-cache';
 import { supabase } from '../../lib/supabaseClient';
 
+
 /** Extract the row number from "SheetName!A37:T37" */
 function getRowNumberFromUpdatedRange(updatedRange) {
   const m = String(updatedRange).match(/![A-Z]+(\d+):/);
@@ -288,6 +289,8 @@ export default async function handler(req, res) {
     // Document will be generated automatically by Apps Script time-driven trigger
     console.log(`✅ Data saved to row ${newRowNumber}. Document will be generated automatically.`);
 
+
+
     // ============================================================
     // DUAL-WRITE TO UPWARD MOBILITY GOOGLE SHEET (NON-BLOCKING)
     // ============================================================
@@ -516,6 +519,7 @@ export default async function handler(req, res) {
     let umRecordId = null;
 
     // For Bangkit, UM data is required EXCEPT for MIA submissions
+    // Use unified check for MIA status
     if (reportData.status !== 'MIA' && reportData.UPWARD_MOBILITY_JSON && supabaseRecordId) {
       try {
         console.log('📊 Starting Upward Mobility dual-write for BANGKIT...');

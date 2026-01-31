@@ -6,6 +6,8 @@ import InputField from '../components/InputField';
 import SelectField from '../components/SelectField';
 import TextArea from '../components/TextArea';
 import FileInput from '../components/FileInput';
+import MIAEvidenceForm from '../components/MIAEvidenceForm';
+import ReceiptModal from '../components/ReceiptModal'; // Import ReceiptModal
 import InfoCard from '../components/InfoCard';
 import { format } from 'date-fns';
 import {
@@ -115,6 +117,10 @@ const LaporanMajuPage = () => {
   const [files, setFiles] = useState({ gw360: null, sesi: [], premis: [] });
   const [compressionProgress, setCompressionProgress] = useState({ show: false, current: 0, total: 0, message: '', fileName: '' });
   const [submissionStage, setSubmissionStage] = useState({ stage: '', message: '', detail: '' });
+
+  // Receipt Modal State
+  const [submissionResult, setSubmissionResult] = useState(null);
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
 
   // --- Draft/Autosave functionality ---
   const getDraftKey = (menteeName, sessionNo, mentorEmail) =>
@@ -1070,11 +1076,16 @@ const LaporanMajuPage = () => {
           detail: ''
         });
 
-        // Show success with row number for verification
-        const successMessage = `${result.message || '✅ Laporan berjaya dihantar!'}\n\n📊 Row Number: ${result.rowNumber || 'N/A'}\n\nSila semak Google Sheet untuk pengesahan.`;
-
-        setMessage(successMessage);
-        setMessageType('success');
+        // Show Receipt Modal
+        const receiptData = {
+          submissionId: result?.dualWrite?.supabaseReports?.recordId || `ROW-${result?.rowNumber || 'UNKNOWN'}`,
+          submittedAt: new Date().toISOString(),
+          menteeName: formData.NAMA_MENTEE || 'Usahawan',
+          sessionNumber: currentSessionNumber,
+          program: 'Maju & Upward Mobility'
+        };
+        setSubmissionResult(receiptData);
+        setIsReceiptModalOpen(true);
 
         // Clear saved draft before resetting
         try {
@@ -1092,6 +1103,7 @@ const LaporanMajuPage = () => {
         console.log('🔄 [PHASE 5] Resetting form...');
         resetForm();
         setSubmissionStage({ stage: '', message: '', detail: '' }); // Clear stage after reset
+        setMessage(''); // Clear inline message
 
         console.log('✅ [COMPLETE] Submission process completed successfully');
         return;
@@ -2439,6 +2451,19 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
           </div>
         </form >
       </div >
+
+      <ReceiptModal
+        isOpen={isReceiptModalOpen}
+        onClose={() => {
+          setIsReceiptModalOpen(false);
+          setSubmissionResult(null);
+        }}
+        submissionId={submissionResult?.submissionId}
+        submittedAt={submissionResult?.submittedAt}
+        menteeName={submissionResult?.menteeName}
+        sessionNumber={submissionResult?.sessionNumber}
+        program={submissionResult?.program}
+      />
     </div >
   );
 };

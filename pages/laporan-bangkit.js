@@ -18,7 +18,10 @@ import {
 
 
 // --- UI Components ---
-import InfoCard from '../components/InfoCard';  // Import InfoCard if not already implemented
+import InfoCard from '../components/InfoCard';
+import MIAEvidenceForm from '../components/MIAEvidenceForm';
+import ReceiptModal from '../components/ReceiptModal'; // Import ReceiptModal
+import { format } from 'date-fns';
 
 const Section = ({ title, children, description }) => (
   <div className="p-6 border border-gray-200 rounded-lg bg-white shadow-sm">
@@ -210,6 +213,10 @@ export default function LaporanSesiPage() {
   const [success, setSuccess] = useState('');
   const [compressionProgress, setCompressionProgress] = useState({ show: false, current: 0, total: 0, message: '', fileName: '' });
   const [submissionStage, setSubmissionStage] = useState({ stage: '', message: '', detail: '' });
+
+  // Receipt Modal State
+  const [submissionResult, setSubmissionResult] = useState(null);
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
 
   // --- Non-blocking toast (yellow notice) ---
   const [toast, setToast] = useState({ show: false, message: '' });
@@ -881,6 +888,7 @@ export default function LaporanSesiPage() {
       // Add frontend timeout protection (25 seconds)
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 25000);
+      let result;
 
       try {
         const response = await fetch('/api/submitBangkit', {
@@ -892,7 +900,7 @@ export default function LaporanSesiPage() {
         clearTimeout(timeoutId);
 
         // Safe JSON parsing with fallback
-        let result;
+
         const contentType = response.headers.get('content-type');
 
         try {
@@ -954,6 +962,18 @@ export default function LaporanSesiPage() {
 
       setSuccess('✅ Laporan Bangkit dan Upward Mobility berjaya dihantar! Borang sedang direset...');
       window.scrollTo(0, 0);
+
+      // Prepare Receipt Data
+      const receiptData = {
+        submissionId: result?.dualWrite?.supabaseReports?.recordId || `ROW-${result?.rowNumber || 'UNKNOWN'}`,
+        submittedAt: new Date().toISOString(),
+        menteeName: selectedMentee?.Usahawan || 'Usahawan',
+        sessionNumber: currentSession,
+        program: 'Bangkit'
+      };
+      setSubmissionResult(receiptData);
+      setIsReceiptModalOpen(true);
+
       // Reduced timeout and immediate feedback
       setTimeout(() => {
         resetForm();
@@ -2318,6 +2338,19 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
           )}
         </form>
       </div>
+
+      <ReceiptModal
+        isOpen={isReceiptModalOpen}
+        onClose={() => {
+          setIsReceiptModalOpen(false);
+          setSubmissionResult(null);
+        }}
+        submissionId={submissionResult?.submissionId}
+        submittedAt={submissionResult?.submittedAt}
+        menteeName={submissionResult?.menteeName}
+        sessionNumber={submissionResult?.sessionNumber}
+        program={submissionResult?.program}
+      />
     </div>
   );
 }
