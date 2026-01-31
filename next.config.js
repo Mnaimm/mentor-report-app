@@ -4,19 +4,24 @@
 const csp = [
   "default-src 'self'",
   // Next/React dev needs the 'unsafe-*' in many setups; keep minimal
-  "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+  // LogRocket CDN scripts - comprehensive coverage
+  "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.logrocket.io https://cdn.lr-in.com https://cdn.lr-intake.com https://cdn.lr-ingest.com https://*.logrocket.io https://*.lr-in.com",
   "style-src 'self' 'unsafe-inline'",
-  // Allow Auth.js provider logos
-  "img-src 'self' data: blob: https://authjs.dev",
+  // Allow Auth.js provider logos + LogRocket assets
+  "img-src 'self' data: blob: https://authjs.dev https://*.logrocket.io https://*.lr-in.com",
   "font-src 'self' data:",
-  // Allow OAuth/API calls during auth + your existing Apps Script usage
-  "connect-src 'self' https://script.google.com https://script.googleusercontent.com https://*.googleapis.com https://accounts.google.com https://www.googleapis.com",
+  // Allow OAuth/API calls during auth + your existing Apps Script usage + LogRocket (comprehensive)
+  "connect-src 'self' https://script.google.com https://script.googleusercontent.com https://*.googleapis.com https://accounts.google.com https://www.googleapis.com https://*.logrocket.io https://*.lr-in.com https://*.lr-intake.com https://*.lr-ingest.com https://*.logrocket.com https://r.lr-in.com https://r.lr-intake.com ws://localhost:* wss://localhost:*",
   // Allow Google OAuth pages in frames during the handoff
   "frame-src 'self' https://accounts.google.com",
   "object-src 'none'",
   "base-uri 'self'",
   // Allow form posts to your prod domain and Google OAuth
-  "form-action 'self' https://mentor-report-app.vercel.app https://accounts.google.com"
+  "form-action 'self' https://mentor-report-app.vercel.app https://accounts.google.com",
+  // LogRocket workers
+  "worker-src 'self' blob:",
+  // Media sources for LogRocket
+  "media-src 'self' blob: data:"
 ].join('; ');
 
 const nextConfig = {
