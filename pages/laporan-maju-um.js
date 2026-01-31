@@ -306,6 +306,12 @@ const LaporanMajuPage = () => {
 
           console.log('🔍 Final Folder_ID set to:', updatedFormData.Folder_ID);
           console.log('🔍 Mentee email (emel) set to:', updatedFormData.emel);
+
+          // Warn if Folder_ID is empty
+          if (!updatedFormData.Folder_ID) {
+            console.warn('⚠️ WARNING: Folder_ID is empty for mentee:', selectedMenteeName);
+            console.warn('⚠️ This will prevent image uploads. Please add Folder_ID in the mapping sheet.');
+          }
         } else {
           console.log('❌ No mentee mapping data received');
         }
@@ -345,12 +351,28 @@ const LaporanMajuPage = () => {
 
         if (saved) {
           const parsed = JSON.parse(saved);
-          setFormData(prev => ({
-            ...prev,
-            ...parsed,
-          }));
+          setFormData(prev => {
+            // Preserve critical fields from API that shouldn't be overwritten by draft
+            const preservedFields = {
+              // Mapping-derived fields that must come from API
+              NAMA_BISNES: prev.NAMA_BISNES,
+              LOKASI_BISNES: prev.LOKASI_BISNES,
+              PRODUK_SERVIS: prev.PRODUK_SERVIS,
+              NO_TELEFON: prev.NO_TELEFON,
+              Folder_ID: prev.Folder_ID,
+              emel: prev.emel,
+              NAMA_MENTEE: prev.NAMA_MENTEE, // Keep selected mentee name
+            };
+
+            return {
+              ...prev,
+              ...parsed,
+              ...preservedFields, // Override draft with preserved fields
+            };
+          });
           setSaveStatus('Draft restored');
           console.log('📄 Draft restored for:', selectedMenteeName, 'Sesi', sessionData.currentSession);
+          console.log('🔒 Preserved fields:', preservedFields);
         }
       } catch (draftError) {
         console.error('Failed to restore draft:', draftError);
@@ -779,6 +801,11 @@ const LaporanMajuPage = () => {
 
       // Check if we have images to upload
       const hasImagesToUpload = files.gw360 || (files.sesi && files.sesi.length > 0) || (files.premis && files.premis.length > 0) || miaProofFile;
+
+      // Validate folderId before attempting uploads
+      if (hasImagesToUpload && !folderId) {
+        throw new Error(`Folder ID tidak ditemui untuk mentee: ${menteeNameForUpload}. Sila hubungi admin untuk menambah Folder ID dalam mapping sheet.`);
+      }
 
       if (!hasImagesToUpload) {
         console.log('ℹ️ No images to upload, skipping upload phase');
