@@ -809,8 +809,8 @@ export default function LaporanSesiPage() {
 
       // Check if we have images to upload
       const hasImagesToUpload = files.mia || files.gw || files.profil ||
-                                (files.sesi && files.sesi.length > 0) ||
-                                (files.premis && files.premis.length > 0);
+        (files.sesi && files.sesi.length > 0) ||
+        (files.premis && files.premis.length > 0);
 
       // Validate folderId before attempting uploads
       if (hasImagesToUpload && !folderId) {
@@ -878,6 +878,7 @@ export default function LaporanSesiPage() {
         imageUrls,
         premisDilawatChecked: !!formState.sesi?.premisDilawat,
         programType: 'bangkit', // Added programType
+        batch: selectedMentee?.Batch || '', // Added Batch from selectedMentee
       };
 
       // UPWARD MOBILITY - Only include for non-MIA submissions

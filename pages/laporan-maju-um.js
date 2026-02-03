@@ -75,6 +75,7 @@ const LaporanMajuPage = () => {
     PRODUK_SERVIS: '',
     NO_TELEFON: '',
     emel: '', // Mentee email from mapping for Supabase entrepreneur lookup
+    BATCH: '',
     TARIKH_SESI: format(new Date(), 'yyyy-MM-dd'),
     SESI_NUMBER: 1,
     MOD_SESI: '',
@@ -303,6 +304,8 @@ const LaporanMajuPage = () => {
           updatedFormData.Folder_ID = sessionData.menteeMapping.Folder_ID || '';
           // Store mentee email for Supabase entrepreneur lookup
           updatedFormData.emel = sessionData.menteeMapping.MENTEE_EMAIL_FROM_MAPPING || '';
+          updatedFormData.BATCH = sessionData.menteeMapping.BATCH || ''; // Set Batch from mapping
+
 
           console.log('🔍 Final Folder_ID set to:', updatedFormData.Folder_ID);
           console.log('🔍 Mentee email (emel) set to:', updatedFormData.emel);
@@ -867,6 +870,8 @@ const LaporanMajuPage = () => {
           NAMA_MENTEE: formData.NAMA_MENTEE,
           NAMA_BISNES: formData.NAMA_BISNES,
           SESI_NUMBER: currentSessionNumber,
+          BATCH: formData.BATCH || '', // Added Batch
+          PROGRAM: 'MAJU', // Added Program
           emel: formData.emel || '',
           LOKASI_BISNES: '',
           PRODUK_SERVIS: '',
@@ -927,6 +932,8 @@ const LaporanMajuPage = () => {
           NAMA_MENTEE: formData.NAMA_MENTEE,
           NAMA_BISNES: formData.NAMA_BISNES,
           SESI_NUMBER: currentSessionNumber,
+          BATCH: formData.BATCH || '', // Added Batch
+          PROGRAM: 'MAJU', // Added Program
           emel: formData.emel || '',
           LOKASI_BISNES: formData.LOKASI_BISNES,
           PRODUK_SERVIS: formData.PRODUK_SERVIS,

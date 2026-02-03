@@ -36,11 +36,11 @@ export default async function handler(req, res) {
 
     const laporanMajuRows = laporanMajuResponse.data.values;
     if (!laporanMajuRows || laporanMajuRows.length < 1) { // Need at least headers
-      return res.status(200).json({ 
-        currentSession: 1, 
-        previousData: null, 
+      return res.status(200).json({
+        currentSession: 1,
+        previousData: null,
         latarBelakangUsahawanSesi1: '',
-        hasPremisPhotos: false, 
+        hasPremisPhotos: false,
         menteeMapping: null,
         isMIA: false // Default to false if no data
       });
@@ -57,8 +57,8 @@ export default async function handler(req, res) {
     // Find column indices dynamically using normalized headers from LaporanMaju
     // These must EXACTLY match your LaporanMaju tab's header row
     const menteeNameColIndex = headers.indexOf(normHeader('NAMA_MENTEE'));
-    const sesiNumberColIndex = headers.indexOf(normHeader('SESI_NUMBER')); 
-    const latarBelakangColIndex = headers.indexOf(normHeader('LATARBELAKANG_USAHAWAN')); 
+    const sesiNumberColIndex = headers.indexOf(normHeader('SESI_NUMBER'));
+    const latarBelakangColIndex = headers.indexOf(normHeader('LATARBELAKANG_USAHAWAN'));
     const dataKewanganJsonColIndex = headers.indexOf(normHeader('DATA_KEWANGAN_BULANAN_JSON'));
     const mentoringFindingsJsonColIndex = headers.indexOf(normHeader('MENTORING_FINDINGS_JSON'));
     const premisPhotosColIndex = headers.indexOf(normHeader('URL_GAMBAR_PREMIS_JSON'));
@@ -67,16 +67,16 @@ export default async function handler(req, res) {
 
     // Critical column checks
     if (menteeNameColIndex === -1) {
-        return res.status(500).json({ error: `Header 'NAMA_MENTEE' not found in '${LAPORAN_MAJU_TAB}' tab.` });
+      return res.status(500).json({ error: `Header 'NAMA_MENTEE' not found in '${LAPORAN_MAJU_TAB}' tab.` });
     }
     if (sesiNumberColIndex === -1) {
-        return res.status(500).json({ error: `Header 'SESI_NUMBER' not found in '${LAPORAN_MAJU_TAB}' tab.` });
+      return res.status(500).json({ error: `Header 'SESI_NUMBER' not found in '${LAPORAN_MAJU_TAB}' tab.` });
     }
     // NEW: Check for MIA_STATUS column
     if (miaStatusColIndex === -1) {
-        // This is a soft error, as MIA might not be implemented in all sheets yet,
-        // but it's good to log or warn.
-        console.warn(`Header 'MIA_STATUS' not found in '${LAPORAN_MAJU_TAB}' tab. MIA functionality might be limited.`);
+      // This is a soft error, as MIA might not be implemented in all sheets yet,
+      // but it's good to log or warn.
+      console.warn(`Header 'MIA_STATUS' not found in '${LAPORAN_MAJU_TAB}' tab. MIA functionality might be limited.`);
     }
 
     console.log('🔍 [laporanMajuData] Column indices:', {
@@ -106,77 +106,77 @@ export default async function handler(req, res) {
     } else {
       console.log('❌ [laporanMajuData] NO MATCHES FOUND for:', name);
     }
-    
+
     let currentSession = 1;
-    let latestPreviousData = null; 
+    let latestPreviousData = null;
     let latarBelakangUsahawanSesi1 = '';
     let hasPremisPhotos = false;
     let isMIAStatus = false; // Initialize MIA status
 
     // Sort menteeReports by session number
     menteeReports.sort((a, b) => {
-        const sessionA = parseInt((a[sesiNumberColIndex] || ''), 10) || 0; 
-        const sessionB = parseInt((b[sesiNumberColIndex] || ''), 10) || 0;
-        return sessionA - sessionB;
+      const sessionA = parseInt((a[sesiNumberColIndex] || ''), 10) || 0;
+      const sessionB = parseInt((b[sesiNumberColIndex] || ''), 10) || 0;
+      return sessionA - sessionB;
     });
 
     if (menteeReports.length > 0) {
-        const highestSessionReported = menteeReports.reduce((max, row) => {
-            const sessionNum = parseInt((row[sesiNumberColIndex] || ''), 10) || 0;
-            return Math.max(max, sessionNum);
-        }, 0);
-        currentSession = highestSessionReported + 1;
+      const highestSessionReported = menteeReports.reduce((max, row) => {
+        const sessionNum = parseInt((row[sesiNumberColIndex] || ''), 10) || 0;
+        return Math.max(max, sessionNum);
+      }, 0);
+      currentSession = highestSessionReported + 1;
 
-        const previousSessionRow = menteeReports.find(row => 
-            (parseInt((row[sesiNumberColIndex] || ''), 10) || 0) === highestSessionReported
-        );
+      const previousSessionRow = menteeReports.find(row =>
+        (parseInt((row[sesiNumberColIndex] || ''), 10) || 0) === highestSessionReported
+      );
 
-        if (previousSessionRow) {
-            latestPreviousData = {
-                MENTORING_FINDINGS_JSON: mentoringFindingsJsonColIndex !== -1 ? (previousSessionRow[mentoringFindingsJsonColIndex] || '') : '',
-                DATA_KEWANGAN_BULANAN_JSON: dataKewanganJsonColIndex !== -1 ? (previousSessionRow[dataKewanganJsonColIndex] || '') : '',
-            };
-        }
+      if (previousSessionRow) {
+        latestPreviousData = {
+          MENTORING_FINDINGS_JSON: mentoringFindingsJsonColIndex !== -1 ? (previousSessionRow[mentoringFindingsJsonColIndex] || '') : '',
+          DATA_KEWANGAN_BULANAN_JSON: dataKewanganJsonColIndex !== -1 ? (previousSessionRow[dataKewanganJsonColIndex] || '') : '',
+        };
+      }
 
-        const sesi1Row = menteeReports.find(row => 
-            (parseInt((row[sesiNumberColIndex] || ''), 10) || 0) === 1
-        );
-        if (sesi1Row && latarBelakangColIndex !== -1) {
-            latarBelakangUsahawanSesi1 = sesi1Row[latarBelakangColIndex] || '';
-        }
+      const sesi1Row = menteeReports.find(row =>
+        (parseInt((row[sesiNumberColIndex] || ''), 10) || 0) === 1
+      );
+      if (sesi1Row && latarBelakangColIndex !== -1) {
+        latarBelakangUsahawanSesi1 = sesi1Row[latarBelakangColIndex] || '';
+      }
 
-        hasPremisPhotos = menteeReports.some(row => 
-            premisPhotosColIndex !== -1 && 
-            (row[premisPhotosColIndex] || '').trim() !== '' && 
-            (row[premisPhotosColIndex] || '').trim() !== '[]' 
-        );
+      hasPremisPhotos = menteeReports.some(row =>
+        premisPhotosColIndex !== -1 &&
+        (row[premisPhotosColIndex] || '').trim() !== '' &&
+        (row[premisPhotosColIndex] || '').trim() !== '[]'
+      );
 
-        // NEW: Check if any report for this mentee has MIA_STATUS as 'MIA'
-        // This assumes if a mentee is marked MIA once, they stay MIA.
-        isMIAStatus = menteeReports.some(row => 
-            miaStatusColIndex !== -1 && (row[miaStatusColIndex] || '').toLowerCase() === 'mia'
-        );
+      // NEW: Check if any report for this mentee has MIA_STATUS as 'MIA'
+      // This assumes if a mentee is marked MIA once, they stay MIA.
+      isMIAStatus = menteeReports.some(row =>
+        miaStatusColIndex !== -1 && (row[miaStatusColIndex] || '').toLowerCase() === 'mia'
+      );
     }
 
     // Fetch mentee's mapping info from the MAPPING_SHEET_ID
     const MAPPING_SHEET_ID = process.env.GOOGLE_SHEETS_MAPPING_ID;
-    const MAPPING_TAB = process.env.MAPPING_TAB || "mapping"; 
+    const MAPPING_TAB = process.env.MAPPING_TAB || "mapping";
 
     const mappingResponse = await sheets.spreadsheets.values.get({
-        spreadsheetId: MAPPING_SHEET_ID,
-        range: `${MAPPING_TAB}!A:ZZ`, // Fetch wide range for mapping as well
+      spreadsheetId: MAPPING_SHEET_ID,
+      range: `${MAPPING_TAB}!A:ZZ`, // Fetch wide range for mapping as well
     });
     const mappingRows = mappingResponse.data.values;
     if (!mappingRows || mappingRows.length < 1) {
-        console.warn(`Mapping tab '${MAPPING_TAB}' is empty or does not exist.`);
-        return res.status(200).json({
-          currentSession, 
-          previousData: latestPreviousData, 
-          latarBelakangUsahawanSesi1, 
-          hasPremisPhotos, 
-          menteeMapping: null, 
-          isMIA: isMIAStatus
-        });
+      console.warn(`Mapping tab '${MAPPING_TAB}' is empty or does not exist.`);
+      return res.status(200).json({
+        currentSession,
+        previousData: latestPreviousData,
+        latarBelakangUsahawanSesi1,
+        hasPremisPhotos,
+        menteeMapping: null,
+        isMIA: isMIAStatus
+      });
     }
 
     const mappingHeaders = mappingRows[0].map(normHeader);
@@ -185,79 +185,81 @@ export default async function handler(req, res) {
     console.log('🔍 DEBUG - Mapping headers:', mappingHeaders);
     console.log('👤 DEBUG - Looking for mentee:', name);
 
-// Replace the header mapping section in laporanMajuData.js with this:
+    // Replace the header mapping section in laporanMajuData.js with this:
 
-// Dynamic column finding for mapping sheet (using EXACT headers from your mapping sheet)
-// Remember: normHeader converts to lowercase and normalizes spaces
-const mapMenteeIdx = mappingHeaders.indexOf(normHeader('Mentee'));
-const mapNamaSyarikatIdx = mappingHeaders.indexOf(normHeader('Nama Syarikat')); // Note the space
-const mapAlamatIdx = mappingHeaders.indexOf(normHeader('Alamat'));
-const mapNoTelefonIdx = mappingHeaders.indexOf(normHeader('no Telefon')); // Note the space and lowercase 'n'
-const mapJenisBisnesIdx = mappingHeaders.indexOf(normHeader('JENIS BISNES')); // Note the space
-const mapMentorEmailIdx = mappingHeaders.indexOf(normHeader('Mentor_Email'));
-const mapMentorNameIdx = mappingHeaders.indexOf(normHeader('Mentor'));
-const mapFolderIdIdx = mappingHeaders.indexOf(normHeader('Folder_ID')); // Match the actual header name
-const mapEmailIdx = mappingHeaders.indexOf(normHeader('EMAIL'));
+    // Dynamic column finding for mapping sheet (using EXACT headers from your mapping sheet)
+    // Remember: normHeader converts to lowercase and normalizes spaces
+    const mapMenteeIdx = mappingHeaders.indexOf(normHeader('Mentee'));
+    const mapNamaSyarikatIdx = mappingHeaders.indexOf(normHeader('Nama Syarikat')); // Note the space
+    const mapAlamatIdx = mappingHeaders.indexOf(normHeader('Alamat'));
+    const mapNoTelefonIdx = mappingHeaders.indexOf(normHeader('no Telefon')); // Note the space and lowercase 'n'
+    const mapJenisBisnesIdx = mappingHeaders.indexOf(normHeader('JENIS BISNES')); // Note the space
+    const mapMentorEmailIdx = mappingHeaders.indexOf(normHeader('Mentor_Email'));
+    const mapMentorNameIdx = mappingHeaders.indexOf(normHeader('Mentor'));
+    const mapFolderIdIdx = mappingHeaders.indexOf(normHeader('Folder_ID')); // Match the actual header name
+    const mapEmailIdx = mappingHeaders.indexOf(normHeader('EMAIL'));
+    const mapBatchIdx = mappingHeaders.indexOf(normHeader('Batch'));
 
-// DEBUG: Let's also add a debug log to see what the normHeader function produces
-console.log('🔍 DEBUG - Normalized header examples:');
-console.log('  "Nama Syarikat" becomes:', normHeader('Nama Syarikat'));
-console.log('  "no Telefon" becomes:', normHeader('no Telefon'));
-console.log('  "JENIS BISNES" becomes:', normHeader('JENIS BISNES'));
-console.log('  "Folder_ID" becomes:', normHeader('Folder_ID'));
+    // DEBUG: Let's also add a debug log to see what the normHeader function produces
+    console.log('🔍 DEBUG - Normalized header examples:');
+    console.log('  "Nama Syarikat" becomes:', normHeader('Nama Syarikat'));
+    console.log('  "no Telefon" becomes:', normHeader('no Telefon'));
+    console.log('  "JENIS BISNES" becomes:', normHeader('JENIS BISNES'));
+    console.log('  "Folder_ID" becomes:', normHeader('Folder_ID'));
 
     // DEBUG: Log the mapping indices
     console.log('📊 DEBUG - Mapping indices:', {
-        mapMenteeIdx,
-        mapNamaSyarikatIdx,
-        mapAlamatIdx,
-        mapNoTelefonIdx,
-        mapJenisBisnesIdx,
-        mapMentorEmailIdx,
-        mapMentorNameIdx,
-        mapFolderIdIdx,
-        mapEmailIdx
+      mapMenteeIdx,
+      mapNamaSyarikatIdx,
+      mapAlamatIdx,
+      mapNoTelefonIdx,
+      mapJenisBisnesIdx,
+      mapMentorEmailIdx,
+      mapMentorNameIdx,
+      mapFolderIdIdx,
+      mapEmailIdx
     });
 
     let menteeMapping = null;
     if (mapMenteeIdx !== -1) {
-        const menteeMapRow = mappingRows.slice(1).find(row => row && (row[mapMenteeIdx] || '') === name);
-        
-        // DEBUG: Log mentee search
-        console.log('🔍 DEBUG - Searching for mentee in mapping data...');
-        console.log('📋 DEBUG - Available mentees in mapping:', mappingRows.slice(1).map(row => row[mapMenteeIdx]).filter(Boolean));
-        
-        if (menteeMapRow) {
-            console.log('🔍 DEBUG - Found mentee mapping row:', menteeMapRow);
-            
-            menteeMapping = {
-                // Map to the desired frontend field names
-                NAMA_BISNES: mapNamaSyarikatIdx !== -1 ? menteeMapRow[mapNamaSyarikatIdx] : '',
-                LOKASI_BISNES: mapAlamatIdx !== -1 ? menteeMapRow[mapAlamatIdx] : '',
-                NO_TELEFON: mapNoTelefonIdx !== -1 ? menteeMapRow[mapNoTelefonIdx] : '',
-                PRODUK_SERVIS: mapJenisBisnesIdx !== -1 ? menteeMapRow[mapJenisBisnesIdx] : '',
-                MENTOR_EMAIL: mapMentorEmailIdx !== -1 ? menteeMapRow[mapMentorEmailIdx] : '',
-                NAMA_MENTOR_FROM_MAPPING: mapMentorNameIdx !== -1 ? menteeMapRow[mapMentorNameIdx] : '',
-                Folder_ID: mapFolderIdIdx !== -1 ? menteeMapRow[mapFolderIdIdx] : '', // Pass this through
-                MENTEE_EMAIL_FROM_MAPPING: mapEmailIdx !== -1 ? menteeMapRow[mapEmailIdx] : '', // Pass mentee email
-            };
-            
-            console.log('✅ DEBUG - Created mentee mapping:', menteeMapping);
-        } else {
-            console.log('❌ DEBUG - No mentee mapping row found for:', name);
-        }
+      const menteeMapRow = mappingRows.slice(1).find(row => row && (row[mapMenteeIdx] || '') === name);
+
+      // DEBUG: Log mentee search
+      console.log('🔍 DEBUG - Searching for mentee in mapping data...');
+      console.log('📋 DEBUG - Available mentees in mapping:', mappingRows.slice(1).map(row => row[mapMenteeIdx]).filter(Boolean));
+
+      if (menteeMapRow) {
+        console.log('🔍 DEBUG - Found mentee mapping row:', menteeMapRow);
+
+        menteeMapping = {
+          // Map to the desired frontend field names
+          NAMA_BISNES: mapNamaSyarikatIdx !== -1 ? menteeMapRow[mapNamaSyarikatIdx] : '',
+          LOKASI_BISNES: mapAlamatIdx !== -1 ? menteeMapRow[mapAlamatIdx] : '',
+          NO_TELEFON: mapNoTelefonIdx !== -1 ? menteeMapRow[mapNoTelefonIdx] : '',
+          PRODUK_SERVIS: mapJenisBisnesIdx !== -1 ? menteeMapRow[mapJenisBisnesIdx] : '',
+          MENTOR_EMAIL: mapMentorEmailIdx !== -1 ? menteeMapRow[mapMentorEmailIdx] : '',
+          NAMA_MENTOR_FROM_MAPPING: mapMentorNameIdx !== -1 ? menteeMapRow[mapMentorNameIdx] : '',
+          Folder_ID: mapFolderIdIdx !== -1 ? menteeMapRow[mapFolderIdIdx] : '', // Pass this through
+          MENTEE_EMAIL_FROM_MAPPING: mapEmailIdx !== -1 ? menteeMapRow[mapEmailIdx] : '', // Pass mentee email
+          BATCH: mapBatchIdx !== -1 ? menteeMapRow[mapBatchIdx] : '', // Added Batch mapping
+        };
+
+        console.log('✅ DEBUG - Created mentee mapping:', menteeMapping);
+      } else {
+        console.log('❌ DEBUG - No mentee mapping row found for:', name);
+      }
     } else {
-        console.log('❌ DEBUG - mapMenteeIdx is -1, header "Usahawan" not found');
+      console.log('❌ DEBUG - mapMenteeIdx is -1, header "Usahawan" not found');
     }
 
     // Final response
     const responseData = {
-        currentSession, 
-        previousData: latestPreviousData, 
-        latarBelakangUsahawanSesi1,
-        hasPremisPhotos,
-        menteeMapping,
-        isMIA: isMIAStatus // Return MIA status
+      currentSession,
+      previousData: latestPreviousData,
+      latarBelakangUsahawanSesi1,
+      hasPremisPhotos,
+      menteeMapping,
+      isMIA: isMIAStatus // Return MIA status
     };
 
     console.log('📤 DEBUG - Final API response:', responseData);
