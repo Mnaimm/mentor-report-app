@@ -17,6 +17,13 @@ export async function middleware(req) {
     secret: process.env.NEXTAUTH_SECRET,
   });
 
+  console.log(`🔒 Middleware Debug: Path=${pathname}`);
+  console.log(`   - Cookies: ${req.cookies.getAll().map(c => c.name).join(', ')}`);
+  console.log(`   - Token found: ${!!token}`);
+  if (!token) {
+    console.log("   - Redirecting to /login due to missing token");
+  }
+
   if (!token) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
