@@ -112,22 +112,87 @@ const ProgressBar = ({ value, total, showPercentage = true }) => {
 
 // Status Badge Component
 const StatusBadge = ({ status }) => {
-  const isOnTrack = status === 'on_track';
+  let color = 'bg-gray-100 text-gray-800';
+  let label = 'Tidak Diketahui';
+
+  if (status === 'on_track') {
+    color = 'bg-green-100 text-green-800';
+    label = '✓ Mengikut Jadual';
+  } else if (status === 'at_risk') {
+    color = 'bg-yellow-100 text-yellow-800';
+    label = '⚠ Berisiko';
+  } else if (status === 'critical') {
+    color = 'bg-red-100 text-red-800';
+    label = '🛑 Kritikal';
+  }
+
   return (
     <span
-      className={`px-3 py-1 rounded-full text-xs font-semibold ${isOnTrack
-        ? 'bg-green-100 text-green-800'
-        : 'bg-red-100 text-red-800'
-        }`}
+      className={`px-3 py-1 rounded-full text-xs font-semibold ${color}`}
     >
-      {isOnTrack ? '✓ On Track' : '⚠ At Risk'}
+      {label}
     </span>
+  );
+};
+
+// Guide Modal Component
+const GuideModal = ({ onClose }) => {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-t-xl flex justify-between items-center">
+          <h2 className="text-xl font-bold">📖 Panduan Admin Dashboard</h2>
+          <button onClick={onClose} className="text-white hover:bg-white hover:bg-opacity-20 rounded-full p-1">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <div className="p-6 space-y-6">
+          <section>
+            <h3 className="font-bold text-lg text-gray-800 mb-2">1. Logik Penapisan (Filtering)</h3>
+            <p className="text-gray-600">
+              Apabila anda memilih Kohort tertentu (contoh: "Batch 5 Bangkit"), <strong>SEMUA</strong> nombor (Kemajuan UM, Laporan, Statistik) akan dikira semula untuk menggambarkan <strong>HANYA</strong> kohort tersebut.
+            </p>
+          </section>
+
+          <section>
+            <h3 className="font-bold text-lg text-gray-800 mb-2">2. Pengiraan Pusingan (Current Round)</h3>
+            <ul className="list-disc list-inside text-gray-600 space-y-1">
+              <li>Sistem mengesan <strong>Current Round</strong> berdasarkan tarikh hari ini vs jadual Batch.</li>
+              <li>Jumlah laporan/UM yang diperlukan dikira berdasarkan pusingan semasa (bukan keseluruhan program).</li>
+              <li>Contoh: Jika sekarang Round 2, mentor hanya perlu hantar laporan sehingga Sesi 2.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h3 className="font-bold text-lg text-gray-800 mb-2">3. Borang Gabungan (Combined Forms)</h3>
+            <p className="text-gray-600 mb-2">
+              Bagi sesetengah kohort, penghantaran <strong>Laporan Sesi</strong> dianggap sebagai penghantaran <strong>UM</strong> secara automatik:
+            </p>
+            <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
+              <ul className="list-disc list-inside text-sm text-blue-800 space-y-1">
+                <li><strong>Bangkit:</strong> Batch 6+ (Semua Sesi), Batch 5 (Sesi 2+)</li>
+                <li><strong>Maju:</strong> Batch 5+ (Semua Sesi), Batch 4 (Sesi 2+)</li>
+              </ul>
+            </div>
+          </section>
+
+          <section>
+            <h3 className="font-bold text-lg text-gray-800 mb-2">4. Sumber Data</h3>
+            <p className="text-gray-600">
+              Semua data diambil dari <strong>Google Sheets</strong> (Tab UM & Tab Laporan).
+            </p>
+          </section>
+        </div>
+        <div className="p-6 bg-gray-50 rounded-b-xl text-right">
+          <button onClick={onClose} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Faham</button>
+        </div>
+      </div>
+    </div>
   );
 };
 
 // Mentor Detail Modal Component
 const MentorDetailModal = ({ mentor, onClose }) => {
-  if (!mentor) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
@@ -251,11 +316,11 @@ const MentorDetailModal = ({ mentor, onClose }) => {
                     <table className="w-full text-sm">
                       <thead className="bg-gray-100">
                         <tr>
-                          <th className="px-4 py-2 text-left">Session</th>
-                          <th className="px-4 py-2 text-center">Submitted</th>
-                          <th className="px-4 py-2 text-center">Required</th>
-                          <th className="px-4 py-2 text-center">Pending</th>
-                          <th className="px-4 py-2 text-left">Progress</th>
+                          <th className="px-4 py-2 text-left">Sesi</th>
+                          <th className="px-4 py-2 text-center">Dihantar</th>
+                          <th className="px-4 py-2 text-center">Diperlukan</th>
+                          <th className="px-4 py-2 text-center">Belum Hantar</th>
+                          <th className="px-4 py-2 text-left">Kemajuan</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -298,7 +363,7 @@ const MentorDetailModal = ({ mentor, onClose }) => {
                 href={`mailto:${mentor.mentorEmail}`}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
               >
-                📧 Contact Mentor
+                📧 Hubungi Mentor
               </a>
               <button
                 disabled
@@ -331,6 +396,7 @@ export default function AdminProgressDashboard({ userEmail, isReadOnlyUser, acce
   const [filterStatus, setFilterStatus] = useState('all');
   const [sortBy, setSortBy] = useState('name');
   const [selectedMentor, setSelectedMentor] = useState(null);
+  const [showGuide, setShowGuide] = useState(false); // Helper Guide logic
   const [currentPage, setCurrentPage] = useState(1);
   const [lastUpdated, setLastUpdated] = useState(null);
 
@@ -398,11 +464,12 @@ export default function AdminProgressDashboard({ userEmail, isReadOnlyUser, acce
 
         // Status filter
         if (filterStatus !== 'all') {
-          const overallCompletion =
-            (mentor.umCompletionRate + mentor.reportCompletionRate) / 2;
-          const isOnTrack = overallCompletion >= 50;
-          if (filterStatus === 'on_track' && !isOnTrack) return false;
-          if (filterStatus === 'at_risk' && isOnTrack) return false;
+          if (filterStatus === 'on_track') {
+            return mentor.status === 'on_track';
+          }
+          if (filterStatus === 'at_risk') {
+            return mentor.status === 'at_risk' || mentor.status === 'critical';
+          }
         }
 
         return true;
@@ -457,7 +524,7 @@ export default function AdminProgressDashboard({ userEmail, isReadOnlyUser, acce
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading mentor progress data...</p>
+          <p className="text-gray-600">Memuatkan data prestasi mentor...</p>
         </div>
       </div>
     );
@@ -468,13 +535,13 @@ export default function AdminProgressDashboard({ userEmail, isReadOnlyUser, acce
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center">
           <div className="text-red-500 text-5xl mb-4">⚠️</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Error Loading Data</h2>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Ralat Memuatkan Data</h2>
           <p className="text-gray-600 mb-6">{error}</p>
           <button
             onClick={() => fetchData()}
             className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
           >
-            🔄 Try Again
+            🔄 Cuba Lagi
           </button>
         </div>
       </div>
@@ -491,14 +558,14 @@ export default function AdminProgressDashboard({ userEmail, isReadOnlyUser, acce
         <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4 mb-4">
           <div>
             <h1 className="text-3xl font-bold text-gray-800 mb-2">
-              Admin Dashboard - Mentor Progress Overview
+              Papan Pemuka Admin - Prestasi Mentor
             </h1>
             <nav className="text-sm text-gray-600">
               <Link href="/admin" className="hover:text-blue-600">
                 Admin
               </Link>
               <span className="mx-2">/</span>
-              <span className="text-gray-800 font-medium">Dashboard</span>
+              <span className="text-gray-800 font-medium">Papan Pemuka</span>
             </nav>
           </div>
           <div className="flex gap-3">
@@ -506,23 +573,23 @@ export default function AdminProgressDashboard({ userEmail, isReadOnlyUser, acce
               href="/admin"
               className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium text-sm"
             >
-              ← Back to Sales Status
+              ← Kembali ke Admin
             </Link>
             <button
               onClick={() => fetchData(true)}
               disabled={loading}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm disabled:bg-gray-400"
             >
-              {loading ? 'Loading...' : '🔄 Refresh'}
+              {loading ? 'Memuatkan...' : '🔄 Kemaskini'}
             </button>
           </div>
         </div>
         {lastUpdated && (
           <p className="text-sm text-gray-500">
-            Last updated: {lastUpdated.toLocaleString()}
+            Dikemaskini pada: {lastUpdated.toLocaleString()}
             {data?.cached && (
               <span className="ml-2 text-green-600">
-                (Cached - {data.cacheAge}s old)
+                (Tanda Masa - {data.cacheAge}s lalu)
               </span>
             )}
           </p>
@@ -535,9 +602,9 @@ export default function AdminProgressDashboard({ userEmail, isReadOnlyUser, acce
         <div className="bg-white rounded-xl shadow-md p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-500 text-sm font-medium mb-1">Total Mentors</p>
+              <p className="text-gray-500 text-sm font-medium mb-1">Jumlah Mentor</p>
               <p className="text-3xl font-bold text-gray-800">{data?.summary?.totalMentors || 0}</p>
-              <p className="text-xs text-gray-400 mt-1">Active in program</p>
+              <p className="text-xs text-gray-400 mt-1">Aktif dalam program</p>
             </div>
             <div className="text-4xl">👥</div>
           </div>
@@ -547,12 +614,12 @@ export default function AdminProgressDashboard({ userEmail, isReadOnlyUser, acce
         <div className="bg-white rounded-xl shadow-md p-6">
           <div className="flex items-center justify-between mb-3">
             <div className="flex-1">
-              <p className="text-gray-500 text-sm font-medium mb-1">UM Forms Progress</p>
+              <p className="text-gray-500 text-sm font-medium mb-1">Kemajuan Borang UM</p>
               <p className="text-3xl font-bold text-purple-600">
                 {data?.summary?.umCompletionRate || 0}%
               </p>
               <p className="text-xs text-gray-600 mt-1">
-                {data?.summary?.totalUMFormsSubmitted || 0}/{data?.summary?.totalUMFormsRequired || 0} completed
+                {data?.summary?.totalUMFormsSubmitted || 0}/{data?.summary?.totalUMFormsRequired || 0} selesai
               </p>
             </div>
             <div className="text-4xl">📋</div>
@@ -568,12 +635,12 @@ export default function AdminProgressDashboard({ userEmail, isReadOnlyUser, acce
         <div className="bg-white rounded-xl shadow-md p-6">
           <div className="flex items-center justify-between mb-3">
             <div className="flex-1">
-              <p className="text-gray-500 text-sm font-medium mb-1">Session Reports</p>
+              <p className="text-gray-500 text-sm font-medium mb-1">Laporan Sesi</p>
               <p className="text-3xl font-bold text-blue-600">
                 {data?.summary?.sessionReportCompletionRate || 0}%
               </p>
               <p className="text-xs text-gray-600 mt-1">
-                {data?.summary?.totalSessionReportsSubmitted || 0}/{data?.summary?.totalSessionReportsRequired || 0} submitted
+                {data?.summary?.totalSessionReportsSubmitted || 0}/{data?.summary?.totalSessionReportsRequired || 0} dihantar
               </p>
             </div>
             <div className="text-4xl">📝</div>
@@ -589,16 +656,16 @@ export default function AdminProgressDashboard({ userEmail, isReadOnlyUser, acce
         <div className="bg-white rounded-xl shadow-md p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-500 text-sm font-medium mb-1">Mentors At Risk</p>
+              <p className="text-gray-500 text-sm font-medium mb-1">Mentor Berisiko</p>
               <p className="text-3xl font-bold text-red-600">
                 {data?.summary?.mentorsAtRisk || 0}
               </p>
               <p className="text-xs text-gray-400 mt-1">
-                Below 50% completion
+                Kritikal atau Berisiko
               </p>
               {data?.summary?.mentorsOnTrack > 0 && (
                 <p className="text-xs text-green-600 mt-1">
-                  {data.summary.mentorsOnTrack} on track ✓
+                  {data.summary.mentorsOnTrack} mengikut jadual ✓
                 </p>
               )}
             </div>
@@ -613,11 +680,11 @@ export default function AdminProgressDashboard({ userEmail, isReadOnlyUser, acce
           {/* Search */}
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Search Mentors
+              Cari Mentor
             </label>
             <input
               type="text"
-              placeholder="Search by name or email..."
+              placeholder="Cari nama atau emel..."
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
@@ -630,7 +697,7 @@ export default function AdminProgressDashboard({ userEmail, isReadOnlyUser, acce
           {/* Batch Filter */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Filter by Batch
+              Tapis mengikut Kohort
             </label>
             <select
               value={filterBatch}
@@ -640,7 +707,7 @@ export default function AdminProgressDashboard({ userEmail, isReadOnlyUser, acce
               }}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
-              <option value="all">All Batches</option>
+              <option value="all">Semua Kohort</option>
               {uniqueBatches.map((batch) => (
                 <option key={batch} value={batch}>
                   {batch}
@@ -652,7 +719,7 @@ export default function AdminProgressDashboard({ userEmail, isReadOnlyUser, acce
           {/* Status Filter */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Filter by Status
+              Tapis mengikut Status
             </label>
             <select
               value={filterStatus}
@@ -662,22 +729,33 @@ export default function AdminProgressDashboard({ userEmail, isReadOnlyUser, acce
               }}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
-              <option value="all">All Statuses</option>
-              <option value="on_track">On Track</option>
-              <option value="at_risk">At Risk</option>
+              <option value="all">Semua Status</option>
+              <option value="on_track">Mengikut Jadual</option>
+              <option value="at_risk">Berisiko / Kritikal</option>
             </select>
+          </div>
+
+          {/* Guide Button */}
+          <div className="flex items-end">
+            <button
+              onClick={() => setShowGuide(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 font-medium transition-colors border border-indigo-200"
+            >
+              <span className="text-xl">📖</span>
+              Panduan Admin
+            </button>
           </div>
         </div>
 
         {/* Sort */}
         <div className="mt-4 flex items-center gap-3">
-          <label className="text-sm font-medium text-gray-700">Sort by:</label>
+          <label className="text-sm font-medium text-gray-700">Susun ikut:</label>
           <div className="flex gap-2">
             {[
-              { value: 'name', label: 'Name' },
-              { value: 'um_progress', label: 'UM Progress' },
-              { value: 'report_progress', label: 'Report Progress' },
-              { value: 'overall', label: 'Overall %' },
+              { value: 'name', label: 'Nama' },
+              { value: 'um_progress', label: 'Kemajuan UM' },
+              { value: 'report_progress', label: 'Kemajuan Laporan' },
+              { value: 'overall', label: 'Peratus Keseluruhan' },
             ].map((option) => (
               <button
                 key={option.value}
@@ -694,9 +772,8 @@ export default function AdminProgressDashboard({ userEmail, isReadOnlyUser, acce
         </div>
       </div>
 
-      {/* Results Summary */}
       <div className="mb-4 text-sm text-gray-600">
-        Showing {paginatedMentors.length} of {filteredMentors.length} mentors
+        Menunjukkan {paginatedMentors.length} daripada {filteredMentors.length} mentor
       </div>
 
       {/* Mentors Table */}
@@ -709,22 +786,22 @@ export default function AdminProgressDashboard({ userEmail, isReadOnlyUser, acce
                   Mentor
                 </th>
                 <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Mentees
+                  Usahawan
                 </th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Batch(es)
+                  Kohort
                 </th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  UM Progress
+                  Kemajuan UM
                 </th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Reports Progress
+                  Kemajuan Laporan
                 </th>
                 <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Status
                 </th>
                 <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Actions
+                  Tindakan
                 </th>
               </tr>
             </thead>
@@ -781,14 +858,14 @@ export default function AdminProgressDashboard({ userEmail, isReadOnlyUser, acce
                         />
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <StatusBadge status={isOnTrack ? 'on_track' : 'at_risk'} />
+                        <StatusBadge status={mentor.status} />
                       </td>
                       <td className="px-6 py-4 text-center">
                         <button
                           onClick={() => setSelectedMentor(mentor)}
                           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
                         >
-                          View Details
+                          Lihat Perincian
                         </button>
                       </td>
                     </tr>
@@ -797,7 +874,7 @@ export default function AdminProgressDashboard({ userEmail, isReadOnlyUser, acce
               ) : (
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
-                    No mentors found matching your filters
+                    Tiada mentor ditemui dengan tapisan anda
                   </td>
                 </tr>
               )}
@@ -857,11 +934,16 @@ export default function AdminProgressDashboard({ userEmail, isReadOnlyUser, acce
       </div>
 
       {/* Mentor Detail Modal */}
+      {/* Modals */}
       {selectedMentor && (
         <MentorDetailModal
           mentor={selectedMentor}
           onClose={() => setSelectedMentor(null)}
         />
+      )}
+
+      {showGuide && (
+        <GuideModal onClose={() => setShowGuide(false)} />
       )}
     </div>
   );

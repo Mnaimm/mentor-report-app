@@ -6,9 +6,9 @@ import AccessDenied from '../../components/AccessDenied';
 import ReadOnlyBadge from '../../components/ReadOnlyBadge';
 
 const CollapseIcon = ({ is_open }) => (
-    <svg className={`w-6 h-6 transition-transform duration-200 ${is_open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
-    </svg>
+  <svg className={`w-6 h-6 transition-transform duration-200 ${is_open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+  </svg>
 );
 
 export default function AdminDashboard({ userEmail, isReadOnlyUser, accessDenied }) {
@@ -47,7 +47,7 @@ export default function AdminDashboard({ userEmail, isReadOnlyUser, accessDenied
   useEffect(() => {
     fetchData();
   }, []);
-  
+
   const toggleBatch = (index) => {
     setOpenBatches(prev => ({ ...prev, [index]: !prev[index] }));
   };
@@ -72,6 +72,16 @@ export default function AdminDashboard({ userEmail, isReadOnlyUser, accessDenied
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
         </Link>
+        <Link
+          href="/admin/verification"
+          className="ml-4 inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg hover:from-emerald-700 hover:to-teal-700 transition-all shadow-md hover:shadow-lg font-medium"
+        >
+          <span className="text-xl">✅</span>
+          <span>Modul Pengesahan Laporan</span>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </Link>
       </div>
 
       <div className="flex justify-between items-center mb-8">
@@ -81,11 +91,10 @@ export default function AdminDashboard({ userEmail, isReadOnlyUser, accessDenied
         <button
           onClick={fetchData}
           disabled={loading || isReadOnlyUser}
-          className={`px-4 py-2 rounded-lg transition-colors font-medium ${
-            isReadOnlyUser
+          className={`px-4 py-2 rounded-lg transition-colors font-medium ${isReadOnlyUser
               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
               : 'bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed'
-          }`}
+            }`}
           title={isReadOnlyUser ? 'View-only access - refresh disabled' : ''}
         >
           {loading ? 'Loading...' : '🔄 Refresh Data'}
@@ -103,7 +112,7 @@ export default function AdminDashboard({ userEmail, isReadOnlyUser, accessDenied
               </h2>
               <CollapseIcon is_open={openBatches[i]} />
             </button>
-            
+
             {openBatches[i] && (
               <div className="p-4 border-t">
                 {batch.zones.map((zone, z_idx) => (

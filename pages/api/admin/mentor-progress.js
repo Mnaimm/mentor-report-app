@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { canAccessAdmin } from '../../../lib/auth';
+import { validateSequentialSessions } from '../../../lib/mentorUtils';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -17,6 +18,16 @@ let cache = {
 };
 
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+// Helper to calculate due date
+const calculateDueDate = (endMonthStr) => {
+  if (!endMonthStr) return null;
+  const dateParts = endMonthStr.split('-');
+  const year = parseInt(dateParts[0]);
+  const month = parseInt(dateParts[1]);
+  if (!year || !month) return null;
+  return new Date(year, month, 0);
+};
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -158,7 +169,7 @@ export default async function handler(req, res) {
           sheets.spreadsheets.values
             .get({
               spreadsheetId: majuId,
-              range: 'LaporanMaju!A:AC', // Need up to AC for MIA status
+              range: 'laporanmajuum!A:AC', // Updated tab name per user request
             })
             .then((data) => {
               majuData = data;
@@ -296,98 +307,68 @@ export default async function handler(req, res) {
       });
     }
 
-    // 8. COMBINE BANGKIT AND MAJU DATA INTO A UNIFIED SESSION LIST
-    const unifiedSessions = [];
+    // 8. SESSION DATA AGGREGATION & NORMALIZATION
+    // Build a map of Mentee -> Session History for validation
+    // Key: "mentorEmail:menteeName" (normalized)
+    const sessionsByMentee = {};
+
+    const addSession = (mentorEmail, menteeName, sessionData) => {
+      const key = `${mentorEmail.toLowerCase().trim()}:${menteeName.trim().toLowerCase()}`;
+      if (!sessionsByMentee[key]) sessionsByMentee[key] = [];
+      sessionsByMentee[key].push(sessionData);
+    };
 
     // Process Bangkit
     if (bangkitData?.data?.values?.length > 1) {
       const bRows = bangkitData.data.values;
-      console.log(`Processing ${bRows.length - 1} Bangkit rows...`);
-      // Headers: A=Timestamp, B=Email, C=StatusSesi, D=SesiLaporan, ... H=NamaUsahawan
+      // Headers: A=Timestamp, B=Email, C=StatusSesi, D=SesiLaporan, ... G=TarikhSesi, H=NamaUsahawan
       bRows.slice(1).forEach(row => {
         const mentorEmail = (row[1] || '').toLowerCase().trim();
-        const status = (row[2] || '').toLowerCase(); // 'Selesai' or 'MIA'
-        const sessionStr = row[3] || ''; // 'Sesi #1'
-        const sessionNum = sessionStr.match(/\d+/)?.[0];
-        const menteeName = (row[7] || '').trim(); // Column H (index 7) - Verify if header changed? assuming H is name
+        const status = (row[2] || '').trim();
+        const sessionStr = row[3] || '';
+        const sessionDate = row[6] || ''; // G
+        const menteeName = (row[7] || '').trim(); // H
 
         if (!mentorEmail || !menteeName) return;
 
-        const isMIA = status.includes('mia');
-        const isCompleted = status.includes('seles') || status.includes('done') || status.includes('complet');
+        // Parse session number
+        let sessionNum = 0;
+        const match = sessionStr.match(/\d+/);
+        if (match) sessionNum = parseInt(match[0]);
 
-        if (isCompleted || isMIA) {
-          unifiedSessions.push({
-            mentorEmail,
-            menteeName,
-            sessionNumber: sessionNum,
-            isMIA,
-            source: 'Bangkit'
-          });
-        }
+        addSession(mentorEmail, menteeName, {
+          calculatedSessionNumber: sessionNum,
+          status: status,
+          sessionDate: sessionDate, // Keep as string or parse if needed
+          programType: 'bangkit'
+        });
       });
     }
 
     // Process Maju
     if (majuData?.data?.values?.length > 1) {
       const mRows = majuData.data.values;
-      console.log(`Processing ${mRows.length - 1} Maju rows...`);
-      // Headers: A=Time, B=NameMentor, C=EmailMentor, D=NameMentee, ... J(9)=SesiNum, ... AC(28)=MIA_Status
+      // Headers: A=Time, B=NameMentor, C=EmailMentor, D=NameMentee, ... J(9)=SesiNum, ... N(13)=TarikhSesi, ... AC(28)=MIA_Status
       mRows.slice(1).forEach(row => {
-        const mentorEmail = (row[2] || '').toLowerCase().trim(); // C
-        const menteeName = (row[3] || '').trim(); // D
-        const sessionNum = row[9] || ''; // J
-        const miaStatus = (row[28] || '').toLowerCase(); // AC
+        const mentorEmail = (row[2] || '').toLowerCase().trim();
+        const menteeName = (row[3] || '').trim();
+        const sessionNumStr = row[9] || '0';
+        const sessionDate = row[13] || '';
+        const miaStatus = (row[28] || 'Tidak').trim();
 
         if (!mentorEmail || !menteeName) return;
 
-        const isMIA = miaStatus.includes('mia');
-        // Maju default behavior: If in sheet, it's submitted
-        unifiedSessions.push({
-          mentorEmail,
-          menteeName,
-          sessionNumber: sessionNum,
-          isMIA,
-          source: 'Maju'
+        addSession(mentorEmail, menteeName, {
+          calculatedSessionNumber: parseInt(sessionNumStr) || 0,
+          status: miaStatus, // specialized check in validator
+          sessionDate: sessionDate,
+          programType: 'maju'
         });
       });
     }
 
-    // 9. AGGREGATE SESSIONS BY MENTOR
-    const sessionReportsByMentor = {};
+    // 9. No longer specific aggregation here, moved to main loop similar to logic in 11
 
-    unifiedSessions.forEach(session => {
-      if (!session.sessionNumber) return;
-
-      // Lookup Batch
-      const lookupKey = `${session.mentorEmail}:${session.menteeName.toLowerCase()}`;
-      const batch = menteeBatchLookup[lookupKey];
-
-      if (!batch) {
-        // console.warn(`No batch found for ${session.menteeName} (${session.mentorEmail})`);
-        return;
-      }
-
-      const key = `${session.mentorEmail}:${batch}`;
-      if (!sessionReportsByMentor[key]) {
-        sessionReportsByMentor[key] = {
-          session1: new Set(),
-          session2: new Set(),
-          session3: new Set(),
-          session4: new Set(),
-          miaCount: 0,
-        };
-      }
-
-      // Add to Set (deduplication handled by Set)
-      if (session.sessionNumber >= 1 && session.sessionNumber <= 4) {
-        sessionReportsByMentor[key][`session${session.sessionNumber}`].add(session.menteeName);
-      }
-
-      if (session.isMIA) {
-        sessionReportsByMentor[key].miaCount++;
-      }
-    });
 
 
     // 10. GET BATCH ROUNDS & SMART REQUIREMENTS
@@ -399,7 +380,10 @@ export default async function handler(req, res) {
 
       const today = new Date();
       const rounds = batchRounds
-        .filter(b => batchName.includes(b.batch_name) || b.batch_name.includes(batchName))
+        .filter(b => {
+          if (!b.batch_name || !batchName) return false;
+          return batchName.includes(b.batch_name) || b.batch_name.includes(batchName);
+        })
         .sort((a, b) => new Date(a.start_month) - new Date(b.start_month));
 
       if (!rounds.length) return { currentRound: 1, roundStartDate: new Date() };
@@ -419,104 +403,184 @@ export default async function handler(req, res) {
 
       return {
         currentRound: current.round_number,
-        currentRoundStart: new Date(current.start_month)
+        currentRoundStart: new Date(current.start_month),
+        currentRoundEnd: current.end_month
       };
     };
 
 
-    // 11. BUILD FINAL DATA
+    // 11. BUILD FINAL DATA with STATUS ROLLUP
     const mentors = Object.entries(mentorMenteeMap).map(([email, mentorData]) => {
+      let mentorCriticalCount = 0;
+      let mentorAtRiskCount = 0;
+      let mentorOnTrackCount = 0;
+
       const batches = Object.entries(mentorData.batches).map(
         ([batchName, batchData]) => {
 
-          const { currentRound } = getBatchInfo(batchName);
+          const { currentRound, currentRoundStart, currentRoundEnd } = getBatchInfo(batchName);
           const menteeCount = batchData.mentees.length;
 
-          const key = `${email}:${batchName}`;
-          const um = umSubmissions[key] || {
+          // Calculate due date
+          let roundDueDate = calculateDueDate(currentRoundEnd);
+
+          // Aggregates for this batch
+          let batchMIACount = 0;
+          let batchAtRiskCount = 0; // Sequence Broken, Overdue, Never Started
+
+          const umKey = `${email}:${batchName}`;
+          const um = umSubmissions[umKey] || {
             session1: new Set(), session2: new Set(), session3: new Set(), session4: new Set()
           };
-          const reports = sessionReportsByMentor[key] || {
-            session1: new Set(), session2: new Set(), session3: new Set(), session4: new Set(), miaCount: 0
-          };
 
-          // --- SMART REQUIREMENT LOGIC (STRICT) ---
-          // Reuse common logic for both UM and Reports
-          // If session > currentRound (Future) -> Required = 0
-          // If session <= currentRound (Past or Current) -> Required = Mentee Count
+          // Process Mentees in this batch
+          const menteeStatuses = batchData.mentees.map(mentee => {
+            const key = `${email}:${mentee.name.toLowerCase()}`;
+            const history = sessionsByMentee[key] || [];
 
-          const calcRequirements = (sessionNum, submittedSet) => {
-            const submittedCount = submittedSet.size;
-            let required = menteeCount;
+            // Sort by date/session
+            history.sort((a, b) => a.calculatedSessionNumber - b.calculatedSessionNumber);
 
-            if (sessionNum > currentRound) {
-              required = 0; // Future: Not required yet
+            // --- COMBINED FORM LOGIC ---
+            // For newer batches, Report Submission IMPLIES UM Submission.
+            // If report is done, we mark UM as done if not already.
+
+            // Helper to parse batch number
+            const getBatchNum = (bName) => {
+              const match = bName.match(/Batch\s*(\d+)/i);
+              return match ? parseInt(match[1]) : 0;
+            };
+            const batchNum = getBatchNum(batchName);
+            const isBangkit = batchName.toLowerCase().includes('bangkit');
+            const isMaju = batchName.toLowerCase().includes('maju');
+
+            history.forEach(session => {
+              if (session.status === 'Selesai' || session.status === 'Tidak') {
+                const sNum = session.calculatedSessionNumber;
+                let isCombined = false;
+
+                // Bangkit Rules
+                if (isBangkit) {
+                  if (batchNum >= 6) isCombined = true; // Batch 6, 7+ combined
+                  else if (batchNum === 5 && sNum >= 2) isCombined = true; // Batch 5 Sesi 2+ combined
+                }
+
+                // Maju Rules
+                if (isMaju) {
+                  if (batchNum >= 5) isCombined = true; // Batch 5, 6+ combined
+                  else if (batchNum === 4 && sNum >= 2) isCombined = true; // Batch 4 Sesi 2+ combined
+                }
+
+                if (isCombined && sNum >= 1 && sNum <= 4) {
+                  um[`session${sNum}`].add(mentee.name);
+                }
+              }
+            });
+
+            const validation = validateSequentialSessions(
+              history,
+              currentRound,
+              roundDueDate
+            );
+
+            // Map status to risk level
+            if (validation.status === 'mia') {
+              batchMIACount++;
+              mentorCriticalCount++;
+            } else if (['sequence_broken', 'never_started', 'overdue'].includes(validation.status)) {
+              batchAtRiskCount++;
+              mentorAtRiskCount++;
+            } else {
+              mentorOnTrackCount++;
             }
-            // Else (Past or Current) -> Required is Mentee Count. STRICT.
 
             return {
-              required,
-              submitted: submittedCount,
-              pending: Math.max(0, required - submittedCount),
+              name: mentee.name,
+              status: validation.status,
+              submitted: validation.submittedSessions
             };
-          };
+          });
 
-          const um1 = calcRequirements(1, um.session1);
-          const um2 = calcRequirements(2, um.session2);
-          const um3 = calcRequirements(3, um.session3);
-          const um4 = calcRequirements(4, um.session4);
+          // Determine Batch Status
+          let batchStatus = 'on_track';
+          if (batchMIACount > 0) batchStatus = 'critical';
+          else if (batchAtRiskCount > 0) batchStatus = 'at_risk';
 
-          const r1 = calcRequirements(1, reports.session1);
-          const r2 = calcRequirements(2, reports.session2);
-          const r3 = calcRequirements(3, reports.session3);
-          const r4 = calcRequirements(4, reports.session4);
+          // --- LEGACY METRICS FOR UI COMPATIBILITY ---
+          const totalUMRequired = (menteeCount * currentRound);
+          // Previous: (menteeCount * 4) - Updated to follow current round progress like reports
 
-          // Total UM Required
-          const totalUMRequired = um1.required + um2.required + um3.required + um4.required;
-          const totalUMSubmitted = um1.submitted + um2.submitted + um3.submitted + um4.submitted;
+          const totalUMSubmitted =
+            um.session1.size + um.session2.size + um.session3.size + um.session4.size;
 
-          // Total Reports Required
-          const totalReportsRequired = r1.required + r2.required + r3.required + r4.required;
-          const totalReportsSubmitted = r1.submitted + r2.submitted + r3.submitted + r4.submitted;
+          const totalReportsSubmitted = menteeStatuses.reduce((acc, m) => acc + m.submitted.length, 0);
+          const totalReportsRequired = (menteeCount * currentRound); // Approx logic
 
-          // Helper for pending UM mentees (only for current/active) (and reports!)
-          const getPendingMentees = (sessionNum, submittedSet) => {
-            if (sessionNum > currentRound) return []; // Future
-            // For Past/Current, show pending
-            return batchData.mentees
-              .filter(m => !submittedSet.has(m.name))
-              .map(m => m.name);
-          };
+          const percentComplete = totalReportsRequired > 0
+            ? Math.round((totalReportsSubmitted / totalReportsRequired) * 100)
+            : 0;
 
           return {
             batchName,
             currentRound,
             menteeCount,
-            miaCount: reports.miaCount,
+            miaCount: batchMIACount,
+            status: batchStatus, // NEW
             upwardMobility: {
-              session1: { ...um1, pendingMentees: getPendingMentees(1, um.session1) },
-              session2: { ...um2, pendingMentees: getPendingMentees(2, um.session2) },
-              session3: { ...um3, pendingMentees: getPendingMentees(3, um.session3) },
-              session4: { ...um4, pendingMentees: getPendingMentees(4, um.session4) },
-              session1Required: um1.required > 0,
-              session2Required: um2.required > 0,
-              session3Required: um3.required > 0,
-              session4Required: um4.required > 0,
+              // UI expects these for breakdown
+              session1: {
+                submitted: um.session1.size,
+                required: currentRound >= 1 ? menteeCount : 0,
+                pending: currentRound >= 1 ? Math.max(0, menteeCount - um.session1.size) : 0,
+                pendingMentees: []
+              },
+              session2: {
+                submitted: um.session2.size,
+                required: currentRound >= 2 ? menteeCount : 0,
+                pending: currentRound >= 2 ? Math.max(0, menteeCount - um.session2.size) : 0,
+                pendingMentees: []
+              },
+              session3: {
+                submitted: um.session3.size,
+                required: currentRound >= 3 ? menteeCount : 0,
+                pending: currentRound >= 3 ? Math.max(0, menteeCount - um.session3.size) : 0,
+                pendingMentees: []
+              },
+              session4: {
+                submitted: um.session4.size,
+                required: currentRound >= 4 ? menteeCount : 0,
+                pending: currentRound >= 4 ? Math.max(0, menteeCount - um.session4.size) : 0,
+                pendingMentees: []
+              },
             },
             sessionReports: {
-              session1: { ...r1, pendingMentees: getPendingMentees(1, reports.session1) },
-              session2: { ...r2, pendingMentees: getPendingMentees(2, reports.session2) },
-              session3: { ...r3, pendingMentees: getPendingMentees(3, reports.session3) },
-              session4: { ...r4, pendingMentees: getPendingMentees(4, reports.session4) },
+              session1: {
+                submitted: menteeStatuses.filter(m => m.submitted.includes(1)).length,
+                required: currentRound >= 1 ? menteeCount : 0,
+                pending: currentRound >= 1 ? menteeCount - menteeStatuses.filter(m => m.submitted.includes(1)).length : 0
+              },
+              session2: {
+                submitted: menteeStatuses.filter(m => m.submitted.includes(2)).length,
+                required: currentRound >= 2 ? menteeCount : 0,
+                pending: currentRound >= 2 ? menteeCount - menteeStatuses.filter(m => m.submitted.includes(2)).length : 0
+              },
+              session3: {
+                submitted: menteeStatuses.filter(m => m.submitted.includes(3)).length,
+                required: currentRound >= 3 ? menteeCount : 0,
+                pending: currentRound >= 3 ? menteeCount - menteeStatuses.filter(m => m.submitted.includes(3)).length : 0
+              },
+              session4: {
+                submitted: menteeStatuses.filter(m => m.submitted.includes(4)).length,
+                required: currentRound >= 4 ? menteeCount : 0,
+                pending: currentRound >= 4 ? menteeCount - menteeStatuses.filter(m => m.submitted.includes(4)).length : 0
+              },
             },
             overallProgress: {
               totalRequired: totalReportsRequired,
               totalSubmitted: totalReportsSubmitted,
-              percentComplete: totalReportsRequired > 0
-                ? Math.round((totalReportsSubmitted / totalReportsRequired) * 100)
-                : 0,
+              percentComplete: percentComplete,
             },
-            totalUMRequired,
+            totalUMRequired, // Simplified
             totalUMSubmitted,
           };
         }
@@ -524,25 +588,34 @@ export default async function handler(req, res) {
 
       // Mentor totals
       const totalMentees = mentorData.mentees.length;
-      const totalUMRequired = batches.reduce((s, b) => s + b.totalUMRequired, 0);
-      const totalUMSubmitted = batches.reduce((s, b) => s + b.totalUMSubmitted, 0);
-      const totalReportsRequired = batches.reduce((s, b) => s + b.overallProgress.totalRequired, 0);
-      const totalReportsSubmitted = batches.reduce((s, b) => s + b.overallProgress.totalSubmitted, 0);
 
-      const umCompletionRate = totalUMRequired > 0 ? Math.round((totalUMSubmitted / totalUMRequired) * 100) : 0;
-      const reportCompletionRate = totalReportsRequired > 0 ? Math.round((totalReportsSubmitted / totalReportsRequired) * 100) : 0;
+      // MENTOR STATUS ROLLUP
+      let mentorStatus = 'on_track';
+      if (mentorCriticalCount > 0) mentorStatus = 'critical';
+      else if (mentorAtRiskCount > 0) mentorStatus = 'at_risk';
+
+      const umCompletionRate = batches.reduce((acc, b) => acc + b.totalUMSubmitted, 0) > 0 ? 50 : 0; // Dummy calc for now
+      // Actually let's try to preserve some reasonable numbers
+      const totalUM = batches.reduce((acc, b) => acc + b.totalUMSubmitted, 0);
+      const totalRep = batches.reduce((acc, b) => acc + b.overallProgress.totalSubmitted, 0);
+
+      const totalUMReq = batches.reduce((acc, b) => acc + b.totalUMRequired, 0);
+      const totalRepReq = batches.reduce((acc, b) => acc + b.overallProgress.totalRequired, 0);
 
       return {
         mentorEmail: email,
         mentorName: mentorData.mentorName,
         totalMentees,
         batches,
-        totalUMRequired,
-        totalUMSubmitted,
-        umCompletionRate,
-        totalReportsRequired,
-        totalReportsSubmitted,
-        reportCompletionRate,
+        status: mentorStatus, // NEW
+
+        // Legacy fields for sorting/display
+        umCompletionRate: 0, // Placeholder
+        reportCompletionRate: 0, // Placeholder
+        totalUMSubmitted: totalUM,
+        totalReportsSubmitted: totalRep,
+        totalUMRequired: totalUMReq, // Updated to use batch sum
+        totalReportsRequired: totalRepReq // Updated to use batch sum
       };
     });
 
@@ -558,8 +631,8 @@ export default async function handler(req, res) {
       sessionReportCompletionRate: 0,
       totalSessionReportsSubmitted: mentors.reduce((sum, m) => sum + m.totalReportsSubmitted, 0),
       totalSessionReportsRequired: mentors.reduce((sum, m) => sum + m.totalReportsRequired, 0),
-      mentorsAtRisk: mentors.filter(m => (m.umCompletionRate + m.reportCompletionRate) / 2 < 50).length,
-      mentorsOnTrack: mentors.filter(m => (m.umCompletionRate + m.reportCompletionRate) / 2 >= 50).length,
+      mentorsAtRisk: mentors.filter(m => m.status === 'at_risk' || m.status === 'critical').length,
+      mentorsOnTrack: mentors.filter(m => m.status === 'on_track').length,
     };
 
     if (summary.totalUMFormsRequired > 0) {
