@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { getSheetsClient } from '../../../lib/sheets';
+import { validateSequentialSessions } from '../../../lib/mentorUtils';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -50,7 +51,7 @@ export default async function handler(req, res) {
     const { data: batchRounds, error: batchError } = await supabase
       .from('batch_rounds')
       .select('*');
-    
+
     if (batchError) {
       console.error('❌ Error fetching batch rounds:', batchError);
     } else {
@@ -60,35 +61,35 @@ export default async function handler(req, res) {
         console.log('Available batches:', uniqueBatches.join(', '));
       }
     }
-    
+
     // Helper function to get batch round info
     const getBatchRoundInfo = (batchName, programName) => {
       if (!batchRounds) {
         console.warn('⚠️ No batch_rounds data available');
         return null;
       }
-      
+
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
+
       // Find all matching batch rounds for this batch and program
       const matchingRounds = batchRounds.filter(b => {
-        const batchMatch = b.batch_name === batchName || 
-                          b.batch_name?.includes(batchName) || 
-                          batchName?.includes(b.batch_name);
-        
-        const programMatch = !programName || 
-                            b.program?.toLowerCase() === programName?.toLowerCase() ||
-                            programName?.toLowerCase().includes(b.program?.toLowerCase());
-        
+        const batchMatch = b.batch_name === batchName ||
+          b.batch_name?.includes(batchName) ||
+          batchName?.includes(b.batch_name);
+
+        const programMatch = !programName ||
+          b.program?.toLowerCase() === programName?.toLowerCase() ||
+          programName?.toLowerCase().includes(b.program?.toLowerCase());
+
         return batchMatch && programMatch;
       });
-      
+
       if (matchingRounds.length === 0) {
         console.warn(`❌ No batch_rounds entry for: "${batchName}" (${programName})`);
         return null;
       }
-      
+
       // Find the current active round (today is between start and end)
       let currentRound = matchingRounds.find(b => {
         const startDate = new Date(b.start_month);
@@ -97,32 +98,32 @@ export default async function handler(req, res) {
         endDate.setHours(23, 59, 59, 999);
         return today >= startDate && today <= endDate;
       });
-      
+
       // If no current round, find the next upcoming round
       if (!currentRound) {
         const upcomingRounds = matchingRounds
           .filter(b => new Date(b.start_month) > today)
           .sort((a, b) => new Date(a.start_month) - new Date(b.start_month));
-        
+
         currentRound = upcomingRounds[0];
       }
-      
+
       // If still no round, take the most recent past round
       if (!currentRound) {
         const pastRounds = matchingRounds
           .filter(b => new Date(b.end_month) < today)
           .sort((a, b) => new Date(b.end_month) - new Date(a.end_month));
-        
+
         currentRound = pastRounds[0];
       }
-      
+
       if (!currentRound) {
         console.warn(`❌ No suitable round found for: "${batchName}" (${programName})`);
         return null;
       }
-      
+
       console.log(`✅ Found round: ${currentRound.batch_name} - ${currentRound.round_name}`);
-      
+
       return {
         batch: currentRound.batch_name,
         round: currentRound.round_name,
@@ -137,55 +138,126 @@ export default async function handler(req, res) {
     // Helper function to calculate due date from end month
     const calculateDueDate = (endMonthStr) => {
       if (!endMonthStr) return null;
-      
+
       // Handle both formats: "2024-08" or "2024-08-31"
       const dateParts = endMonthStr.split('-');
       const year = parseInt(dateParts[0]);
       const month = parseInt(dateParts[1]);
-      
+
       if (!year || !month) {
         console.error(`❌ Invalid end month format: "${endMonthStr}"`);
         return null;
       }
-      
+
       // Return the last day of the end month (no grace period)
       const dueDate = new Date(year, month, 0);
-      
+
       console.log(`📅 Due date: ${endMonthStr} → ${dueDate.toISOString().split('T')[0]}`);
-      
+
       return dueDate;
     };
 
-    // 1. Get mentor's assigned mentees
-    const { data: assignments, error: assignmentsError } = await supabase
-      .from('mentor_assignments')
-      .select(`
-        id,
-        assigned_at,
-        status,
-        entrepreneurs (
-          id,
-          name,
-          email,
-          business_name,
-          phone,
-          state,
-          program,
-          cohort,
-          status
-        )
-      `)
-      .eq('mentor_id', mentorId)
-      .eq('status', 'active');
-
-    if (assignmentsError) {
-      console.error('Error fetching assignments:', assignmentsError);
-      return res.status(500).json({ error: 'Failed to fetch mentees' });
+    // 1. REFACTOR: Get mentor's assigned mentees from MAPPING SHEET (Source of Truth)
+    // We replace the DB query to 'mentor_assignments' with a call to the Google Sheet.
+    console.log('📋 Reading mentor assignments from Google Sheets "mapping"...');
+    const client = await getSheetsClient();
+    let mappingRows = [];
+    try {
+      mappingRows = await client.getRows('mapping');
+      console.log(`✅ Loaded ${mappingRows.length} rows from mapping sheet`);
+    } catch (sheetError) {
+      console.error('❌ Error fetching mapping sheet:', sheetError);
+      return res.status(500).json({ error: 'Failed to fetch mentee mapping' });
     }
+
+    // Filter for this mentor
+    // Mapping Sheet Columns based on standard access:
+    // [0] Batch, [1] Zon, [2] Mentor, [3] Mentor_Email, [4] Usahawan(Name), [5] Nama_Syarikat, ...
+    // Note: getRows returns objects keyed by header. Assuming headers are standard.
+    // Let's iterate and filter manually to be safe with string normalization.
+
+    // Debug: Log the first row keys to understand column names
+    if (mappingRows.length > 0) {
+      const firstRow = mappingRows[0];
+      // Google Spreadsheet Row object usually has properties directly or via _rawData / _sheet.headerValues
+      // But for json serialization often we iterate keys
+      try {
+        const keys = Object.keys(firstRow); // This might include internal keys if using google-spreadsheet
+        // filter out internal keys assuming they start with _ or are methods
+        const validKeys = keys.filter(k => !k.startsWith('_') && typeof firstRow[k] !== 'function');
+        console.log('📋 Mapping Sheet Columns:', validKeys.join(', '));
+      } catch (e) {
+        console.log('could not read keys', e);
+      }
+    }
+
+    const myAssignments = mappingRows.filter(row => {
+      // Try multiple variations for Mentor Email
+      const rowEmail = (
+        row['Mentor_Email'] ||
+        row['Mentor Email'] ||
+        row['Email Mentor'] ||
+        row['Emel Mentor'] ||
+        ''
+      ).trim().toLowerCase();
+
+      return rowEmail === userEmail;
+    });
+
+    console.log(`🔍 Found ${myAssignments.length} mentees assigned to ${userEmail}`);
+
+    const assignments = myAssignments.map((row, index) => {
+      // Helper to try multiple column names
+      const getCol = (possibleNames) => {
+        for (const name of possibleNames) {
+          if (row[name]) return row[name];
+        }
+        return null;
+      };
+
+      // Extract fields with fallbacks
+      const batchStr = getCol(['Batch', 'Cohort', 'Kohort']) || 'Unknown Batch';
+      const menteeName = getCol(['Mentee', 'Usahawan', 'Nama Usahawan', 'Nama_Usahawan', 'Nama', 'Name', 'Participant', 'Nama Peserta']) || 'Unknown Mentee';
+      const businessName = getCol(['Nama Syarikat', 'Nama_Syarikat', 'Business Name', 'Syarikat']) || '';
+      const phone = getCol(['No_Tel', 'No. Tel', 'No Tel', 'Phone', 'Telefon']) || '';
+      const state = getCol(['Zon', 'Zone', 'State', 'Negeri']) || '';
+      const email = getCol(['Emel', 'Email', 'E-mail', 'EMAIL']) || '';
+
+      // Log if name resolution fails
+      if (menteeName === 'Unknown Mentee') {
+        console.warn(`⚠️ Failed to resolve mentee name for row ${index}. Available data:`, JSON.stringify(row));
+      }
+
+      // Derive Program from Batch String (e.g. "Bangkit Batch 5" -> "Bangkit")
+      let program = 'Unknown';
+      if (batchStr.toLowerCase().includes('bangkit')) program = 'Bangkit';
+      else if (batchStr.toLowerCase().includes('maju')) program = 'Maju';
+
+      // Mock an 'entrepreneurs' object to match previous structure
+      return {
+        id: `sheet_row_${index}`, // Dummy ID since we don't have DB IDs
+        assigned_at: new Date().toISOString(), // Dummy date
+        status: 'active',
+        entrepreneurs: {
+          id: `sheet_${index}`, // Dummy ID
+          name: menteeName,
+          email: email,
+          business_name: businessName,
+          phone: phone,
+          state: state,
+          program: program,
+          cohort: batchStr,
+          status: 'active'
+        }
+      };
+    });
+
+    // We no longer check assignmentsError because we used try/catch above for Sheets
+
 
     // 2. CRITICAL: Read sessions from Google Sheets (source of truth), NOT Supabase
     console.log('📋 Reading session data from Google Sheets...');
-    const client = await getSheetsClient();
+    // client is already initialized in Step 1
     const bangkitSheet = await client.getRows('Bangkit');
 
     // Read Maju reports sheet
@@ -224,9 +296,9 @@ export default async function handler(req, res) {
       const menteeBatch = entrepreneur.cohort; // e.g., "Batch 5"
       const menteeProgram = entrepreneur.program; // e.g., "Bangkit" or "Maju"
       console.log(`🔍 Processing ${entrepreneur.name}, cohort: "${menteeBatch}", program: "${menteeProgram}"`);
-      
+
       const batchInfo = getBatchRoundInfo(menteeBatch, menteeProgram);
-      
+
       // Debug logging for batch mismatch
       if (!batchInfo) {
         console.warn(`⚠️ No batch_rounds entry found for cohort: "${menteeBatch}" (${entrepreneur.name})`);
@@ -237,7 +309,7 @@ export default async function handler(req, res) {
       } else {
         console.log(`✅ Found batch info for ${entrepreneur.name}:`, batchInfo);
       }
-      
+
       // CRITICAL FIX: Get sessions from Google Sheets for this mentee
       const menteeName = entrepreneur.name;
       let menteeSessions = [];
@@ -320,72 +392,33 @@ export default async function handler(req, res) {
 
       console.log(`✅ ${entrepreneur.name}: ${completedSessions.length} total completed sessions`);
 
-      // CRITICAL FIX: Check if THIS ROUND'S session has been submitted
-      const currentRoundSession = sessionsWithNumbers.find(s => {
-        const sessionNum = s.calculatedSessionNumber;
-        const statusValue = (s.status || '').toLowerCase();
+      // 5. Calculate Status using Sequential Logic
+      // We pass: all sessions, current round number, and due date
+      const validationResult = validateSequentialSessions(
+        sessionsWithNumbers,
+        currentRoundNum,
+        dueDate
+      );
 
-        // Check if completed
-        let isCompleted = false;
-        if (s.programType === 'maju') {
-          isCompleted = statusValue !== 'mia' && statusValue.includes('tidak');
-        } else {
-          isCompleted = statusValue === 'selesai' || statusValue === 'completed';
-        }
+      const status = validationResult.status;
+      const nextDueSession = validationResult.nextDueSession;
+      const missingSessions = validationResult.missingSessions;
 
-        return sessionNum == currentRoundNum && isCompleted;
-      });
+      console.log(`📊 Status for ${menteeName}: ${status} (Next: ${nextDueSession}, Missing: ${missingSessions})`);
 
-      // Expected reports for current round (usually 1 per round)
-      const expectedReportsThisRound = 1;
-      const reportsThisRound = currentRoundSession ? 1 : 0;
-
-      console.log(`🔍 ${entrepreneur.name}: Round ${currentRoundNum} session ${currentRoundSession ? 'SUBMITTED ✅' : 'NOT SUBMITTED ❌'}`);
-
-      // Check for MIA status
-      const hasMIASession = sessionsWithNumbers.some(s => {
-        if (s.programType === 'maju') {
-          return (s.status || '').toUpperCase() === 'MIA';
-        } else {
-          return (s.status || '').toUpperCase() === 'MIA';
-        }
-      });
-
-      // Calculate last session date (from most recent completed session)
-      const lastSession = completedSessions.length > 0 ? completedSessions[completedSessions.length - 1] : null;
-      const lastSessionDate = lastSession?.sessionDate || null;
-
-      // Calculate days until due
+      // Calculate missing display fields
       let daysUntilDue = null;
-      let status = 'pending_first_session';
-
-      // Determine status based on sessions and due date
-      if (hasMIASession) {
-        status = 'mia';
-      } else if (completedSessions.length === 0 && menteeSessions.length === 0) {
-        status = 'pending_first_session'; // No sessions at all
-      } else if (reportsThisRound >= expectedReportsThisRound) {
-        status = 'on_track'; // Completed this round
-      } else if (dueDate) {
-        // Calculate days until due if we have a due date
+      if (dueDate) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        dueDate.setHours(0, 0, 0, 0);
-        
-        const diffTime = dueDate - today;
+        const due = new Date(dueDate);
+        due.setHours(0, 0, 0, 0);
+        const diffTime = due.getTime() - today.getTime();
         daysUntilDue = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-        if (daysUntilDue < 0) {
-          status = 'overdue'; // Past due date
-        } else if (daysUntilDue <= 7) {
-          status = 'due_soon'; // Within 7 days
-        } else {
-          status = 'pending'; // Not yet due
-        }
-      } else {
-        // No due date available, but has sessions - default to pending
-        status = 'pending';
       }
+
+      const lastSession = menteeSessions.length > 0 ? menteeSessions[menteeSessions.length - 1] : null;
+      const lastSessionDate = lastSession ? lastSession.sessionDate : null;
 
       // UM tracking removed from mentor dashboard
 
@@ -402,14 +435,17 @@ export default async function handler(req, res) {
         currentRoundNumber: currentRoundNum,
         status: status,
         totalSessions: menteeSessions.length,
-        completedSessions: completedSessions.length,
-        reportsThisRound: reportsThisRound,
-        expectedReportsThisRound: expectedReportsThisRound,
+        completedSessions: validationResult.completedCount,
+        reportsThisRound: validationResult.submittedSessions.includes(currentRoundNum) ? 1 : 0,
+        expectedReportsThisRound: 1,
         lastSessionDate: lastSessionDate,
         roundDueDate: dueDate?.toISOString().split('T')[0],
-        daysUntilDue: daysUntilDue,
+        nextDueDate: dueDate?.toISOString().split('T')[0],
+        daysUntilDue: daysUntilDue, // Keep existing calc for display if needed, but status drives logic
         assignedAt: assignment.assigned_at,
-        batchPeriod: batchInfo?.period || ''
+        batchPeriod: batchInfo?.period || '',
+        nextDueSession: validationResult.nextDueSession,
+        missingSessions: validationResult.missingSessions
       };
     }).filter(m => m !== null) || [];
 
@@ -420,10 +456,12 @@ export default async function handler(req, res) {
       dueSoon: mentees.filter(m => m.status === 'due_soon').length,
       overdue: mentees.filter(m => m.status === 'overdue').length,
       mia: mentees.filter(m => m.status === 'mia').length,
-      pendingFirstSession: mentees.filter(m => m.status === 'pending_first_session').length,
+      pendingFirstSession: mentees.filter(m => m.status === 'pending_first_session' || m.status === 'never_started').length,
       needsAction: mentees.filter(m =>
         m.status === 'overdue' ||
-        m.status === 'due_soon'
+        m.status === 'due_soon' ||
+        m.status === 'sequence_broken' ||
+        m.status === 'never_started'
       ).length,
       totalSessions: mentees.reduce((sum, m) => sum + m.totalSessions, 0),
       completedSessions: mentees.reduce((sum, m) => sum + m.completedSessions, 0),

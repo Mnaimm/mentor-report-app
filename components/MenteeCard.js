@@ -7,54 +7,81 @@ export default function MenteeCard({ mentee, selected, onSelect, onAssign, onVie
 
   // Status priority for card display
   const getCardPriority = (mentee) => {
+    if (mentee.status === 'mia') return 0;
     if (mentee.status === 'overdue') return 1;
     if (mentee.status === 'due_soon') return 2;
-    if (mentee.status === 'on_track') return 3;
-    return 4;
+    if (mentee.status === 'sequence_broken') return 3;
+    if (mentee.status === 'never_started') return 4;
+    if (mentee.status === 'on_track') return 5;
+    return 6;
   };
 
-  // Status colors and border styles
+  // Status colors and text (Bahasa Melayu)
   const getStatusStyles = (mentee) => {
-    if (mentee.status === 'overdue') {
-      return {
-        border: 'border-l-4 border-red-500',
-        badge: 'bg-red-100 text-red-800',
-        badgeText: '🔴 OVERDUE'
-      };
+    switch (mentee.status) {
+      case 'mia':
+        return {
+          border: 'border-l-4 border-red-600',
+          badge: 'bg-red-100 text-red-800',
+          badgeText: '🔴 TIDAK DAPAT DIHUBUNGI (MIA)',
+          helperText: 'Usahawan ini tidak dapat dihubungi untuk beberapa sesi.'
+        };
+      case 'overdue':
+        return {
+          border: 'border-l-4 border-red-500',
+          badge: 'bg-red-100 text-red-800',
+          badgeText: '🔴 LEWAT',
+          helperText: 'Sesi ini telah melepasi tarikh akhir. Sila hantar laporan segera.'
+        };
+      case 'due_soon':
+        return {
+          border: 'border-l-4 border-yellow-500',
+          badge: 'bg-yellow-100 text-yellow-800',
+          badgeText: '🟡 PERLU TINDAKAN SEGERA',
+          helperText: 'Tarikh akhir sesi ini hampir tiba.'
+        };
+      case 'sequence_broken':
+        return {
+          border: 'border-l-4 border-orange-500',
+          badge: 'bg-orange-100 text-orange-800',
+          badgeText: '🔴 SESI TERCICIR',
+          helperText: 'Terdapat sesi terdahulu yang belum lengkap. Sila semak semula.'
+        };
+      case 'never_started':
+        return {
+          border: 'border-l-4 border-gray-400',
+          badge: 'bg-gray-100 text-gray-700',
+          badgeText: '⚪ BELUM BERMULA',
+          helperText: 'Usahawan ini belum memulakan sebarang sesi mentoring.'
+        };
+      case 'on_track':
+        return {
+          border: 'border-l-4 border-green-500',
+          badge: 'bg-green-100 text-green-800',
+          badgeText: '🟢 MENGIKUT JADUAL',
+          helperText: 'Semua sesi sehingga kini telah selesai.'
+        };
+      default: // pending
+        return {
+          border: 'border-l-4 border-gray-400',
+          badge: 'bg-gray-100 text-gray-600',
+          badgeText: '⚪ MENUNGGU SESI SETERUSNYA',
+          helperText: 'Status ini merujuk kepada sesi yang akan datang, bukan sesi yang telah lengkap.'
+        };
     }
-
-    if (mentee.status === 'due_soon') {
-      return {
-        border: 'border-l-4 border-yellow-500',
-        badge: 'bg-yellow-100 text-yellow-800',
-        badgeText: '🟡 DUE SOON'
-      };
-    }
-
-    if (mentee.status === 'on_track') {
-      return {
-        border: 'border-l-4 border-green-500',
-        badge: 'bg-green-100 text-green-800',
-        badgeText: '🟢 ON TRACK'
-      };
-    }
-
-    if (mentee.status === 'mia') {
-      return {
-        border: 'border-l-4 border-red-500',
-        badge: 'bg-red-100 text-red-800',
-        badgeText: '🔴 MIA'
-      };
-    }
-
-    return {
-      border: 'border-l-4 border-gray-400',
-      badge: 'bg-gray-100 text-gray-600',
-      badgeText: '⚪ NOT STARTED'
-    };
   };
 
   const styles = getStatusStyles(mentee);
+
+  // Format Date dd/mm/yyyy
+  // Format Date dd/mm/yyyy
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Tiada';
+    const date = new Date(dateString);
+    // Check if date is valid
+    if (isNaN(date.getTime())) return 'Tiada';
+    return new Intl.DateTimeFormat('en-GB').format(date); // dd/mm/yyyy
+  };
 
   // COSMETIC ONLY: Display program badge color
   // Note: Card behavior, status, and button visibility are program-agnostic
@@ -135,47 +162,57 @@ export default function MenteeCard({ mentee, selected, onSelect, onAssign, onVie
         </div>
       </div>
 
-      {/* Current Round Progress */}
+      {/* Current Round Progress / Mentoring Period */}
       {mentee.currentRound && (
         <div className="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-          <div className="text-xs font-semibold text-blue-700 mb-1">
-            {mentee.batchPeriod || mentee.currentRound}
+          <div className="text-xs font-semibold text-blue-700 mb-2">
+            Pusingan Mentoring: {mentee.batchPeriod || mentee.currentRound}
           </div>
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-700">This Round:</span>
-            <span className="text-lg font-bold text-blue-600">
-              {mentee.reportsThisRound || 0}/{mentee.expectedReportsThisRound || 1}
+
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-sm font-medium text-gray-800">
+              {mentee.status === 'on_track' ? 'Sesi Selesai' : `Sesi Akan Datang: Sesi ${mentee.nextDueSession || mentee.currentRoundNumber}`}
             </span>
+            {mentee.status === 'on_track' && (
+              <span className="text-lg font-bold text-green-600">✓</span>
+            )}
           </div>
-          {mentee.roundDueDate && (
-            <div className="text-xs text-gray-600 mt-1">
+
+          {mentee.roundDueDate && mentee.status !== 'on_track' && (
+            <div className="text-xs text-gray-600">
+              Tarikh Akhir: {formatDate(mentee.roundDueDate)}
               {mentee.daysUntilDue < 0 ? (
-                <span className="text-red-600 font-semibold">
-                  Overdue by {Math.abs(mentee.daysUntilDue)} days
+                <span className="text-red-600 font-bold ml-1">
+                  (Lewat {Math.abs(mentee.daysUntilDue)} hari)
                 </span>
-              ) : mentee.status === 'on_track' ? (
-                <span className="text-green-600 font-semibold">✓ Completed</span>
               ) : (
-                <span>Due: {new Date(mentee.roundDueDate).toLocaleDateString()} ({mentee.daysUntilDue}d)</span>
+                <span className="ml-1">({mentee.daysUntilDue} hari lagi)</span>
               )}
             </div>
           )}
         </div>
       )}
 
+      {/* Helper Text */}
+      <div className="mb-4 text-xs text-gray-500 italic px-2 py-1 bg-gray-50 rounded">
+        {styles.helperText}
+      </div>
+
       {/* Session Details */}
       <div className="space-y-2 text-sm mb-4">
         {mentee.totalSessions !== undefined && (
           <div className="flex justify-between">
-            <span className="text-gray-600">All Sessions:</span>
-            <span className="font-medium">{mentee.completedSessions || 0}/{mentee.totalSessions || 0}</span>
+            <span className="text-gray-600">Sesi Telah Lengkap:</span>
+            <span className="font-medium text-gray-900">
+              {mentee.completedSessions || 0}
+            </span>
           </div>
         )}
         {mentee.lastSessionDate && (
           <div className="flex justify-between">
-            <span className="text-gray-600">Last Session:</span>
-            <span className="font-medium text-xs">
-              {new Date(mentee.lastSessionDate).toLocaleDateString()}
+            <span className="text-gray-600">Sesi Terakhir:</span>
+            <span className="font-medium text-xs text-gray-900">
+              {formatDate(mentee.lastSessionDate)}
             </span>
           </div>
         )}
@@ -189,7 +226,7 @@ export default function MenteeCard({ mentee, selected, onSelect, onAssign, onVie
             onClick={handleSubmitReport}
             className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors text-sm"
           >
-            📝 Submit Session Report
+            📝 Hantar Laporan Sesi
           </button>
         )}
 
@@ -199,13 +236,13 @@ export default function MenteeCard({ mentee, selected, onSelect, onAssign, onVie
             onClick={handleViewDetails}
             className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-3 rounded-lg text-xs transition-colors"
           >
-            View Details
+            Lihat Butiran
           </button>
           <button
             onClick={() => handleContact('email')}
             className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-3 rounded-lg text-xs transition-colors"
           >
-            📧 Email
+            📧 Hubungi
           </button>
         </div>
       </div>
