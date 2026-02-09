@@ -193,12 +193,13 @@ const GuideModal = ({ onClose }) => {
 
 // Mentor Detail Modal Component
 const MentorDetailModal = ({ mentor, onClose }) => {
+  if (!mentor) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
       <div className="bg-white rounded-xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-t-xl">
+        <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-t-xl z-10">
           <div className="flex justify-between items-start">
             <div>
               <h2 className="text-2xl font-bold mb-2">{mentor.mentorName}</h2>
@@ -226,7 +227,7 @@ const MentorDetailModal = ({ mentor, onClose }) => {
         {/* Body */}
         <div className="p-6">
           {/* Quick Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div className="bg-purple-50 rounded-lg p-4 text-center">
               <div className="text-3xl font-bold text-purple-600">{mentor.umCompletionRate}%</div>
               <div className="text-xs text-gray-600 mt-1">UM Completion</div>
@@ -555,49 +556,46 @@ export default function AdminProgressDashboard({ userEmail, isReadOnlyUser, acce
 
       {/* Header */}
       <div className="mb-8">
-        <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4 mb-4">
+
+        {/* Mobile Notice */}
+        <div className="md:hidden bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4 rounded shadow-sm" role="alert">
+          <p className="font-bold">Paparan Desktop Disyorkan</p>
+          <p className="text-xs">Halaman ini dioptimumkan untuk paparan desktop. Beberapa lajur mungkin disembunyikan pada peranti mudah alih.</p>
+        </div>
+
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">
-              Papan Pemuka Admin - Prestasi Mentor
-            </h1>
-            <nav className="text-sm text-gray-600">
-              <Link href="/admin" className="hover:text-blue-600">
-                Admin
-              </Link>
-              <span className="mx-2">/</span>
-              <span className="text-gray-800 font-medium">Papan Pemuka</span>
-            </nav>
+            <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
+            <p className="text-gray-600 mt-2">Pemantauan Program Mentor-Mentee</p>
+            {lastUpdated && (
+              <p className="text-sm text-gray-500 mt-1">
+                Dikemaskini pada: {lastUpdated.toLocaleString()}
+                {data?.cached && (
+                  <span className="ml-2 text-green-600">
+                    (Tanda Masa - {data.cacheAge}s lalu)
+                  </span>
+                )}
+              </p>
+            )}
           </div>
-          <div className="flex gap-3">
-            <Link
-              href="/admin"
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium text-sm"
-            >
-              ← Kembali ke Admin
+          <div className="flex flex-wrap gap-3">
+            <Link href="/admin/verify-users">
+              <a className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium transition-colors shadow-sm text-sm">
+                Manage Users
+              </a>
             </Link>
             <button
               onClick={() => fetchData(true)}
-              disabled={loading}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm disabled:bg-gray-400"
+              className="px-4 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-100 font-medium transition-colors shadow-sm border border-gray-200 text-sm flex items-center gap-2"
             >
-              {loading ? 'Memuatkan...' : '🔄 Kemaskini'}
+              {loading ? 'Refreshing...' : '🔄 Kemaskini'}
             </button>
           </div>
         </div>
-        {lastUpdated && (
-          <p className="text-sm text-gray-500">
-            Dikemaskini pada: {lastUpdated.toLocaleString()}
-            {data?.cached && (
-              <span className="ml-2 text-green-600">
-                (Tanda Masa - {data.cacheAge}s lalu)
-              </span>
-            )}
-          </p>
-        )}
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {/* Total Mentors */}
         <div className="bg-white rounded-xl shadow-md p-6">
           <div className="flex items-center justify-between">
@@ -675,7 +673,7 @@ export default function AdminProgressDashboard({ userEmail, isReadOnlyUser, acce
       </div>
 
       {/* Filters and Search */}
-      <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+      <div className="bg-white rounded-xl shadow-md p-4 md:p-6 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Search */}
           <div className="md:col-span-2">
@@ -782,25 +780,25 @@ export default function AdminProgressDashboard({ userEmail, isReadOnlyUser, acce
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">
                   Mentor
                 </th>
-                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap hidden sm:table-cell">
                   Usahawan
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap hidden md:table-cell">
                   Kohort
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">
                   Kemajuan UM
                 </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap hidden lg:table-cell">
                   Kemajuan Laporan
                 </th>
-                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">
                   Status
                 </th>
-                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">
                   Tindakan
                 </th>
               </tr>
@@ -818,19 +816,19 @@ export default function AdminProgressDashboard({ userEmail, isReadOnlyUser, acce
                         <div className="font-medium text-gray-900">{mentor.mentorName}</div>
                         <div className="text-sm text-gray-500">{mentor.mentorEmail}</div>
                       </td>
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-6 py-4 text-center hidden sm:table-cell">
                         <span className="text-lg font-semibold text-gray-800">
                           {mentor.totalMentees}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 hidden md:table-cell">
                         <div className="flex flex-wrap gap-1">
                           {mentor.batches
                             .filter(batch => filterBatch === 'all' || batch.batchName === filterBatch)
                             .map((batch, bIdx) => (
                               <span
                                 key={bIdx}
-                                className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
+                                className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full whitespace-nowrap"
                               >
                                 {batch.batchName}
                               </span>
@@ -847,7 +845,7 @@ export default function AdminProgressDashboard({ userEmail, isReadOnlyUser, acce
                           showPercentage={false}
                         />
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 hidden lg:table-cell">
                         <div className="text-sm font-semibold text-gray-800 mb-1">
                           {mentor.totalReportsSubmitted}/{mentor.totalReportsRequired} ({mentor.reportCompletionRate}%)
                         </div>
@@ -857,13 +855,13 @@ export default function AdminProgressDashboard({ userEmail, isReadOnlyUser, acce
                           showPercentage={false}
                         />
                       </td>
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-6 py-4 text-center whitespace-nowrap">
                         <StatusBadge status={mentor.status} />
                       </td>
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-6 py-4 text-center whitespace-nowrap">
                         <button
                           onClick={() => setSelectedMentor(mentor)}
-                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                          className="text-blue-600 hover:text-blue-900 font-semibold text-sm"
                         >
                           Lihat Perincian
                         </button>
