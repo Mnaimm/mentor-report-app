@@ -48,9 +48,9 @@ pages/api/cron/
 # DATABASE & SQL
 # ==========================================
 *.sql
-supabase/
-supabase-audit/
-supabase-export/
+/supabase/
+/supabase-audit/
+/supabase-export/
 
 # ==========================================
 # ARCHIVE & BACKUP
