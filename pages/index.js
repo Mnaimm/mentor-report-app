@@ -273,9 +273,9 @@ export default function HomePage() {
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
                   <StatCard
-                    label="Jumlah Usahawan (Batch Aktif)"
-                    value={stats.totalMenteesInCurrentPeriod ?? stats.totalMentees ?? 0}
-                    sublabel={stats.currentPeriod?.activeBatches ? `${stats.currentPeriod.activeBatches.length} batch aktif` : ''}
+                    label="Jumlah Usahawan"
+                    value={stats.totalMentees ?? 0}
+                    sublabel={`${stats.totalMenteesInCurrentPeriod ?? 0} dalam pusingan semasa`}
                     color="blue"
                   />
                   <StatCard

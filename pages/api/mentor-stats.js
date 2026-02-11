@@ -147,7 +147,11 @@ export default async function handler(req, res) {
       const months = {
         'jan': 0, 'feb': 1, 'mar': 2, 'apr': 3, 'mei': 4, 'may': 4,
         'jun': 5, 'jul': 6, 'ogos': 7, 'aug': 7, 'sep': 8, 'sept': 8,
-        'okt': 9, 'oct': 9, 'nov': 10, 'dis': 11, 'dec': 11
+        'okt': 9, 'oct': 9, 'nov': 10, 'dis': 11, 'dec': 11,
+        // Full names
+        'january': 0, 'february': 1, 'march': 2, 'april': 3, 'may': 4,
+        'june': 5, 'july': 6, 'august': 7, 'september': 8,
+        'october': 9, 'november': 10, 'december': 11
       };
 
       // Clean up the period string - handle formats like "Sept – Nov" with various dashes
@@ -179,13 +183,22 @@ export default async function handler(req, res) {
     let currentPeriodName = null;
 
     for (const batch of mentorBatches) {
-      const batchInfos = batchSheet.filter(b => b['Batch'] === batch);
+      // Use case-insensitive and trimmed match for batch name to be safe
+      const batchInfos = batchSheet.filter(b =>
+        (b['Batch'] || '').toString().trim().toLowerCase() === batch.toLowerCase()
+      );
+
+      console.log(`🔍 [${debugInfo.requestId}] Batch check: "${batch}" found ${batchInfos.length} rows in batch sheet`);
 
       for (const info of batchInfos) {
         const period = info['Period'] || '';
-        if (isCurrentPeriod(period)) {
+        const isCurrent = isCurrentPeriod(period);
+
+        console.log(`   Period: "${period}" -> Active: ${isCurrent}`);
+
+        if (isCurrent) {
           activeBatchInfos.push({
-            batch,
+            batch, // Use the mentor's batch name formatting
             period,
             roundLabel: info['Mentoring Round'] || 'Round 1',
             info
@@ -201,9 +214,12 @@ export default async function handler(req, res) {
 
     // If no active batches found, use first available as fallback
     if (activeBatchInfos.length === 0) {
-      console.warn(`⚠️ [${debugInfo.requestId}] No current period match found, using first batch info as fallback`);
+      console.warn(`⚠️ [${debugInfo.requestId}] No current period match found, using ALL batches as fallback`);
       for (const batch of mentorBatches) {
-        const batchInfos = batchSheet.filter(b => b['Batch'] === batch);
+        // Use relaxed matching here too
+        const batchInfos = batchSheet.filter(b =>
+          (b['Batch'] || '').toString().trim().toLowerCase() === batch.toLowerCase()
+        );
         if (batchInfos.length > 0) {
           const info = batchInfos[0];
           activeBatchInfos.push({
@@ -212,8 +228,7 @@ export default async function handler(req, res) {
             roundLabel: info['Mentoring Round'] || 'Round 1',
             info
           });
-          currentPeriodName = info['Period'] || '';
-          break;
+          if (!currentPeriodName) currentPeriodName = info['Period'] || '';
         }
       }
     }
