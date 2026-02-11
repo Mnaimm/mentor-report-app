@@ -1,5 +1,3 @@
-export type EngagementStatus = 'new' | 'active' | 'at-risk' | 'overdue'
-
 export interface Entrepreneur {
     id: string
     name: string
@@ -15,14 +13,27 @@ export interface Entrepreneur {
     state: string | null
 }
 
-export interface EntrepreneurWithSessions extends Entrepreneur {
+// Simple directory type (no session tracking)
+export interface EntrepreneurDirectory {
+    id: string
+    name: string
+    business_name: string | null
+    phone: string | null
+    email: string
+    address: string | null
+    business_type: string | null
+    state: string | null
+    zone: string | null
+    batch: string | null
+    program: string
+}
+
+// Admin view includes assignment + mentor info
+export interface EntrepreneurDirectoryAdmin extends EntrepreneurDirectory {
     assignment_status: 'Assigned' | 'Unassigned'
     mentor_name: string | null
     mentor_email: string | null
-    assigned_at: string | null
-    session_count: number
-    last_session_date: string | null
-    latest_session_number: number | null
-    days_since_last_session: number | null
-    engagement_status?: EngagementStatus
 }
+
+// Mentor view - just the entrepreneur contact info
+export type MyEntrepreneur = EntrepreneurDirectory

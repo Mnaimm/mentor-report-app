@@ -1,12 +1,11 @@
 import { ColumnDef } from "@tanstack/react-table"
-import { EntrepreneurWithSessions } from "@/types/entrepreneur"
+import { EntrepreneurDirectoryAdmin } from "@/types/entrepreneur"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { SessionBadge } from "@/components/entrepreneurs/SessionBadge"
 import { normalizePhoneMY } from "@/lib/utils/phone"
 import { ArrowUpDown, Mail, Phone } from "lucide-react"
 
-export const columns: ColumnDef<EntrepreneurWithSessions>[] = [
+export const columns: ColumnDef<EntrepreneurDirectoryAdmin>[] = [
     {
         accessorKey: "name",
         header: ({ column }) => {
@@ -69,28 +68,9 @@ export const columns: ColumnDef<EntrepreneurWithSessions>[] = [
         },
     },
     {
-        accessorKey: "session_count",
-        header: ({ column }) => {
-            return (
-                <Button
-                    variant="ghost"
-                    onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-                >
-                    Sessions
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
-                </Button>
-            )
-        },
-        cell: ({ row }) => {
-            return (
-                <SessionBadge
-                    count={row.getValue("session_count")}
-                    engagementStatus={row.original.engagement_status}
-                    lastSessionDate={row.original.last_session_date}
-                    daysSinceLastSession={row.original.days_since_last_session}
-                />
-            )
-        },
+        accessorKey: "batch",
+        header: "Batch",
+        cell: ({ row }) => <div>{row.getValue("batch") || '-'}</div>,
     },
     {
         accessorKey: "assignment_status",
@@ -108,5 +88,10 @@ export const columns: ColumnDef<EntrepreneurWithSessions>[] = [
                 </div>
             )
         },
-    }
+    },
+    {
+        accessorKey: "address",
+        header: "Address",
+        cell: ({ row }) => <div className="truncate max-w-[180px]" title={row.getValue("address")}>{row.getValue("address") || '-'}</div>,
+    },
 ]

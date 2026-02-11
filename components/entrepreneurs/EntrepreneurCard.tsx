@@ -1,14 +1,13 @@
 import React from 'react'
-import { EntrepreneurWithSessions } from '@/types/entrepreneur'
+import { EntrepreneurDirectoryAdmin } from '@/types/entrepreneur'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Phone, Mail, MapPin, Briefcase, User } from 'lucide-react'
-import { SessionBadge } from './SessionBadge'
 import { normalizePhoneMY } from '@/lib/utils/phone'
 
 interface EntrepreneurCardProps {
-    entrepreneur: EntrepreneurWithSessions
+    entrepreneur: EntrepreneurDirectoryAdmin
 }
 
 export function EntrepreneurCard({ entrepreneur }: EntrepreneurCardProps) {
@@ -25,11 +24,13 @@ export function EntrepreneurCard({ entrepreneur }: EntrepreneurCardProps) {
                             <p className="text-sm text-slate-600 font-medium">{entrepreneur.business_name}</p>
                         )}
                     </div>
-                    <Badge
-                        variant={entrepreneur.assignment_status === 'Assigned' ? 'success' : 'warning'}
-                    >
-                        {entrepreneur.assignment_status}
-                    </Badge>
+                    {entrepreneur.assignment_status && (
+                        <Badge
+                            variant={entrepreneur.assignment_status === 'Assigned' ? 'success' : 'warning'}
+                        >
+                            {entrepreneur.assignment_status}
+                        </Badge>
+                    )}
                 </div>
 
                 {/* Details Grid */}
@@ -44,14 +45,14 @@ export function EntrepreneurCard({ entrepreneur }: EntrepreneurCardProps) {
                     </div>
                 </div>
 
-                {/* Session Info */}
-                <div className="bg-slate-50 p-3 rounded-md">
-                    <SessionBadge
-                        count={entrepreneur.session_count}
-                        engagementStatus={entrepreneur.engagement_status}
-                        lastSessionDate={entrepreneur.last_session_date}
-                        daysSinceLastSession={entrepreneur.days_since_last_session}
-                    />
+                {/* Program & Batch */}
+                <div className="flex gap-2">
+                    <Badge variant={entrepreneur.program === 'Bangkit' ? 'info' : 'warning'}>
+                        {entrepreneur.program}
+                    </Badge>
+                    {entrepreneur.batch && (
+                        <Badge variant="secondary">{entrepreneur.batch}</Badge>
+                    )}
                 </div>
 
                 {/* Mentor Info (if assigned) */}

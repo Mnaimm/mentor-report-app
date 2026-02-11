@@ -1,4 +1,4 @@
-import { EntrepreneurWithSessions } from '@/types/entrepreneur'
+import { EntrepreneurDirectoryAdmin } from '@/types/entrepreneur'
 
 function sanitizeCell(value: any): string {
     if (value === null || value === undefined) return ''
@@ -8,11 +8,10 @@ function sanitizeCell(value: any): string {
     return `"${str.replace(/"/g, '""')}"`
 }
 
-export function exportToCSV(data: EntrepreneurWithSessions[], filename: string) {
+export function exportToCSV(data: EntrepreneurDirectoryAdmin[], filename: string) {
     const headers = [
         'Name', 'Business', 'Phone', 'Email', 'Address', 'Type',
-        'State', 'Zone', 'Program', 'Batch', 'Sessions',
-        'Last Session', 'Status', 'Mentor'
+        'State', 'Zone', 'Program', 'Batch', 'Status', 'Mentor'
     ]
 
     const rows = data.map(e => [
@@ -26,9 +25,7 @@ export function exportToCSV(data: EntrepreneurWithSessions[], filename: string) 
         e.zone || '',
         e.program,
         e.batch || '',
-        e.session_count.toString(),
-        e.last_session_date || 'No sessions',
-        e.assignment_status,
+        e.assignment_status || '',
         e.mentor_name || 'Unassigned',
     ].map(sanitizeCell))
 

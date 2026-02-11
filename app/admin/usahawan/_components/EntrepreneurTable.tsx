@@ -19,37 +19,31 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { EntrepreneurCard } from "@/components/entrepreneurs/EntrepreneurCard"
-import { EntrepreneurWithSessions } from "@/types/entrepreneur"
+import { EntrepreneurDirectoryAdmin } from "@/types/entrepreneur"
 import { Skeleton } from "@/components/ui/skeleton"
 
 interface EntrepreneurTableProps<TData, TValue> {
     columns: ColumnDef<TData, TValue>[]
     data: TData[]
     loading?: boolean
-    sorting?: SortingState
-    onSortingChange?: (sorting: SortingState) => void
 }
 
 export function EntrepreneurTable<TData, TValue>({
     columns,
     data,
     loading = false,
-    sorting,
-    onSortingChange,
 }: EntrepreneurTableProps<TData, TValue>) {
-    // Use internal state if no external control provided (client-side sorting fallback)
-    const [internalSorting, setInternalSorting] = React.useState<SortingState>([])
+    const [sorting, setSorting] = React.useState<SortingState>([])
 
     const table = useReactTable({
         data,
         columns,
         getCoreRowModel: getCoreRowModel(),
-        onSortingChange: onSortingChange || setInternalSorting,
+        onSortingChange: setSorting,
         getSortedRowModel: getSortedRowModel(),
         state: {
-            sorting: sorting || internalSorting,
+            sorting,
         },
-        manualSorting: !!onSortingChange, // If controlled, assume manual (server-side) sorting
     })
 
     if (loading) {
@@ -75,7 +69,7 @@ export function EntrepreneurTable<TData, TValue>({
             {/* Mobile View: Cards */}
             <div className="block md:hidden">
                 {data.map((row: any, i) => (
-                    <EntrepreneurCard key={row.id || i} entrepreneur={row as EntrepreneurWithSessions} />
+                    <EntrepreneurCard key={row.id || i} entrepreneur={row as EntrepreneurDirectoryAdmin} />
                 ))}
             </div>
 

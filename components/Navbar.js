@@ -9,9 +9,11 @@ export default function Navbar() {
   const router = useRouter();
   const isAuthenticated = status === 'authenticated';
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const isAdmin = isAuthenticated && session?.user?.email &&
+    process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',').includes(session.user.email);
 
   // Helper to check if a path is the current page
-  const isCurrentPage = (path) => router.pathname === path;
+  const isCurrentPage = (path) => router.asPath.split('?')[0] === path;
 
   return (
     <header className="bg-white shadow-sm sticky top-0 z-50">
@@ -60,7 +62,15 @@ export default function Navbar() {
                 >
                   Dashboard
                 </Link>
-                
+
+                <Link
+                  href="/mentor/usahawan-saya"
+                  className={`px-2 lg:px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${isCurrentPage('/mentor/usahawan-saya') ? 'text-blue-600 bg-blue-50 cursor-default' : 'text-gray-700 hover:text-blue-600'}`}
+                  onClick={(e) => isCurrentPage('/mentor/usahawan-saya') && e.preventDefault()}
+                >
+                  Usahawan Saya
+                </Link>
+
                 {/* Dropdown for Laporan options */}
                 <div className="relative group">
                   <button className="text-gray-700 hover:text-blue-600 px-2 lg:px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1 whitespace-nowrap">
@@ -86,6 +96,34 @@ export default function Navbar() {
                     </Link>
                   </div>
                 </div>
+
+                {/* Admin Menu (only for admin users) */}
+                {isAdmin && (
+                  <div className="relative group">
+                    <button className="text-gray-700 hover:text-blue-600 px-2 lg:px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1 whitespace-nowrap">
+                      Admin
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 hidden group-hover:block">
+                      <Link
+                        href="/admin/dashboard"
+                        className={`block px-4 py-2 text-sm ${isCurrentPage('/admin/dashboard') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:bg-blue-50'}`}
+                        onClick={(e) => isCurrentPage('/admin/dashboard') && e.preventDefault()}
+                      >
+                        Dashboard
+                      </Link>
+                      <Link
+                        href="/admin/usahawan"
+                        className={`block px-4 py-2 text-sm ${isCurrentPage('/admin/usahawan') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:bg-blue-50'}`}
+                        onClick={(e) => isCurrentPage('/admin/usahawan') && e.preventDefault()}
+                      >
+                        Direktori Usahawan
+                      </Link>
+                    </div>
+                  </div>
+                )}
 
                 {/* User Info and Logout */}
                 <div className="flex items-center gap-2 border-l border-gray-300 pl-2 lg:pl-4">
@@ -151,7 +189,21 @@ export default function Navbar() {
                 >
                   Dashboard
                 </Link>
-                
+
+                <Link
+                  href="/mentor/usahawan-saya"
+                  className={`block px-3 py-2 rounded-md text-sm font-medium transition-colors ${isCurrentPage('/mentor/usahawan-saya') ? 'text-blue-600 bg-blue-50 cursor-default' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
+                  onClick={(e) => {
+                    if (isCurrentPage('/mentor/usahawan-saya')) {
+                      e.preventDefault();
+                    } else {
+                      setMobileMenuOpen(false);
+                    }
+                  }}
+                >
+                  Usahawan Saya
+                </Link>
+
                 <div className="px-3 py-2">
                   <p className="text-sm font-medium text-gray-700 mb-2">Laporan</p>
                   <div className="space-y-1 pl-4">
@@ -183,6 +235,41 @@ export default function Navbar() {
                     </Link>
                   </div>
                 </div>
+
+                {/* Admin Section (mobile) */}
+                {isAdmin && (
+                  <div className="px-3 py-2">
+                    <p className="text-sm font-medium text-gray-700 mb-2">Admin</p>
+                    <div className="space-y-1 pl-4">
+                      <Link
+                        href="/admin/dashboard"
+                        className={`block px-3 py-2 rounded-md text-sm transition-colors ${isCurrentPage('/admin/dashboard') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
+                        onClick={(e) => {
+                          if (isCurrentPage('/admin/dashboard')) {
+                            e.preventDefault();
+                          } else {
+                            setMobileMenuOpen(false);
+                          }
+                        }}
+                      >
+                        Dashboard
+                      </Link>
+                      <Link
+                        href="/admin/usahawan"
+                        className={`block px-3 py-2 rounded-md text-sm transition-colors ${isCurrentPage('/admin/usahawan') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
+                        onClick={(e) => {
+                          if (isCurrentPage('/admin/usahawan')) {
+                            e.preventDefault();
+                          } else {
+                            setMobileMenuOpen(false);
+                          }
+                        }}
+                      >
+                        Direktori Usahawan
+                      </Link>
+                    </div>
+                  </div>
+                )}
 
                 <div className="border-t border-gray-200 pt-2 mt-2">
                   <div className="text-sm text-gray-600 px-3 py-2">
