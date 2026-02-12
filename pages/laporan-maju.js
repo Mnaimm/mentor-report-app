@@ -76,9 +76,8 @@ const EnhancedTextArea = ({ label, name, value, onChange, placeholder, rows = 5,
               setTextValue('');
             }
           }}
-          className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-vertical ${
-            showPlaceholder ? 'text-gray-400 italic' : 'text-gray-900'
-          } ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+          className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-vertical ${showPlaceholder ? 'text-gray-400 italic' : 'text-gray-900'
+            } ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
           rows={rows}
           required={required}
           disabled={disabled}
@@ -176,13 +175,13 @@ const LaporanMajuPage = () => {
 
         if (isAdmin) {
           const uniqueMentors = Array.from(new Set(data.map(m => m.Mentor_Email)))
-                                .map(email => {
-                                  const mentorData = data.find(m => m.Mentor_Email === email);
-                                  return { label: mentorData ? mentorData.Mentor : email, value: email };
-                                });
+            .map(email => {
+              const mentorData = data.find(m => m.Mentor_Email === email);
+              return { label: mentorData ? mentorData.Mentor : email, value: email };
+            });
           setMentorsInMapping([{ label: 'Pilih Mentor', value: '' }, ...uniqueMentors]);
           if (!selectedMentorEmail && session?.user?.email && uniqueMentors.some(m => m.value === session.user.email)) {
-              setSelectedMentorEmail(session.user.email);
+            setSelectedMentorEmail(session.user.email);
           }
         }
       } catch (error) {
@@ -202,23 +201,23 @@ const LaporanMajuPage = () => {
     let mentorEmail = session?.user?.email || '';
 
     if (isAdmin && selectedMentorEmail) {
-        const selectedMentorData = allMenteesMapping.find(m => m.Mentor_Email === selectedMentorEmail);
-        if (selectedMentorData) {
-            mentorName = selectedMentorData.Mentor;
-            mentorEmail = selectedMentorData.Mentor_Email;
-        }
+      const selectedMentorData = allMenteesMapping.find(m => m.Mentor_Email === selectedMentorEmail);
+      if (selectedMentorData) {
+        mentorName = selectedMentorData.Mentor;
+        mentorEmail = selectedMentorData.Mentor_Email;
+      }
     } else if (!isAdmin && session?.user?.email) {
-        const loggedInMentorData = allMenteesMapping.find(m => m.Mentor_Email === session.user.email);
-        if (loggedInMentorData) {
-            mentorName = loggedInMentorData.Mentor;
-            mentorEmail = loggedInMentorData.Mentor_Email;
-        }
+      const loggedInMentorData = allMenteesMapping.find(m => m.Mentor_Email === session.user.email);
+      if (loggedInMentorData) {
+        mentorName = loggedInMentorData.Mentor;
+        mentorEmail = loggedInMentorData.Mentor_Email;
+      }
     }
 
     setFormData(prev => ({
-        ...prev,
-        NAMA_MENTOR: mentorName,
-        EMAIL_MENTOR: mentorEmail,
+      ...prev,
+      NAMA_MENTOR: mentorName,
+      EMAIL_MENTOR: mentorEmail,
     }));
   }, [selectedMentorEmail, allMenteesMapping, isAdmin, session?.user?.email]);
 
@@ -330,14 +329,14 @@ const LaporanMajuPage = () => {
           ['Folder_ID', 'FOLDER_ID', 'FolderId', 'folder_id', 'Mentee_Folder_ID'].forEach(field => {
             console.log(`  ${field}:`, sessionData.menteeMapping[field]);
           });
-          
+
           updatedFormData.NAMA_BISNES = sessionData.menteeMapping.NAMA_BISNES || '';
           updatedFormData.LOKASI_BISNES = sessionData.menteeMapping.LOKASI_BISNES || '';
           updatedFormData.PRODUK_SERVIS = sessionData.menteeMapping.PRODUK_SERVIS || '';
           updatedFormData.NO_TELEFON = sessionData.menteeMapping.NO_TELEFON || '';
           // Use the correct field name from the mapping sheet
           updatedFormData.Folder_ID = sessionData.menteeMapping.Folder_ID || '';
-          
+
           console.log('🔍 Final Folder_ID set to:', updatedFormData.Folder_ID);
         } else {
           console.log('❌ No mentee mapping data received');
@@ -357,9 +356,9 @@ const LaporanMajuPage = () => {
 
         setPreviousLatarBelakangUsahawan(sessionData.latarBelakangUsahawanSesi1 || '');
         if (sessionData.currentSession === 1 && sessionData.latarBelakangUsahawanSesi1) {
-            updatedFormData.LATARBELAKANG_USAHAWAN = sessionData.latarBelakangUsahawanSesi1;
+          updatedFormData.LATARBELAKANG_USAHAWAN = sessionData.latarBelakangUsahawanSesi1;
         } else {
-            updatedFormData.LATARBELAKANG_USAHAWAN = '';
+          updatedFormData.LATARBELAKANG_USAHAWAN = '';
         }
 
         setHasPremisPhotosUploaded(sessionData.hasPremisPhotos || false);
@@ -449,9 +448,9 @@ const LaporanMajuPage = () => {
   // HOTFIX: Use working Bangkit Apps Script for images until Maju Apps Script gets uploadImage handler
   // Simple file storage functions (like laporan-sesi)
   const handleFileChange = (type, fileList, multiple = false) => {
-    setFiles((prev) => ({ 
-      ...prev, 
-      [type]: multiple ? Array.from(fileList) : fileList[0] 
+    setFiles((prev) => ({
+      ...prev,
+      [type]: multiple ? Array.from(fileList) : fileList[0]
     }));
   };
 
@@ -785,515 +784,515 @@ const LaporanMajuPage = () => {
   };
 
   // UPDATED: handleSubmit to include 'action' and 'reportType: maju'
-// In your laporan-maju.js, update the handleSubmit function's response handling:
+  // In your laporan-maju.js, update the handleSubmit function's response handling:
 
-// In your laporan-maju.js handleSubmit function, make sure dataToSend is properly defined:
+  // In your laporan-maju.js handleSubmit function, make sure dataToSend is properly defined:
 
-// Form validation function
-const validateForm = () => {
-  const errors = [];
-  
-  // For non-MIA submissions, check required fields
-  if (!isMIA) {
-    // 1. ✅ FIXED: Latar Belakang Usahawan is required ONLY for Sesi 1
-    if (currentSessionNumber === 1) {
-      if (!formData.LATARBELAKANG_USAHAWAN || formData.LATARBELAKANG_USAHAWAN.trim() === '') {
-        errors.push('Latar Belakang Usahawan & Situasi Bisnes adalah wajib diisi');
+  // Form validation function
+  const validateForm = () => {
+    const errors = [];
+
+    // For non-MIA submissions, check required fields
+    if (!isMIA) {
+      // 1. ✅ FIXED: Latar Belakang Usahawan is required ONLY for Sesi 1
+      if (currentSessionNumber === 1) {
+        if (!formData.LATARBELAKANG_USAHAWAN || formData.LATARBELAKANG_USAHAWAN.trim() === '') {
+          errors.push('Latar Belakang Usahawan & Situasi Bisnes adalah wajib diisi');
+        }
       }
-    }
-    
-    // 2. Minimum 1 Dapatan Sesi Mentoring with required fields
-    if (!formData.MENTORING_FINDINGS_JSON || formData.MENTORING_FINDINGS_JSON.length === 0) {
-      errors.push('Sekurang-kurangnya 1 Dapatan Sesi Mentoring diperlukan');
-    } else {
-      // Check each mentoring finding for required fields
-      formData.MENTORING_FINDINGS_JSON.forEach((finding, index) => {
-        if (!finding['Topik Perbincangan'] || finding['Topik Perbincangan'].trim() === '') {
-          errors.push(`Dapatan Mentoring #${index + 1}: Topik Perbincangan adalah wajib`);
-        }
-        if (!finding['Hasil yang Diharapkan'] || finding['Hasil yang Diharapkan'].trim() === '') {
-          errors.push(`Dapatan Mentoring #${index + 1}: Hasil yang Diharapkan adalah wajib`);
-        }
-        // Check minimum 1 action plan
-        if (!finding['Pelan Tindakan'] || finding['Pelan Tindakan'].length === 0) {
-          errors.push(`Dapatan Mentoring #${index + 1}: Sekurang-kurangnya 1 Pelan Tindakan diperlukan`);
-        } else {
-          // Check that at least one action plan has required fields
-          const validActionPlans = finding['Pelan Tindakan'].filter(plan => 
-            plan.Tindakan && plan.Tindakan.trim() !== ''
-          );
-          if (validActionPlans.length === 0) {
-            errors.push(`Dapatan Mentoring #${index + 1}: Pelan Tindakan mesti mempunyai sekurang-kurangnya 1 tindakan yang diisi`);
+
+      // 2. Minimum 1 Dapatan Sesi Mentoring with required fields
+      if (!formData.MENTORING_FINDINGS_JSON || formData.MENTORING_FINDINGS_JSON.length === 0) {
+        errors.push('Sekurang-kurangnya 1 Dapatan Sesi Mentoring diperlukan');
+      } else {
+        // Check each mentoring finding for required fields
+        formData.MENTORING_FINDINGS_JSON.forEach((finding, index) => {
+          if (!finding['Topik Perbincangan'] || finding['Topik Perbincangan'].trim() === '') {
+            errors.push(`Dapatan Mentoring #${index + 1}: Topik Perbincangan adalah wajib`);
           }
-        }
-      });
-    }
-    
-    // 3. ✅ NEW: Previous action updates required for Sesi 2+ (Either Kemajuan OR Cabaran, not both)
-    if (currentSessionNumber >= 2 && previousMentoringFindings.length > 0) {
-      let missingUpdates = [];
-      previousMentoringFindings.forEach((finding, findingIndex) => {
-        if (finding['Pelan Tindakan'] && Array.isArray(finding['Pelan Tindakan'])) {
-          finding['Pelan Tindakan'].forEach((plan, planIndex) => {
-            const hasKemajuan = plan.Kemajuan && plan.Kemajuan.trim() !== '';
-            const hasCabaran = plan.Cabaran && plan.Cabaran.trim() !== '';
-            
-            // Require at least ONE update (either Kemajuan OR Cabaran)
-            if (!hasKemajuan && !hasCabaran) {
-              missingUpdates.push(`Kemaskini samada Kemajuan atau Cabaran untuk "${plan.Tindakan || 'Tindakan ' + (planIndex + 1)}"`);
+          if (!finding['Hasil yang Diharapkan'] || finding['Hasil yang Diharapkan'].trim() === '') {
+            errors.push(`Dapatan Mentoring #${index + 1}: Hasil yang Diharapkan adalah wajib`);
+          }
+          // Check minimum 1 action plan
+          if (!finding['Pelan Tindakan'] || finding['Pelan Tindakan'].length === 0) {
+            errors.push(`Dapatan Mentoring #${index + 1}: Sekurang-kurangnya 1 Pelan Tindakan diperlukan`);
+          } else {
+            // Check that at least one action plan has required fields
+            const validActionPlans = finding['Pelan Tindakan'].filter(plan =>
+              plan.Tindakan && plan.Tindakan.trim() !== ''
+            );
+            if (validActionPlans.length === 0) {
+              errors.push(`Dapatan Mentoring #${index + 1}: Pelan Tindakan mesti mempunyai sekurang-kurangnya 1 tindakan yang diisi`);
             }
-          });
-        }
-      });
-      if (missingUpdates.length > 0) {
-        errors.push(`Sila kemaskini tindakan dari sesi sebelumnya: ${missingUpdates.join(', ')}`);
-      }
-    }
-    
-    // 4. ✅ NEW: Rumusan required for Sesi 2+
-    if (currentSessionNumber >= 2) {
-      if (!formData.RUMUSAN_DAN_LANGKAH_KEHADAPAN || formData.RUMUSAN_DAN_LANGKAH_KEHADAPAN.trim() === '') {
-        errors.push('Rumusan Keseluruhan dan Langkah Kehadapan adalah wajib diisi untuk Sesi 2 ke atas');
-      }
-    }
-    
-    // 4. Refleksi Mentor fields are required
-    if (!formData.REFLEKSI_MENTOR_PERASAAN || formData.REFLEKSI_MENTOR_PERASAAN.trim() === '') {
-      errors.push('Refleksi Mentor - Perasaan Mentor adalah wajib diisi');
-    }
-    if (!formData.REFLEKSI_MENTOR_KOMITMEN || formData.REFLEKSI_MENTOR_KOMITMEN.trim() === '') {
-      errors.push('Refleksi Mentor - Komitmen Mentor adalah wajib diisi');
-    }
-  } else {
-    // For MIA submissions, check MIA-specific requirements
-    if (!miaReason || miaReason.trim() === '') {
-      errors.push('Alasan/Sebab Usahawan MIA adalah wajib diisi');
-    }
-    if (!miaProofFile) {
-      errors.push('Bukti MIA (screenshot/dokumen) adalah wajib dimuat naik');
-    }
-  }
-  
-  return errors;
-};
-
-// ✅ NEW: Build cumulative mentoring findings that include previous sessions with updates
-const buildCumulativeMentoringFindings = () => {
-  let cumulativeFindings = [];
-  
-  // For Sesi 1, just return current findings
-  if (currentSessionNumber === 1) {
-    return formData.MENTORING_FINDINGS_JSON;
-  }
-  
-  // For Sesi 2+, combine previous findings (with updates) + current findings
-  if (previousMentoringFindings.length > 0) {
-    // Add updated previous findings first
-    const updatedPreviousFindings = previousMentoringFindings.map(finding => ({
-      ...finding,
-      // Mark these as being from previous session for document generation
-      SessionOrigin: currentSessionNumber - 1,
-      UpdatedInSession: currentSessionNumber
-    }));
-    cumulativeFindings = [...updatedPreviousFindings];
-  }
-  
-  // Add current session's new findings
-  const currentFindings = formData.MENTORING_FINDINGS_JSON.map(finding => ({
-    ...finding,
-    SessionOrigin: currentSessionNumber
-  }));
-  
-  cumulativeFindings = [...cumulativeFindings, ...currentFindings];
-  
-  console.log(`📊 Built cumulative findings for Sesi ${currentSessionNumber}:`, {
-    previousCount: previousMentoringFindings.length,
-    currentCount: formData.MENTORING_FINDINGS_JSON.length,
-    totalCount: cumulativeFindings.length
-  });
-  
-  return cumulativeFindings;
-};
-
-const handleSubmit = async (e) => {
-  e.preventDefault();
-
-  // IMMEDIATELY disable button to prevent double-click
-  if (loading) {
-    console.warn('⚠️ Submission already in progress, ignoring duplicate click');
-    return;
-  }
-  setLoading(true);
-
-  // Validate form first
-  const validationErrors = validateForm();
-  if (validationErrors.length > 0) {
-    // Create a more user-friendly error message
-    const errorMessage = `❌ Sila lengkapkan medan yang diperlukan (${validationErrors.length} isu):\n\n• ${validationErrors.join('\n• ')}`;
-    setMessage(errorMessage);
-    setMessageType('error');
-
-    // Scroll to the top to show error message
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-
-    setLoading(false); // Re-enable button if validation fails
-    return; // Stop submission if validation fails
-  }
-
-  setMessage('');
-  setMessageType('');
-  setSubmissionStage({ stage: 'preparing', message: 'Preparing submission...', detail: '' });
-
-  console.log('🚀 Starting form submission...');
-
-  try {
-    // Image upload phase - process all images first
-    console.log('📸 Starting batch image upload...');
-    const imageUrls = { gw360: '', sesi: [], premis: [], mia: '' };
-    const uploadPromises = [];
-
-    // Count total files for logging
-    const gw360Count = files.gw360 ? 1 : 0;
-    const sesiCount = files.sesi ? files.sesi.length : 0;  
-    const premisCount = files.premis ? files.premis.length : 0;
-    const miaCount = miaProofFile ? 1 : 0;
-
-    console.log(`📊 Image URLs in submission:`);
-    console.log(`  - Sesi Images: ${sesiCount}`);
-    console.log(`  - Premis Images: ${premisCount}`);
-    console.log(`  - GW360 Image: ${gw360Count ? 'Present' : 'Missing'}`);
-
-    const folderId = formData.Folder_ID;
-    const menteeNameForUpload = formData.NAMA_MENTEE;
-    const sessionNumberForUpload = currentSessionNumber;
-
-    // Check if we have images to upload
-    const hasImagesToUpload = files.gw360 || (files.sesi && files.sesi.length > 0) || (files.premis && files.premis.length > 0) || miaProofFile;
-    
-    if (!hasImagesToUpload) {
-      console.log('ℹ️ No images to upload, skipping upload phase');
-    } else {
-      console.log('📋 Folder ID:', folderId);
-      console.log('📋 Mentee Name:', menteeNameForUpload);
-    }
-
-    // Upload images if we have any
-    if (hasImagesToUpload) {
-      // Upload GW360 image (single file)
-      if (files.gw360) {
-        uploadPromises.push(uploadImage(files.gw360, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => (imageUrls.gw360 = url)));
-      }
-
-      // Upload Sesi images (multiple files)
-      if (files.sesi && files.sesi.length > 0) {
-        files.sesi.forEach((file) => uploadPromises.push(uploadImage(file, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => imageUrls.sesi.push(url))));
-      }
-
-      // Upload Premis images (multiple files)
-      if (files.premis && files.premis.length > 0) {
-        files.premis.forEach((file) => uploadPromises.push(uploadImage(file, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => imageUrls.premis.push(url))));
-      }
-
-      // Upload MIA proof if present
-      if (miaProofFile) {
-        uploadPromises.push(uploadMiaProof(miaProofFile, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => (imageUrls.mia = url)));
-      }
-
-      // Wait for all uploads to complete
-      if (uploadPromises.length > 0) {
-        // Update stage: uploading images
-        setSubmissionStage({
-          stage: 'uploading',
-          message: 'Uploading images to Google Drive...',
-          detail: `Uploading ${uploadPromises.length} image${uploadPromises.length > 1 ? 's' : ''}`
+          }
         });
-
-        console.log(`⏳ Waiting for ${uploadPromises.length} image uploads to complete...`);
-        await Promise.all(uploadPromises);
-        console.log('✅ All images uploaded successfully');
       }
 
-      // Clear compression progress immediately when uploads complete
-      setCompressionProgress({ show: false, current: 0, total: 0, message: '', fileName: '' });
-    }
+      // 3. ✅ NEW: Previous action updates required for Sesi 2+ (Either Kemajuan OR Cabaran, not both)
+      if (currentSessionNumber >= 2 && previousMentoringFindings.length > 0) {
+        let missingUpdates = [];
+        previousMentoringFindings.forEach((finding, findingIndex) => {
+          if (finding['Pelan Tindakan'] && Array.isArray(finding['Pelan Tindakan'])) {
+            finding['Pelan Tindakan'].forEach((plan, planIndex) => {
+              const hasKemajuan = plan.Kemajuan && plan.Kemajuan.trim() !== '';
+              const hasCabaran = plan.Cabaran && plan.Cabaran.trim() !== '';
 
-    // ✅ MAKE SURE dataToSend is declared in the correct scope
-    let dataToSend = {}; // ← Declare it here at the top
+              // Require at least ONE update (either Kemajuan OR Cabaran)
+              if (!hasKemajuan && !hasCabaran) {
+                missingUpdates.push(`Kemaskini samada Kemajuan atau Cabaran untuk "${plan.Tindakan || 'Tindakan ' + (planIndex + 1)}"`);
+              }
+            });
+          }
+        });
+        if (missingUpdates.length > 0) {
+          errors.push(`Sila kemaskini tindakan dari sesi sebelumnya: ${missingUpdates.join(', ')}`);
+        }
+      }
 
-    // CONDITIONALLY BUILD dataToSend BASED ON MIA STATUS
-    if (isMIA) {
-      console.log('📋 Building MIA data to send...');
-      
-      dataToSend = {
-        NAMA_MENTOR: formData.NAMA_MENTOR,
-        EMAIL_MENTOR: formData.EMAIL_MENTOR,
-        NAMA_MENTEE: formData.NAMA_MENTEE,
-        NAMA_BISNES: formData.NAMA_BISNES,
-        SESI_NUMBER: currentSessionNumber,
-        LOKASI_BISNES: '',
-        PRODUK_SERVIS: '',
-        NO_TELEFON: '',
-        TARIKH_SESI: '',
-        MOD_SESI: '',
-        LOKASI_F2F: '',
-        MASA_MULA: '',
-        MASA_TAMAT: '',
-        LATARBELAKANG_USAHAWAN: '',
-        DATA_KEWANGAN_BULANAN_JSON: [],
-        MENTORING_FINDINGS_JSON: [],
-        REFLEKSI_MENTOR_PERASAAN: '',
-        REFLEKSI_MENTOR_KOMITMEN: '',
-        REFLEKSI_MENTOR_LAIN: '',
-        URL_GAMBAR_PREMIS_JSON: [],
-        URL_GAMBAR_SESI_JSON: [],
-        URL_GAMBAR_GW360: '',
-        Folder_ID: formData.Folder_ID,
-        Laporan_Maju_Doc_ID: '',
-        STATUS_PERNIAGAAN_KESELURUHAN: '',
-        RUMUSAN_DAN_LANGKAH_KEHADAPAN: '',
-        MIA_STATUS: 'MIA',
-        MIA_REASON: miaReason,
-        MIA_PROOF_URL: imageUrls.mia,
-      };
+      // 4. ✅ NEW: Rumusan required for Sesi 2+
+      if (currentSessionNumber >= 2) {
+        if (!formData.RUMUSAN_DAN_LANGKAH_KEHADAPAN || formData.RUMUSAN_DAN_LANGKAH_KEHADAPAN.trim() === '') {
+          errors.push('Rumusan Keseluruhan dan Langkah Kehadapan adalah wajib diisi untuk Sesi 2 ke atas');
+        }
+      }
+
+      // 4. Refleksi Mentor fields are required
+      if (!formData.REFLEKSI_MENTOR_PERASAAN || formData.REFLEKSI_MENTOR_PERASAAN.trim() === '') {
+        errors.push('Refleksi Mentor - Perasaan Mentor adalah wajib diisi');
+      }
+      if (!formData.REFLEKSI_MENTOR_KOMITMEN || formData.REFLEKSI_MENTOR_KOMITMEN.trim() === '') {
+        errors.push('Refleksi Mentor - Komitmen Mentor adalah wajib diisi');
+      }
     } else {
-      console.log('📋 Building regular report data to send...');
-      
-      dataToSend = {
-        NAMA_MENTOR: formData.NAMA_MENTOR,
-        EMAIL_MENTOR: formData.EMAIL_MENTOR,
-        NAMA_MENTEE: formData.NAMA_MENTEE,
-        NAMA_BISNES: formData.NAMA_BISNES,
-        SESI_NUMBER: currentSessionNumber,
-        LOKASI_BISNES: formData.LOKASI_BISNES,
-        PRODUK_SERVIS: formData.PRODUK_SERVIS,
-        NO_TELEFON: formData.NO_TELEFON,
-        TARIKH_SESI: formData.TARIKH_SESI,
-        MOD_SESI: formData.MOD_SESI,
-        LOKASI_F2F: formData.LOKASI_F2F,
-        MASA_MULA: formData.MASA_MULA,
-        MASA_TAMAT: formData.MASA_TAMAT,
-        LATARBELAKANG_USAHAWAN: currentSessionNumber === 1 ? formData.LATARBELAKANG_USAHAWAN : previousLatarBelakangUsahawan,
-        DATA_KEWANGAN_BULANAN_JSON: formData.DATA_KEWANGAN_BULANAN_JSON,
-        MENTORING_FINDINGS_JSON: buildCumulativeMentoringFindings(),
-        REFLEKSI_MENTOR_PERASAAN: formData.REFLEKSI_MENTOR_PERASAAN,
-        REFLEKSI_MENTOR_KOMITMEN: formData.REFLEKSI_MENTOR_KOMITMEN,
-        REFLEKSI_MENTOR_LAIN: formData.REFLEKSI_MENTOR_LAIN,
-        URL_GAMBAR_PREMIS_JSON: imageUrls.premis,
-        URL_GAMBAR_SESI_JSON: imageUrls.sesi,
-        URL_GAMBAR_GW360: imageUrls.gw360,
-        Folder_ID: formData.Folder_ID,
-        Laporan_Maju_Doc_ID: '',
-        STATUS_PERNIAGAAN_KESELURUHAN: formData.STATUS_PERNIAGAAN_KESELURUHAN || '',
-        RUMUSAN_DAN_LANGKAH_KEHADAPAN: formData.RUMUSAN_DAN_LANGKAH_KEHADAPAN || '',
-        MIA_STATUS: 'Tidak MIA',
-        MIA_REASON: '',
-        MIA_PROOF_URL: imageUrls.mia,
-      };
+      // For MIA submissions, check MIA-specific requirements
+      if (!miaReason || miaReason.trim() === '') {
+        errors.push('Alasan/Sebab Usahawan MIA adalah wajib diisi');
+      }
+      if (!miaProofFile) {
+        errors.push('Bukti MIA (screenshot/dokumen) adalah wajib dimuat naik');
+      }
     }
 
-    // ✅ Now dataToSend is properly defined and can be used
-    console.log('📤 Data to send:', dataToSend);
-    
-    // DEBUG: Check if images are present
-    console.log('🖼️ Image URLs in submission:');
-    console.log('  - Sesi Images:', dataToSend.URL_GAMBAR_SESI_JSON?.length || 0);
-    console.log('  - Premis Images:', dataToSend.URL_GAMBAR_PREMIS_JSON?.length || 0);
-    console.log('  - GW360 Image:', dataToSend.URL_GAMBAR_GW360 ? 'Present' : 'Missing');
-    
-    console.log('🌐 Submitting to /api/submitMajuReport...');
+    return errors;
+  };
 
-    // Update stage: saving to database
-    setSubmissionStage({
-      stage: 'saving',
-      message: 'Saving report to Google Sheets...',
-      detail: 'This may take up to 30 seconds'
+  // ✅ NEW: Build cumulative mentoring findings that include previous sessions with updates
+  const buildCumulativeMentoringFindings = () => {
+    let cumulativeFindings = [];
+
+    // For Sesi 1, just return current findings
+    if (currentSessionNumber === 1) {
+      return formData.MENTORING_FINDINGS_JSON;
+    }
+
+    // For Sesi 2+, combine previous findings (with updates) + current findings
+    if (previousMentoringFindings.length > 0) {
+      // Add updated previous findings first
+      const updatedPreviousFindings = previousMentoringFindings.map(finding => ({
+        ...finding,
+        // Mark these as being from previous session for document generation
+        SessionOrigin: currentSessionNumber - 1,
+        UpdatedInSession: currentSessionNumber
+      }));
+      cumulativeFindings = [...updatedPreviousFindings];
+    }
+
+    // Add current session's new findings
+    const currentFindings = formData.MENTORING_FINDINGS_JSON.map(finding => ({
+      ...finding,
+      SessionOrigin: currentSessionNumber
+    }));
+
+    cumulativeFindings = [...cumulativeFindings, ...currentFindings];
+
+    console.log(`📊 Built cumulative findings for Sesi ${currentSessionNumber}:`, {
+      previousCount: previousMentoringFindings.length,
+      currentCount: formData.MENTORING_FINDINGS_JSON.length,
+      totalCount: cumulativeFindings.length
     });
 
-    // Add frontend timeout protection (25 seconds)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 25000);
+    return cumulativeFindings;
+  };
 
-    let response;
-    try {
-      response = await fetch('/api/submitMajuReport', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(dataToSend),
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-    } catch (fetchError) {
-      clearTimeout(timeoutId);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-      if (fetchError.name === 'AbortError') {
-        throw new Error('⏱️ Request timeout - sila cuba lagi. Jika masalah berterusan, hubungi admin.');
-      }
-      throw fetchError;
+    // IMMEDIATELY disable button to prevent double-click
+    if (loading) {
+      console.warn('⚠️ Submission already in progress, ignoring duplicate click');
+      return;
+    }
+    setLoading(true);
+
+    // Validate form first
+    const validationErrors = validateForm();
+    if (validationErrors.length > 0) {
+      // Create a more user-friendly error message
+      const errorMessage = `❌ Sila lengkapkan medan yang diperlukan (${validationErrors.length} isu):\n\n• ${validationErrors.join('\n• ')}`;
+      setMessage(errorMessage);
+      setMessageType('error');
+
+      // Scroll to the top to show error message
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      setLoading(false); // Re-enable button if validation fails
+      return; // Stop submission if validation fails
     }
 
-    console.log('📥 Response status:', response.status);
-    console.log('📥 Response ok:', response.ok);
+    setMessage('');
+    setMessageType('');
+    setSubmissionStage({ stage: 'preparing', message: 'Preparing submission...', detail: '' });
 
-    // Safe JSON parsing with fallback
-    let result;
-    const contentType = response.headers.get('content-type');
+    console.log('🚀 Starting form submission...');
 
     try {
-      if (contentType && contentType.includes('application/json')) {
-        result = await response.json();
-        console.log('📄 Parsed response JSON:', result);
+      // Image upload phase - process all images first
+      console.log('📸 Starting batch image upload...');
+      const imageUrls = { gw360: '', sesi: [], premis: [], mia: '' };
+      const uploadPromises = [];
+
+      // Count total files for logging
+      const gw360Count = files.gw360 ? 1 : 0;
+      const sesiCount = files.sesi ? files.sesi.length : 0;
+      const premisCount = files.premis ? files.premis.length : 0;
+      const miaCount = miaProofFile ? 1 : 0;
+
+      console.log(`📊 Image URLs in submission:`);
+      console.log(`  - Sesi Images: ${sesiCount}`);
+      console.log(`  - Premis Images: ${premisCount}`);
+      console.log(`  - GW360 Image: ${gw360Count ? 'Present' : 'Missing'}`);
+
+      const folderId = formData.Folder_ID;
+      const menteeNameForUpload = formData.NAMA_MENTEE;
+      const sessionNumberForUpload = currentSessionNumber;
+
+      // Check if we have images to upload
+      const hasImagesToUpload = files.gw360 || (files.sesi && files.sesi.length > 0) || (files.premis && files.premis.length > 0) || miaProofFile;
+
+      if (!hasImagesToUpload) {
+        console.log('ℹ️ No images to upload, skipping upload phase');
       } else {
-        // Response is not JSON (likely HTML error page)
-        const text = await response.text();
-        console.error('❌ Non-JSON response:', text.substring(0, 200));
-        result = {
-          error: 'Server returned unexpected response. Please check Google Sheet to verify if report was saved.',
-          retryable: false,
-          serverResponse: text.substring(0, 200)
+        console.log('📋 Folder ID:', folderId);
+        console.log('📋 Mentee Name:', menteeNameForUpload);
+      }
+
+      // Upload images if we have any
+      if (hasImagesToUpload) {
+        // Upload GW360 image (single file)
+        if (files.gw360) {
+          uploadPromises.push(uploadImage(files.gw360, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => (imageUrls.gw360 = url)));
+        }
+
+        // Upload Sesi images (multiple files)
+        if (files.sesi && files.sesi.length > 0) {
+          files.sesi.forEach((file) => uploadPromises.push(uploadImage(file, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => imageUrls.sesi.push(url))));
+        }
+
+        // Upload Premis images (multiple files)
+        if (files.premis && files.premis.length > 0) {
+          files.premis.forEach((file) => uploadPromises.push(uploadImage(file, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => imageUrls.premis.push(url))));
+        }
+
+        // Upload MIA proof if present
+        if (miaProofFile) {
+          uploadPromises.push(uploadMiaProof(miaProofFile, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => (imageUrls.mia = url)));
+        }
+
+        // Wait for all uploads to complete
+        if (uploadPromises.length > 0) {
+          // Update stage: uploading images
+          setSubmissionStage({
+            stage: 'uploading',
+            message: 'Uploading images to Google Drive...',
+            detail: `Uploading ${uploadPromises.length} image${uploadPromises.length > 1 ? 's' : ''}`
+          });
+
+          console.log(`⏳ Waiting for ${uploadPromises.length} image uploads to complete...`);
+          await Promise.all(uploadPromises);
+          console.log('✅ All images uploaded successfully');
+        }
+
+        // Clear compression progress immediately when uploads complete
+        setCompressionProgress({ show: false, current: 0, total: 0, message: '', fileName: '' });
+      }
+
+      // ✅ MAKE SURE dataToSend is declared in the correct scope
+      let dataToSend = {}; // ← Declare it here at the top
+
+      // CONDITIONALLY BUILD dataToSend BASED ON MIA STATUS
+      if (isMIA) {
+        console.log('📋 Building MIA data to send...');
+
+        dataToSend = {
+          NAMA_MENTOR: formData.NAMA_MENTOR,
+          EMAIL_MENTOR: formData.EMAIL_MENTOR,
+          NAMA_MENTEE: formData.NAMA_MENTEE,
+          NAMA_BISNES: formData.NAMA_BISNES,
+          SESI_NUMBER: currentSessionNumber,
+          LOKASI_BISNES: '',
+          PRODUK_SERVIS: '',
+          NO_TELEFON: '',
+          TARIKH_SESI: '',
+          MOD_SESI: '',
+          LOKASI_F2F: '',
+          MASA_MULA: '',
+          MASA_TAMAT: '',
+          LATARBELAKANG_USAHAWAN: '',
+          DATA_KEWANGAN_BULANAN_JSON: [],
+          MENTORING_FINDINGS_JSON: [],
+          REFLEKSI_MENTOR_PERASAAN: '',
+          REFLEKSI_MENTOR_KOMITMEN: '',
+          REFLEKSI_MENTOR_LAIN: '',
+          URL_GAMBAR_PREMIS_JSON: [],
+          URL_GAMBAR_SESI_JSON: [],
+          URL_GAMBAR_GW360: '',
+          Folder_ID: formData.Folder_ID,
+          Laporan_Maju_Doc_ID: '',
+          STATUS_PERNIAGAAN_KESELURUHAN: '',
+          RUMUSAN_DAN_LANGKAH_KEHADAPAN: '',
+          MIA_STATUS: 'MIA',
+          MIA_REASON: miaReason,
+          MIA_PROOF_URL: imageUrls.mia,
+        };
+      } else {
+        console.log('📋 Building regular report data to send...');
+
+        dataToSend = {
+          NAMA_MENTOR: formData.NAMA_MENTOR,
+          EMAIL_MENTOR: formData.EMAIL_MENTOR,
+          NAMA_MENTEE: formData.NAMA_MENTEE,
+          NAMA_BISNES: formData.NAMA_BISNES,
+          SESI_NUMBER: currentSessionNumber,
+          LOKASI_BISNES: formData.LOKASI_BISNES,
+          PRODUK_SERVIS: formData.PRODUK_SERVIS,
+          NO_TELEFON: formData.NO_TELEFON,
+          TARIKH_SESI: formData.TARIKH_SESI,
+          MOD_SESI: formData.MOD_SESI,
+          LOKASI_F2F: formData.LOKASI_F2F,
+          MASA_MULA: formData.MASA_MULA,
+          MASA_TAMAT: formData.MASA_TAMAT,
+          LATARBELAKANG_USAHAWAN: currentSessionNumber === 1 ? formData.LATARBELAKANG_USAHAWAN : previousLatarBelakangUsahawan,
+          DATA_KEWANGAN_BULANAN_JSON: formData.DATA_KEWANGAN_BULANAN_JSON,
+          MENTORING_FINDINGS_JSON: buildCumulativeMentoringFindings(),
+          REFLEKSI_MENTOR_PERASAAN: formData.REFLEKSI_MENTOR_PERASAAN,
+          REFLEKSI_MENTOR_KOMITMEN: formData.REFLEKSI_MENTOR_KOMITMEN,
+          REFLEKSI_MENTOR_LAIN: formData.REFLEKSI_MENTOR_LAIN,
+          URL_GAMBAR_PREMIS_JSON: imageUrls.premis,
+          URL_GAMBAR_SESI_JSON: imageUrls.sesi,
+          URL_GAMBAR_GW360: imageUrls.gw360,
+          Folder_ID: formData.Folder_ID,
+          Laporan_Maju_Doc_ID: '',
+          STATUS_PERNIAGAAN_KESELURUHAN: formData.STATUS_PERNIAGAAN_KESELURUHAN || '',
+          RUMUSAN_DAN_LANGKAH_KEHADAPAN: formData.RUMUSAN_DAN_LANGKAH_KEHADAPAN || '',
+          MIA_STATUS: 'Tidak MIA',
+          MIA_REASON: '',
+          MIA_PROOF_URL: imageUrls.mia,
         };
       }
-    } catch (parseError) {
-      console.error('❌ Failed to parse response:', parseError);
-      result = {
-        error: 'Unable to read server response. Please check Google Sheet to verify if report was saved.',
-        retryable: false
-      };
-    }
 
-    // Enhanced error message based on status code
-    if (!response.ok) {
-      let userMessage = result.error || result.message;
+      // ✅ Now dataToSend is properly defined and can be used
+      console.log('📤 Data to send:', dataToSend);
 
-      if (response.status === 504) {
-        userMessage = `⏱️ Server timeout - your images were uploaded, but we couldn't confirm if data was saved.\n\n` +
-                      `✓ Check Google Sheet to see if your report appears\n` +
-                      `✗ DO NOT submit again without checking\n` +
-                      `📞 Contact admin if report is missing`;
-      } else if (response.status === 408) {
-        userMessage = `${result.error || 'Request timeout'}\n\nYou can try submitting again.`;
-      }
+      // DEBUG: Check if images are present
+      console.log('🖼️ Image URLs in submission:');
+      console.log('  - Sesi Images:', dataToSend.URL_GAMBAR_SESI_JSON?.length || 0);
+      console.log('  - Premis Images:', dataToSend.URL_GAMBAR_PREMIS_JSON?.length || 0);
+      console.log('  - GW360 Image:', dataToSend.URL_GAMBAR_GW360 ? 'Present' : 'Missing');
 
-      if (result.retryable) {
-        throw new Error(`${userMessage} (Boleh cuba semula)`);
-      }
-      throw new Error(userMessage);
-    }
+      console.log('🌐 Submitting to /api/submitMajuReport...');
 
-    // Handle success
-    if (response.ok && result.success === true) {
-      console.log('✅ [PHASE 5] Submission successful!');
-      console.log('📋 [PHASE 5] Success message:', result.message);
-
-      if (result.docUrl) {
-        console.log('📄 [PHASE 5] Document URL:', result.docUrl);
-      }
-
-      // Update stage: complete
+      // Update stage: saving to database
       setSubmissionStage({
-        stage: 'complete',
-        message: 'Report submitted successfully!',
-        detail: ''
+        stage: 'saving',
+        message: 'Saving report to Google Sheets...',
+        detail: 'This may take up to 30 seconds'
       });
 
-      // Show success with row number for verification
-      const successMessage = `${result.message || '✅ Laporan berjaya dihantar!'}\n\n📊 Row Number: ${result.rowNumber || 'N/A'}\n\nSila semak Google Sheet untuk pengesahan.`;
+      // Add frontend timeout protection (25 seconds)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
 
-      setMessage(successMessage);
-      setMessageType('success');
-
-      // Clear saved draft before resetting
+      let response;
       try {
-        const draftKey = getDraftKey(
-          formData.NAMA_MENTEE,
-          currentSessionNumber,
-          session?.user?.email
-        );
-        localStorage.removeItem(draftKey);
-        console.log('🗑️ [PHASE 5] Draft cleared after successful submission');
-      } catch (error) {
-        console.error('Failed to clear draft:', error);
+        response = await fetch('/api/submitMajuReport', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(dataToSend),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+
+        if (fetchError.name === 'AbortError') {
+          throw new Error('⏱️ Request timeout - sila cuba lagi. Jika masalah berterusan, hubungi admin.');
+        }
+        throw fetchError;
       }
 
-      console.log('🔄 [PHASE 5] Resetting form...');
-      resetForm();
-      setSubmissionStage({ stage: '', message: '', detail: '' }); // Clear stage after reset
+      console.log('📥 Response status:', response.status);
+      console.log('📥 Response ok:', response.ok);
 
-      console.log('✅ [COMPLETE] Submission process completed successfully');
-      return;
+      // Safe JSON parsing with fallback
+      let result;
+      const contentType = response.headers.get('content-type');
 
-    } else if (result.partialSuccess) {
-      // Handle partial success (sheet saved but document failed)
-      console.warn('⚠️ [PHASE 5] Partial success - sheet saved but document failed');
+      try {
+        if (contentType && contentType.includes('application/json')) {
+          result = await response.json();
+          console.log('📄 Parsed response JSON:', result);
+        } else {
+          // Response is not JSON (likely HTML error page)
+          const text = await response.text();
+          console.error('❌ Non-JSON response:', text.substring(0, 200));
+          result = {
+            error: 'Server returned unexpected response. Please check Google Sheet to verify if report was saved.',
+            retryable: false,
+            serverResponse: text.substring(0, 200)
+          };
+        }
+      } catch (parseError) {
+        console.error('❌ Failed to parse response:', parseError);
+        result = {
+          error: 'Unable to read server response. Please check Google Sheet to verify if report was saved.',
+          retryable: false
+        };
+      }
 
-      // Update stage: show warning
+      // Enhanced error message based on status code
+      if (!response.ok) {
+        let userMessage = result.error || result.message;
+
+        if (response.status === 504) {
+          userMessage = `⏱️ Server timeout - your images were uploaded, but we couldn't confirm if data was saved.\n\n` +
+            `✓ Check Google Sheet to see if your report appears\n` +
+            `✗ DO NOT submit again without checking\n` +
+            `📞 Contact admin if report is missing`;
+        } else if (response.status === 408) {
+          userMessage = `${result.error || 'Request timeout'}\n\nYou can try submitting again.`;
+        }
+
+        if (result.retryable) {
+          throw new Error(`${userMessage} (Boleh cuba semula)`);
+        }
+        throw new Error(userMessage);
+      }
+
+      // Handle success
+      if (response.ok && result.success === true) {
+        console.log('✅ [PHASE 5] Submission successful!');
+        console.log('📋 [PHASE 5] Success message:', result.message);
+
+        if (result.docUrl) {
+          console.log('📄 [PHASE 5] Document URL:', result.docUrl);
+        }
+
+        // Update stage: complete
+        setSubmissionStage({
+          stage: 'complete',
+          message: 'Report submitted successfully!',
+          detail: ''
+        });
+
+        // Show success with row number for verification
+        const successMessage = `${result.message || '✅ Laporan berjaya dihantar!'}\n\n📊 Row Number: ${result.rowNumber || 'N/A'}\n\nSila semak Google Sheet untuk pengesahan.`;
+
+        setMessage(successMessage);
+        setMessageType('success');
+
+        // Clear saved draft before resetting
+        try {
+          const draftKey = getDraftKey(
+            formData.NAMA_MENTEE,
+            currentSessionNumber,
+            session?.user?.email
+          );
+          localStorage.removeItem(draftKey);
+          console.log('🗑️ [PHASE 5] Draft cleared after successful submission');
+        } catch (error) {
+          console.error('Failed to clear draft:', error);
+        }
+
+        console.log('🔄 [PHASE 5] Resetting form...');
+        resetForm();
+        setSubmissionStage({ stage: '', message: '', detail: '' }); // Clear stage after reset
+
+        console.log('✅ [COMPLETE] Submission process completed successfully');
+        return;
+
+      } else if (result.partialSuccess) {
+        // Handle partial success (sheet saved but document failed)
+        console.warn('⚠️ [PHASE 5] Partial success - sheet saved but document failed');
+
+        // Update stage: show warning
+        setSubmissionStage({
+          stage: 'warning',
+          message: 'Data saved but document generation timed out',
+          detail: 'Check the warning message below'
+        });
+
+        const partialMessage = `⚠️ ${result.error || 'Laporan separa berjaya'}\n\n` +
+          `✅ Data telah disimpan di Google Sheet\n` +
+          `❌ Dokumen gagal dicipta\n\n` +
+          `📊 Row Number: ${result.rowNumber}\n` +
+          `📝 Details: ${result.warning || result.message}\n\n` +
+          `💡 Sila hubungi admin dengan nombor row di atas untuk mencipta dokumen.`;
+
+        setMessage(partialMessage);
+        setMessageType('warning');
+
+        // Don't reset form completely - user might need to see data
+        console.log('⚠️ [PHASE 5] Partial success - form not reset');
+        // Don't return early - let finally block clear loading state
+
+      } else {
+        // Failure case
+        console.error('❌ [PHASE 5] Submission failed');
+        console.error('📊 [PHASE 5] Response status:', response.status);
+        console.error('📊 [PHASE 5] Result object:', result);
+
+        const errorMessage = result.error || result.message || 'Unknown error occurred';
+        const errorDetails = result.details || '';
+        const warningInfo = result.warning ? `\n⚠️ Warning: ${result.warning}` : '';
+        const rowInfo = result.rowNumber ? `\n📊 Row Number: ${result.rowNumber}` : '';
+
+        console.error('❌ [PHASE 5] Error message:', errorMessage);
+        if (errorDetails) {
+          console.error('❌ [PHASE 5] Error details:', errorDetails);
+        }
+
+        throw new Error(`${errorMessage}${warningInfo}${errorDetails ? '\n\nDetails: ' + errorDetails : ''}${rowInfo}`);
+      }
+
+    } catch (error) {
+      console.error('❌ Detailed submission error:', error);
+
+      // Determine stage-specific error message
+      let errorMessage = error.message;
+      let errorDetail = '';
+
+      if (submissionStage.stage === 'uploading') {
+        errorMessage = `❌ Image upload failed: ${error.message}`;
+        errorDetail = 'Check your internet connection and try again.';
+      } else if (submissionStage.stage === 'saving') {
+        errorMessage = `⚠️ ${error.message}`;
+        errorDetail = '';
+      }
+
       setSubmissionStage({
-        stage: 'warning',
-        message: 'Data saved but document generation timed out',
-        detail: 'Check the warning message below'
+        stage: 'error',
+        message: errorMessage,
+        detail: errorDetail
       });
 
-      const partialMessage = `⚠️ ${result.error || 'Laporan separa berjaya'}\n\n` +
-        `✅ Data telah disimpan di Google Sheet\n` +
-        `❌ Dokumen gagal dicipta\n\n` +
-        `📊 Row Number: ${result.rowNumber}\n` +
-        `📝 Details: ${result.warning || result.message}\n\n` +
-        `💡 Sila hubungi admin dengan nombor row di atas untuk mencipta dokumen.`;
-
-      setMessage(partialMessage);
-      setMessageType('warning');
-
-      // Don't reset form completely - user might need to see data
-      console.log('⚠️ [PHASE 5] Partial success - form not reset');
-      // Don't return early - let finally block clear loading state
-
-    } else {
-      // Failure case
-      console.error('❌ [PHASE 5] Submission failed');
-      console.error('📊 [PHASE 5] Response status:', response.status);
-      console.error('📊 [PHASE 5] Result object:', result);
-
-      const errorMessage = result.error || result.message || 'Unknown error occurred';
-      const errorDetails = result.details || '';
-      const warningInfo = result.warning ? `\n⚠️ Warning: ${result.warning}` : '';
-      const rowInfo = result.rowNumber ? `\n📊 Row Number: ${result.rowNumber}` : '';
-
-      console.error('❌ [PHASE 5] Error message:', errorMessage);
-      if (errorDetails) {
-        console.error('❌ [PHASE 5] Error details:', errorDetails);
-      }
-
-      throw new Error(`${errorMessage}${warningInfo}${errorDetails ? '\n\nDetails: ' + errorDetails : ''}${rowInfo}`);
+      setMessage(`Failed to submit Laporan: ${error.message}`);
+      setMessageType('error');
+    } finally {
+      setLoading(false);
     }
-
-  } catch (error) {
-    console.error('❌ Detailed submission error:', error);
-
-    // Determine stage-specific error message
-    let errorMessage = error.message;
-    let errorDetail = '';
-
-    if (submissionStage.stage === 'uploading') {
-      errorMessage = `❌ Image upload failed: ${error.message}`;
-      errorDetail = 'Check your internet connection and try again.';
-    } else if (submissionStage.stage === 'saving') {
-      errorMessage = `⚠️ ${error.message}`;
-      errorDetail = '';
-    }
-
-    setSubmissionStage({
-      stage: 'error',
-      message: errorMessage,
-      detail: errorDetail
-    });
-
-    setMessage(`Failed to submit Laporan: ${error.message}`);
-    setMessageType('error');
-  } finally {
-    setLoading(false);
-  }
-};
+  };
   // Early returns for authentication and session limits
   if (!session) {
     return (
@@ -1364,8 +1363,8 @@ const handleSubmit = async (e) => {
             <InfoCard
               title={
                 messageType === 'success' ? 'Success' :
-                messageType === 'warning' ? 'Partial Success' :
-                'Error'
+                  messageType === 'warning' ? 'Partial Success' :
+                    'Error'
               }
               type={messageType}
             >
@@ -1662,7 +1661,7 @@ Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun la
                       <p className="text-sm text-blue-700 mb-4">
                         <strong>Sila pilih untuk kemaskini:</strong> Samada <em>Kemajuan</em> (jika ada progress) atau <em>Cabaran</em> (jika ada halangan) untuk setiap tindakan. Tidak perlu isi kedua-duanya.
                       </p>
-                      
+
                       {previousMentoringFindings.map((finding, findingIndex) => (
                         finding['Pelan Tindakan'] && Array.isArray(finding['Pelan Tindakan']) && finding['Pelan Tindakan'].length > 0 && (
                           <div key={findingIndex} className="bg-white p-4 mb-4 rounded-lg border">
@@ -1672,7 +1671,7 @@ Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun la
                             <p className="text-sm text-gray-600 mb-4">
                               Hasil Diharapkan: {finding['Hasil yang Diharapkan']}
                             </p>
-                            
+
                             {finding['Pelan Tindakan'].map((plan, planIndex) => (
                               <div key={planIndex} className="bg-gray-50 p-3 mb-3 rounded border-l-4 border-orange-400">
                                 <div className="mb-2">
@@ -1682,7 +1681,7 @@ Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun la
                                     Jangkaan Siap: {plan['Jangkaan tarikh siap'] || 'N/A'}
                                   </p>
                                 </div>
-                                
+
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
                                   <TextArea
                                     label="✅ Kemajuan (Progress) - Pilihan 1"
@@ -1699,7 +1698,7 @@ Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun la
                                     rows={3}
                                     placeholder="Pilih ini jika ada kemajuan untuk tindakan ini..."
                                   />
-                                  
+
                                   <TextArea
                                     label="⚠️ Cabaran (Challenges) - Pilihan 2"
                                     name={`cabaran_${findingIndex}_${planIndex}`}
@@ -1721,7 +1720,7 @@ Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun la
                           </div>
                         )
                       ))}
-                      
+
                       <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
                         <p className="text-sm text-yellow-800">
                           💡 <strong>Tip:</strong> Kemaskini progress dan cabaran ini akan dimasukkan ke dalam dokumen laporan untuk menunjukkan perkembangan dari sesi ke sesi.
@@ -2086,13 +2085,12 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
 
             {/* Submission Stage Progress Indicator */}
             {submissionStage.stage && submissionStage.stage !== 'complete' && !compressionProgress.show && (
-              <div className={`border rounded-lg p-4 mb-4 ${
-                submissionStage.stage === 'error'
+              <div className={`border rounded-lg p-4 mb-4 ${submissionStage.stage === 'error'
                   ? 'bg-red-50 border-red-200'
                   : submissionStage.stage === 'warning'
-                  ? 'bg-yellow-50 border-yellow-200'
-                  : 'bg-blue-50 border-blue-200'
-              }`}>
+                    ? 'bg-yellow-50 border-yellow-200'
+                    : 'bg-blue-50 border-blue-200'
+                }`}>
                 <div className="flex items-center space-x-3">
                   {submissionStage.stage !== 'error' && submissionStage.stage !== 'warning' && (
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
@@ -2104,23 +2102,21 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                     <div className="text-yellow-600 text-2xl">⚠️</div>
                   )}
                   <div className="flex-1">
-                    <p className={`text-sm font-medium ${
-                      submissionStage.stage === 'error'
+                    <p className={`text-sm font-medium ${submissionStage.stage === 'error'
                         ? 'text-red-900'
                         : submissionStage.stage === 'warning'
-                        ? 'text-yellow-900'
-                        : 'text-blue-900'
-                    }`}>
+                          ? 'text-yellow-900'
+                          : 'text-blue-900'
+                      }`}>
                       {submissionStage.message}
                     </p>
                     {submissionStage.detail && (
-                      <p className={`text-xs mt-1 ${
-                        submissionStage.stage === 'error'
+                      <p className={`text-xs mt-1 ${submissionStage.stage === 'error'
                           ? 'text-red-700'
                           : submissionStage.stage === 'warning'
-                          ? 'text-yellow-700'
-                          : 'text-blue-700'
-                      }`}>
+                            ? 'text-yellow-700'
+                            : 'text-blue-700'
+                        }`}>
                         {submissionStage.detail}
                       </p>
                     )}
@@ -2157,5 +2153,10 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
     </div>
   );
 };
+
+// Prevent static prerendering – this page uses useSession() which requires runtime
+export async function getServerSideProps() {
+  return { props: {} };
+}
 
 export default LaporanMajuPage;

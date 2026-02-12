@@ -2502,4 +2502,9 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
   );
 };
 
+// Prevent static prerendering – this page uses useSession() which requires runtime
+export async function getServerSideProps() {
+  return { props: {} };
+}
+
 export default LaporanMajuPage;
