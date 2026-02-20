@@ -1,6 +1,6 @@
 // pages/laporan-maju.js
 import React, { useState, useEffect, useCallback } from 'react';
-import { useSession, signIn, getSession } from 'next-auth/react';
+import { useSession, signIn } from 'next-auth/react';
 import Section from '../components/Section';
 import InputField from '../components/InputField';
 import SelectField from '../components/SelectField';
@@ -8,6 +8,16 @@ import TextArea from '../components/TextArea';
 import FileInput from '../components/FileInput';
 import InfoCard from '../components/InfoCard';
 import { format } from 'date-fns';
+
+// Helper function to get today's date in yyyy-MM-dd format (safe for SSR)
+const getTodayDate = () => {
+  if (typeof window === 'undefined') {
+    // Server-side: return empty string or a default
+    return '';
+  }
+  // Client-side: use date-fns format
+  return format(new Date(), 'yyyy-MM-dd');
+};
 
 // Helper function to safely parse JSON
 const safeJSONParse = (str) => {
@@ -111,7 +121,7 @@ const LaporanMajuPage = () => {
     LOKASI_BISNES: '',
     PRODUK_SERVIS: '',
     NO_TELEFON: '',
-    TARIKH_SESI: format(new Date(), 'yyyy-MM-dd'),
+    TARIKH_SESI: getTodayDate(),
     SESI_NUMBER: 1,
     MOD_SESI: '',
     LOKASI_F2F: '',
@@ -160,6 +170,14 @@ const LaporanMajuPage = () => {
     `laporanMaju:draft:v1:${mentorEmail || 'unknown'}:${menteeName || 'none'}:s${sessionNo}`;
   const [saveStatus, setSaveStatus] = useState('');
   const [autosaveArmed, setAutosaveArmed] = useState(false);
+
+  // Set TARIKH_SESI on client-side mount
+  useEffect(() => {
+    setFormData(prev => ({
+      ...prev,
+      TARIKH_SESI: getTodayDate()
+    }));
+  }, []);
 
   // Effect to fetch mapping data on component mount
   useEffect(() => {
@@ -399,7 +417,7 @@ const LaporanMajuPage = () => {
         ...initialFormState,
         NAMA_MENTOR: prev.NAMA_MENTOR,
         EMAIL_MENTOR: prev.EMAIL_MENTOR,
-        TARIKH_SESI: format(new Date(), 'yyyy-MM-dd'),
+        TARIKH_SESI: getTodayDate(),
         NAMA_MENTEE: selectedMenteeName,
       }));
       setCurrentSessionNumber(1);
@@ -756,7 +774,7 @@ const LaporanMajuPage = () => {
       ...initialFormState,
       NAMA_MENTOR: isAdmin ? (mentorsInMapping.find(m => m.value === selectedMentorEmail)?.label || '') : (session?.user?.name || ''),
       EMAIL_MENTOR: isAdmin ? selectedMentorEmail : (session?.user?.email || ''),
-      TARIKH_SESI: format(new Date(), 'yyyy-MM-dd'),
+      TARIKH_SESI: getTodayDate(),
     });
     setCurrentSessionNumber(1);
     setPreviousMentoringFindings([]);
@@ -2153,16 +2171,5 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
     </div>
   );
 };
-
-// Prevent static prerendering – this page uses useSession() which requires runtime
-export async function getServerSideProps(context) {
-  const session = await getSession(context);
-
-  return {
-    props: {
-      session: session || null,
-    },
-  };
-}
 
 export default LaporanMajuPage;

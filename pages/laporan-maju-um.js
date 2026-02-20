@@ -1,6 +1,6 @@
 // pages/laporan-maju.js
 import React, { useState, useEffect, useCallback } from 'react';
-import { useSession, signIn, getSession } from 'next-auth/react';
+import { useSession, signIn } from 'next-auth/react';
 import Section from '../components/Section';
 import InputField from '../components/InputField';
 import SelectField from '../components/SelectField';
@@ -18,6 +18,23 @@ import {
   calculateTagClickValue,
   validateUpwardMobility
 } from '../lib/upwardMobilityUtils';
+import {
+  MIA_PROOF_TYPES,
+  validateMIAProofs,
+  validateMIAReason,
+  prepareMIARequestPayload,
+  getMIACheckboxClasses
+} from '../lib/mia';
+
+// Helper function to get today's date in yyyy-MM-dd format (safe for SSR)
+const getTodayDate = () => {
+  if (typeof window === 'undefined') {
+    // Server-side: return empty string or a default
+    return '';
+  }
+  // Client-side: use date-fns format
+  return getTodayDate();
+};
 
 // Helper function to safely parse JSON
 const safeJSONParse = (str) => {
@@ -76,7 +93,7 @@ const LaporanMajuPage = () => {
     NO_TELEFON: '',
     emel: '', // Mentee email from mapping for Supabase entrepreneur lookup
     BATCH: '',
-    TARIKH_SESI: format(new Date(), 'yyyy-MM-dd'),
+    TARIKH_SESI: '', // Will be set on component mount
     SESI_NUMBER: 1,
     MOD_SESI: '',
     LOKASI_F2F: '',
@@ -114,7 +131,11 @@ const LaporanMajuPage = () => {
   const [messageType, setMessageType] = useState('');
   const [isMIA, setIsMIA] = useState(false);
   const [miaReason, setMiaReason] = useState('');
-  const [miaProofFile, setMiaProofFile] = useState(null);
+  const [miaProofFiles, setMiaProofFiles] = useState({
+    whatsapp: null,
+    email: null,
+    call: null
+  });
   const [files, setFiles] = useState({ gw360: null, sesi: [], premis: [] });
   const [compressionProgress, setCompressionProgress] = useState({ show: false, current: 0, total: 0, message: '', fileName: '' });
   const [submissionStage, setSubmissionStage] = useState({ stage: '', message: '', detail: '' });
@@ -128,6 +149,14 @@ const LaporanMajuPage = () => {
     `laporanMaju:draft:v1:${mentorEmail || 'unknown'}:${menteeName || 'none'}:s${sessionNo}`;
   const [saveStatus, setSaveStatus] = useState('');
   const [autosaveArmed, setAutosaveArmed] = useState(false);
+
+  // Set TARIKH_SESI on client-side mount
+  useEffect(() => {
+    setFormData(prev => ({
+      ...prev,
+      TARIKH_SESI: getTodayDate()
+    }));
+  }, []);
 
   // Effect to fetch mapping data on component mount
   useEffect(() => {
@@ -392,7 +421,7 @@ const LaporanMajuPage = () => {
         ...initialFormState,
         NAMA_MENTOR: prev.NAMA_MENTOR,
         EMAIL_MENTOR: prev.EMAIL_MENTOR,
-        TARIKH_SESI: format(new Date(), 'yyyy-MM-dd'),
+        TARIKH_SESI: getTodayDate(),
         NAMA_MENTEE: selectedMenteeName,
       }));
       setCurrentSessionNumber(1);
@@ -584,7 +613,7 @@ const LaporanMajuPage = () => {
       ...initialFormState,
       NAMA_MENTOR: isAdmin ? (mentorsInMapping.find(m => m.value === selectedMentorEmail)?.label || '') : (session?.user?.name || ''),
       EMAIL_MENTOR: isAdmin ? selectedMentorEmail : (session?.user?.email || ''),
-      TARIKH_SESI: format(new Date(), 'yyyy-MM-dd'),
+      TARIKH_SESI: getTodayDate(),
     });
     setCurrentSessionNumber(1);
     setPreviousMentoringFindings([]);
@@ -693,11 +722,13 @@ const LaporanMajuPage = () => {
       }
     } else {
       // For MIA submissions, check MIA-specific requirements
-      if (!miaReason || miaReason.trim() === '') {
-        errors.push('Alasan/Sebab Usahawan MIA adalah wajib diisi');
+      const reasonValidation = validateMIAReason(miaReason);
+      if (!reasonValidation.valid) {
+        errors.push(reasonValidation.error);
       }
-      if (!miaProofFile) {
-        errors.push('Bukti MIA (screenshot/dokumen) adalah wajib dimuat naik');
+
+      if (!validateMIAProofs(miaProofFiles)) {
+        errors.push('Ketiga-tiga bukti (WhatsApp, E-mel, Panggilan) adalah wajib dimuat naik untuk laporan MIA.');
       }
     }
 
@@ -2501,16 +2532,5 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
     </div >
   );
 };
-
-// Prevent static prerendering – this page uses useSession() which requires runtime
-export async function getServerSideProps(context) {
-  const session = await getSession(context);
-
-  return {
-    props: {
-      session: session || null,
-    },
-  };
-}
 
 export default LaporanMajuPage;
