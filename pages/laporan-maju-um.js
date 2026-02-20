@@ -1,6 +1,6 @@
 // pages/laporan-maju.js
 import React, { useState, useEffect, useCallback } from 'react';
-import { useSession, signIn } from 'next-auth/react';
+import { useSession, signIn, getSession } from 'next-auth/react';
 import Section from '../components/Section';
 import InputField from '../components/InputField';
 import SelectField from '../components/SelectField';
@@ -2503,8 +2503,14 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
 };
 
 // Prevent static prerendering – this page uses useSession() which requires runtime
-export async function getServerSideProps() {
-  return { props: {} };
+export async function getServerSideProps(context) {
+  const session = await getSession(context);
+
+  return {
+    props: {
+      session: session || null,
+    },
+  };
 }
 
 export default LaporanMajuPage;
