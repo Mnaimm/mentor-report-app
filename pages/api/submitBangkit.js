@@ -2,6 +2,7 @@
 import { google } from 'googleapis';
 import cache from '../../lib/simple-cache';
 import { supabase } from '../../lib/supabaseClient';
+import { prepareMIARequestPayload, MIA_STATUS } from '../../lib/mia';
 
 
 /** Extract the row number from "SheetName!A37:T37" */
@@ -17,8 +18,8 @@ function getRowNumberFromUpdatedRange(updatedRange) {
  * Columns BA-BB (52-53): Apps Script fills these
  * Columns BC-CB (54-81): Upward Mobility data (28 columns)
  */
-const mapBangkitDataToSheetRow = (data) => {
-  const row = Array(82).fill(''); // Columns 0-81 (82 total)
+const mapBangkitDataToSheetRow = (data, miaRequestId = null) => {
+  const row = Array(87).fill(''); // Columns 0-86 (87 total) - extended for MIA enhancements
 
   // A–J (0-9): Basic session info
   row[0] = new Date().toISOString();                     // A  Timestamp
@@ -67,8 +68,8 @@ const mapBangkitDataToSheetRow = (data) => {
   // AN (39): GrowthWheel chart
   row[39] = data?.imageUrls?.growthwheel || '';         // AN Link_Carta_GrowthWheel
 
-  // AO (40): Bukti MIA
-  row[40] = data?.status === 'MIA' ? (data?.imageUrls?.mia || '') : ''; // AO Link_Bukti_MIA
+  // AO (40): Bukti MIA (legacy - keep for backward compatibility)
+  row[40] = data?.status === 'MIA' && data?.imageUrls?.mia?.whatsapp ? data.imageUrls.mia.whatsapp : '';
 
   // AP–AW (41-48): Sesi 1 reflection fields
   row[41] = data?.pemerhatian || '';                    // AP Panduan_Pemerhatian_Mentor
@@ -248,14 +249,53 @@ export default async function handler(req, res) {
     let spreadsheetId;
     let range;
     let rowData;
+    let miaRequestId = null;
+
+    // ============================================================
+    // CREATE MIA REQUEST RECORD (if MIA status)
+    // This must happen BEFORE Sheets write so we can include the UUID
+    // ============================================================
+    if (reportData?.status === 'MIA') {
+      console.log('📝 Creating MIA request record...');
+      try {
+        const miaPayload = prepareMIARequestPayload({
+          mentorEmail: reportData.mentorEmail,
+          mentorName: reportData.namaMentor,
+          menteeName: reportData.usahawan,
+          menteeIC: reportData.menteeIC || reportData.usahawan, // Use IC if available, fallback to name
+          menteeCompany: reportData.namaSyarikat,
+          sessionNumber: reportData.sesiLaporan,
+          batch: reportData.batch,
+          miaReason: reportData.mia?.alasan,
+          proofWhatsappUrl: reportData.imageUrls?.mia?.whatsapp,
+          proofEmailUrl: reportData.imageUrls?.mia?.email,
+          proofCallUrl: reportData.imageUrls?.mia?.call
+        }, 'bangkit');
+
+        const { data: miaRequestData, error: miaError } = await supabase
+          .from('mia_requests')
+          .insert(miaPayload)
+          .select()
+          .single();
+
+        if (miaError) {
+          console.error('⚠️ Failed to create MIA request (non-blocking):', miaError);
+        } else {
+          miaRequestId = miaRequestData.id;
+          console.log(`✅ MIA request created with ID: ${miaRequestId}`);
+        }
+      } catch (error) {
+        console.error('⚠️ MIA request creation failed (non-blocking):', error);
+      }
+    }
 
     // Only Bangkit is handled by this endpoint now
     // Maju has its own dedicated endpoint: /api/submitMajuReport
     if (programType === 'bangkit') {
       spreadsheetId = process.env.GOOGLE_SHEETS_REPORT_ID;
       const bangkitTab = process.env.Bangkit_TAB || 'Bangkit';
-      range = `${bangkitTab}!A1`; // Bangkit tab (columns A-CB: 0-81)
-      rowData = mapBangkitDataToSheetRow(reportData);
+      range = `${bangkitTab}!A1`; // Bangkit tab (columns A-CI: 0-86)
+      rowData = mapBangkitDataToSheetRow(reportData, miaRequestId);
       if (!spreadsheetId) {
         throw new Error('Missing GOOGLE_SHEETS_REPORT_ID environment variable for Bangkit program.');
       }
@@ -434,7 +474,8 @@ export default async function handler(req, res) {
           sesi: reportData?.imageUrls?.sesi || [],
           growthwheel: reportData?.imageUrls?.growthwheel || '',
           profil: reportData?.imageUrls?.profil || '',
-          premis: reportData?.imageUrls?.premis || []
+          premis: reportData?.imageUrls?.premis || [],
+          mia: reportData?.imageUrls?.mia || null  // Can be object with {whatsapp, email, call} or null
         },
 
         // Premises visit
@@ -442,7 +483,7 @@ export default async function handler(req, res) {
 
         // MIA status (TEXT field: 'Selesai' or 'MIA', NOT boolean!)
         mia_status: reportData?.status || 'Selesai',
-        mia_proof_url: reportData?.imageUrls?.mia || null,
+        mia_proof_url: reportData?.imageUrls?.mia?.whatsapp || null,  // Legacy field - use WhatsApp proof for backward compatibility
         mia_reason: reportData?.mia?.alasan || null,
 
         // Folder ID for Google Drive integration

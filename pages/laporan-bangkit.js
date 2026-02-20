@@ -10,6 +10,13 @@ import {
   validateUpwardMobility,
   UPWARD_MOBILITY_SECTIONS
 } from '../lib/upwardMobilityUtils';
+import {
+  MIA_PROOF_TYPES,
+  validateMIAProofs,
+  validateMIAReason,
+  prepareMIARequestPayload,
+  getMIACheckboxClasses
+} from '../lib/mia';
 
 
 
@@ -204,7 +211,13 @@ export default function LaporanSesiPage() {
     upwardMobility: { ...INITIAL_UPWARD_MOBILITY_STATE },
   };
   const [formState, setFormState] = useState(initialFormState);
-  const [files, setFiles] = useState({ gw: null, profil: null, sesi: [], premis: [], mia: null });
+  const [files, setFiles] = useState({
+    gw: null,
+    profil: null,
+    sesi: [],
+    premis: [],
+    mia: { whatsapp: null, email: null, call: null }
+  });
 
   const [isLoading, setIsLoading] = useState(true);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
@@ -240,7 +253,13 @@ export default function LaporanSesiPage() {
     } catch { }
 
     setFormState(initialFormState);
-    setFiles({ gw: null, profil: null, sesi: [], premis: [], mia: null });
+    setFiles({
+      gw: null,
+      profil: null,
+      sesi: [],
+      premis: [],
+      mia: { whatsapp: null, email: null, call: null }
+    });
     setSelectedMentee(null);
     setIsMIA(false);
     setPreviousData({ sales: [], inisiatif: [], premisDilawat: false });
@@ -517,6 +536,17 @@ export default function LaporanSesiPage() {
   const handleFileChange = (type, fileList, multiple = false) =>
     setFiles((prev) => ({ ...prev, [type]: multiple ? Array.from(fileList) : fileList[0] }));
 
+  const handleMIAFileChange = (proofType, fileList) => {
+    const file = fileList && fileList.length > 0 ? fileList[0] : null;
+    setFiles((prev) => ({
+      ...prev,
+      mia: {
+        ...prev.mia,
+        [proofType]: file
+      }
+    }));
+  };
+
   const handleKemaskiniChange = (index, value) => {
     setFormState((p) => {
       const newKemaskini = [...p.kemaskiniInisiatif];
@@ -592,10 +622,20 @@ export default function LaporanSesiPage() {
       }
     }
 
-    if (isMIA && !formState.mia.alasan) {
-      setError('Sila berikan alasan untuk status MIA.');
-      setIsSubmitting(false);
-      return;
+    // MIA validation - require reason and all 3 proofs
+    if (isMIA) {
+      const reasonValidation = validateMIAReason(formState.mia.alasan);
+      if (!reasonValidation.valid) {
+        setError(reasonValidation.error);
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (!validateMIAProofs(files.mia)) {
+        setError('Ketiga-tiga bukti (WhatsApp, E-mel, Panggilan) adalah wajib dimuat naik untuk laporan MIA.');
+        setIsSubmitting(false);
+        return;
+      }
     }
 
     // ============== INISIATIF VALIDATION ==============
@@ -654,7 +694,17 @@ export default function LaporanSesiPage() {
     setSubmissionStage({ stage: 'preparing', message: 'Preparing submission...', detail: '' });
 
     try {
-      const imageUrls = { growthwheel: '', profil: '', sesi: [], premis: [], mia: '' };
+      const imageUrls = {
+        growthwheel: '',
+        profil: '',
+        sesi: [],
+        premis: [],
+        mia: {
+          whatsapp: '',
+          email: '',
+          call: ''
+        }
+      };
       const uploadPromises = [];
       const folderId = selectedMentee.Folder_ID;
 
@@ -818,7 +868,25 @@ export default function LaporanSesiPage() {
       }
 
       if (isMIA) {
-        if (files.mia) uploadPromises.push(uploadImage(files.mia, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => (imageUrls.mia = url)));
+        // Upload 3 MIA proof images
+        if (files.mia.whatsapp) {
+          uploadPromises.push(
+            uploadImage(files.mia.whatsapp, folderId, menteeNameForUpload, sessionNumberForUpload)
+              .then((url) => (imageUrls.mia.whatsapp = url))
+          );
+        }
+        if (files.mia.email) {
+          uploadPromises.push(
+            uploadImage(files.mia.email, folderId, menteeNameForUpload, sessionNumberForUpload)
+              .then((url) => (imageUrls.mia.email = url))
+          );
+        }
+        if (files.mia.call) {
+          uploadPromises.push(
+            uploadImage(files.mia.call, folderId, menteeNameForUpload, sessionNumberForUpload)
+              .then((url) => (imageUrls.mia.call = url))
+          );
+        }
       } else if (currentSession === 1) {
         if (files.gw) uploadPromises.push(uploadImage(files.gw, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => (imageUrls.growthwheel = url)));
         if (files.profil) uploadPromises.push(uploadImage(files.profil, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => (imageUrls.profil = url)));
@@ -2196,9 +2264,69 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
   };
 
   const renderMIAForm = () => (
-    <Section title={`Laporan Status MIA - Sesi #${currentSession}`}>
-      <TextArea label="Alasan / Sebab Usahawan MIA" value={formState.mia.alasan} onChange={(e) => handleInputChange('mia', 'alasan', e.target.value)} placeholder="Cth: Telah dihubungi 3 kali melalui WhatsApp pada 01/08/2025, tiada jawapan." required />
-      <FileInput label="Muat Naik Bukti (Cth: Screenshot Perbualan)" onChange={(e) => handleFileChange('mia', e.target.files)} />
+    <Section
+      title={`Laporan Status MIA - Sesi #${currentSession}`}
+      description="Sila muat naik 3 bukti percubaan menghubungi usahawan (WhatsApp, E-mel, Panggilan)"
+    >
+      <TextArea
+        label="Alasan / Sebab Usahawan MIA *"
+        value={formState.mia.alasan}
+        onChange={(e) => handleInputChange('mia', 'alasan', e.target.value)}
+        placeholder="Cth: Telah dihubungi 3 kali melalui WhatsApp pada 01/08/2025, 03/08/2025, dan 05/08/2025. Dihantar e-mel pada 06/08/2025. Dipanggil 2 kali tetapi tiada jawapan. Usahawan tidak memberikan sebarang maklum balas."
+        required
+      />
+
+      <div className="space-y-4 mt-4">
+        <h3 className="font-semibold text-gray-700">Bukti Percubaan Menghubungi (3 jenis diperlukan)</h3>
+
+        {/* WhatsApp Proof */}
+        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+          <FileInput
+            label={`${MIA_PROOF_TYPES.WHATSAPP.label} *`}
+            onChange={(e) => handleMIAFileChange('whatsapp', e.target.files)}
+            required
+            isImageUpload={true}
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            {MIA_PROOF_TYPES.WHATSAPP.description}
+          </p>
+          {files.mia.whatsapp && (
+            <p className="text-sm text-green-600 mt-2">✓ {files.mia.whatsapp.name}</p>
+          )}
+        </div>
+
+        {/* Email Proof */}
+        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+          <FileInput
+            label={`${MIA_PROOF_TYPES.EMAIL.label} *`}
+            onChange={(e) => handleMIAFileChange('email', e.target.files)}
+            required
+            isImageUpload={true}
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            {MIA_PROOF_TYPES.EMAIL.description}
+          </p>
+          {files.mia.email && (
+            <p className="text-sm text-green-600 mt-2">✓ {files.mia.email.name}</p>
+          )}
+        </div>
+
+        {/* Call Proof */}
+        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+          <FileInput
+            label={`${MIA_PROOF_TYPES.CALL.label} *`}
+            onChange={(e) => handleMIAFileChange('call', e.target.files)}
+            required
+            isImageUpload={true}
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            {MIA_PROOF_TYPES.CALL.description}
+          </p>
+          {files.mia.call && (
+            <p className="text-sm text-green-600 mt-2">✓ {files.mia.call.name}</p>
+          )}
+        </div>
+      </div>
     </Section>
   );
 
@@ -2295,7 +2423,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
           ) : (
             selectedMentee && (
               <>
-                <div className="my-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center justify-center">
+                <div className={getMIACheckboxClasses(isMIA)}>
                   <input type="checkbox" id="mia-checkbox" checked={isMIA} onChange={(e) => setIsMIA(e.target.checked)} className="h-5 w-5 rounded text-red-600 focus:ring-red-500" />
                   <label htmlFor="mia-checkbox" className="ml-3 font-semibold text-gray-700">Tandakan jika Usahawan Tidak Hadir / MIA</label>
                 </div>
