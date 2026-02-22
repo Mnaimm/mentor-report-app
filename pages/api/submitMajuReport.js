@@ -2,6 +2,7 @@
 import { google } from 'googleapis';
 import cache from '../../lib/simple-cache';
 import { supabase } from '../../lib/supabaseClient';
+import { prepareMIARequestPayload } from '../../lib/mia';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -49,8 +50,46 @@ export default async function handler(req, res) {
       console.error('⚠️ Request body Folder_ID:', reportData.Folder_ID);
     }
 
+    // If MIA submission, create mia_requests entry FIRST to get the ID for Sheets
+    let miaRequestId = null;
+    if (reportData.MIA_STATUS === 'MIA') {
+      try {
+        const miaPayload = prepareMIARequestPayload({
+          mentorEmail: reportData.EMAIL_MENTOR,
+          mentorName: reportData.NAMA_MENTOR,
+          menteeName: reportData.NAMA_MENTEE,
+          menteeIC: reportData.NAMA_MENTEE, // Use name as fallback if IC not available
+          menteeCompany: reportData.NAMA_BISNES,
+          menteeBusinessType: reportData.PRODUK_SERVIS,
+          menteeLocation: reportData.LOKASI_BISNES,
+          menteePhone: reportData.NO_TELEFON,
+          sessionNumber: reportData.SESI_NUMBER,
+          batch: reportData.BATCH,
+          miaReason: reportData.MIA_REASON,
+          proofWhatsappUrl: reportData.imageUrls?.mia?.whatsapp,
+          proofEmailUrl: reportData.imageUrls?.mia?.email,
+          proofCallUrl: reportData.imageUrls?.mia?.call
+        }, 'maju');
+
+        const { data: miaRequestData, error: miaError } = await supabase
+          .from('mia_requests')
+          .insert(miaPayload)
+          .select()
+          .single();
+
+        if (miaError) {
+          console.error('⚠️ Failed to create MIA request (non-blocking):', miaError);
+        } else {
+          miaRequestId = miaRequestData.id;
+          console.log(`✅ MIA request created with ID: ${miaRequestId}`);
+        }
+      } catch (error) {
+        console.error('⚠️ MIA request creation failed (non-blocking):', error);
+      }
+    }
+
     // Prepare row data
-    const rowData = mapMajuDataToSheetRow(reportData);
+    const rowData = mapMajuDataToSheetRow(reportData, miaRequestId);
     console.log('📊 Prepared row data (first 5 values):', rowData.slice(0, 5));
     console.log('📊 Folder_ID in row data (index 25):', rowData[25]);
 
@@ -143,7 +182,8 @@ export default async function handler(req, res) {
         image_urls: {
           premis: reportData.URL_GAMBAR_PREMIS_JSON || [],
           sesi: reportData.URL_GAMBAR_SESI_JSON || [],
-          growthwheel: reportData.URL_GAMBAR_GW360 || ''
+          growthwheel: reportData.URL_GAMBAR_GW360 || '',
+          mia: reportData.imageUrls?.mia || null  // Can be object with {whatsapp, email, call} or null
         },
 
         // Folder & Document IDs
@@ -153,7 +193,10 @@ export default async function handler(req, res) {
         // MIA Status (TEXT field: 'Tidak MIA' or 'MIA', NOT boolean!)
         mia_status: reportData.MIA_STATUS || 'Tidak MIA',
         mia_reason: reportData.MIA_REASON || null,
-        mia_proof_url: reportData.MIA_PROOF_URL || null,
+        mia_proof_url: reportData.imageUrls?.mia?.whatsapp || null,  // Legacy field - use WhatsApp proof for backward compatibility
+        mia_proof_whatsapp: reportData.imageUrls?.mia?.whatsapp || null,
+        mia_proof_email: reportData.imageUrls?.mia?.email || null,
+        mia_proof_call: reportData.imageUrls?.mia?.call || null,
 
         // Payment fields (defaults)
         payment_status: 'pending'
@@ -169,6 +212,24 @@ export default async function handler(req, res) {
       supabaseSuccess = true;
       supabaseRecordId = insertedData?.[0]?.id || null;
       console.log(`✅ Supabase dual-write successful. Record ID: ${supabaseRecordId}`);
+
+      // If MIA submission, update mia_request with the report_id link
+      if (reportData.MIA_STATUS === 'MIA' && miaRequestId && supabaseRecordId) {
+        try {
+          const { error: updateError } = await supabase
+            .from('mia_requests')
+            .update({ report_id: supabaseRecordId })
+            .eq('id', miaRequestId);
+
+          if (updateError) {
+            console.error('⚠️ Failed to link MIA request to report (non-blocking):', updateError);
+          } else {
+            console.log(`✅ Linked MIA request ${miaRequestId} to report ${supabaseRecordId}`);
+          }
+        } catch (error) {
+          console.error('⚠️ MIA request update failed (non-blocking):', error);
+        }
+      }
 
       // Log success to dual_write_monitoring
       await supabase.from('dual_write_monitoring').insert({
@@ -263,7 +324,7 @@ export default async function handler(req, res) {
 }
 
 // Helper function to map form data to sheet row
-function mapMajuDataToSheetRow(data) {
+function mapMajuDataToSheetRow(data, miaRequestId = null) {
   // This should match the order of your getLaporanMajuColumnHeaders() in Apps Script
   const timestamp = new Date().toLocaleString('en-MY', { timeZone: 'Asia/Kuala_Lumpur' });
   
@@ -293,10 +354,43 @@ function mapMajuDataToSheetRow(data) {
     JSON.stringify(data.URL_GAMBAR_PREMIS_JSON || []),         // URL_GAMBAR_PREMIS_JSON
     JSON.stringify(data.URL_GAMBAR_SESI_JSON || []),           // URL_GAMBAR_SESI_JSON
     data.URL_GAMBAR_GW360 || '',                 // URL_GAMBAR_GW360
-    data.Folder_ID || '',                        // Folder_ID (FIXED: was Mentee_Folder_ID)
-    '',                                          // Laporan_Maju_Doc_ID (empty, will be filled by Apps Script)
-    data.MIA_STATUS || 'Tidak MIA',              // MIA_STATUS
-    data.MIA_REASON || '',                       // MIA_REASON
-    data.MIA_PROOF_URL || ''                     // MIA_PROOF_URL
+    data.Folder_ID || '',                        // Z  Folder_ID (FIXED: was Mentee_Folder_ID)
+    '',                                          // AA Laporan_Maju_Doc_ID (empty, will be filled by Apps Script)
+    data.MIA_STATUS || 'Tidak MIA',              // AB MIA_STATUS
+    data.MIA_REASON || '',                       // AC MIA_REASON
+    data.UPWARD_MOBILITY_JSON || '',             // AD UPWARD_MOBILITY_JSON
+    '',                                          // AE (reserved for future UM fields)
+    '',                                          // AF
+    '',                                          // AG
+    '',                                          // AH
+    '',                                          // AI
+    '',                                          // AJ
+    '',                                          // AK
+    '',                                          // AL
+    '',                                          // AM
+    '',                                          // AN
+    '',                                          // AO
+    '',                                          // AP
+    '',                                          // AQ
+    '',                                          // AR
+    '',                                          // AS
+    '',                                          // AT
+    '',                                          // AU
+    '',                                          // AV
+    '',                                          // AW
+    '',                                          // AX
+    '',                                          // AY
+    '',                                          // AZ
+    '',                                          // BA
+    '',                                          // BB
+    '',                                          // BC
+    '',                                          // BD
+    '',                                          // BE
+    '',                                          // BF
+    data.imageUrls?.mia?.whatsapp || '',         // BG MIA_PROOF_WHATSAPP
+    data.imageUrls?.mia?.email || '',            // BH MIA_PROOF_EMAIL
+    data.imageUrls?.mia?.call || '',             // BI MIA_PROOF_CALL
+    miaRequestId || '',                          // BJ MIA_REQUEST_ID (UUID from mia_requests table)
+    data.MIA_STATUS === 'MIA' ? 'requested' : '' // BK MIA_REQUEST_STATUS
   ];
 }

@@ -131,12 +131,16 @@ const LaporanMajuPage = () => {
   const [messageType, setMessageType] = useState('');
   const [isMIA, setIsMIA] = useState(false);
   const [miaReason, setMiaReason] = useState('');
-  const [miaProofFiles, setMiaProofFiles] = useState({
-    whatsapp: null,
-    email: null,
-    call: null
+  const [files, setFiles] = useState({
+    gw360: null,
+    sesi: [],
+    premis: [],
+    mia: {
+      whatsapp: null,
+      email: null,
+      call: null
+    }
   });
-  const [files, setFiles] = useState({ gw360: null, sesi: [], premis: [] });
   const [compressionProgress, setCompressionProgress] = useState({ show: false, current: 0, total: 0, message: '', fileName: '' });
   const [submissionStage, setSubmissionStage] = useState({ stage: '', message: '', detail: '' });
 
@@ -294,7 +298,10 @@ const LaporanMajuPage = () => {
     setLawatanPremisChecked(false);
     setIsMIA(false);
     setMiaReason('');
-    setMiaProofFile(null);
+    setFiles(prev => ({
+      ...prev,
+      mia: { whatsapp: null, email: null, call: null }
+    }));
 
     if (!selectedMenteeName) {
       setMessage('');
@@ -514,9 +521,15 @@ const LaporanMajuPage = () => {
     }));
   };
 
-  const handleMiaProofFileChange = (e) => {
-    const file = e.target.files[0];
-    setMiaProofFile(file);
+  const handleMIAFileChange = (proofType, fileList) => {
+    const file = fileList && fileList.length > 0 ? fileList[0] : null;
+    setFiles((prev) => ({
+      ...prev,
+      mia: {
+        ...prev.mia,
+        [proofType]: file
+      }
+    }));
   };
 
   // Batch upload function
@@ -625,7 +638,10 @@ const LaporanMajuPage = () => {
     setLoading(false);
     setIsMIA(false);
     setMiaReason('');
-    setMiaProofFile(null);
+    setFiles(prev => ({
+      ...prev,
+      mia: { whatsapp: null, email: null, call: null }
+    }));
     setFiles({ gw360: null, sesi: [], premis: [] });
     setSaveStatus('');
     setAutosaveArmed(false);
@@ -727,7 +743,7 @@ const LaporanMajuPage = () => {
         errors.push(reasonValidation.error);
       }
 
-      if (!validateMIAProofs(miaProofFiles)) {
+      if (!validateMIAProofs(files.mia)) {
         errors.push('Ketiga-tiga bukti (WhatsApp, E-mel, Panggilan) adalah wajib dimuat naik untuk laporan MIA.');
       }
     }
@@ -815,14 +831,23 @@ const LaporanMajuPage = () => {
     try {
       // Image upload phase - process all images first
       console.log('📸 Starting batch image upload...');
-      const imageUrls = { gw360: '', sesi: [], premis: [], mia: '' };
+      const imageUrls = {
+        gw360: '',
+        sesi: [],
+        premis: [],
+        mia: {
+          whatsapp: '',
+          email: '',
+          call: ''
+        }
+      };
       const uploadPromises = [];
 
       // Count total files for logging
       const gw360Count = files.gw360 ? 1 : 0;
       const sesiCount = files.sesi ? files.sesi.length : 0;
       const premisCount = files.premis ? files.premis.length : 0;
-      const miaCount = miaProofFile ? 1 : 0;
+      const miaCount = (files.mia.whatsapp ? 1 : 0) + (files.mia.email ? 1 : 0) + (files.mia.call ? 1 : 0);
 
       console.log(`📊 Image URLs in submission:`);
       console.log(`  - Sesi Images: ${sesiCount}`);
@@ -834,7 +859,7 @@ const LaporanMajuPage = () => {
       const sessionNumberForUpload = currentSessionNumber;
 
       // Check if we have images to upload
-      const hasImagesToUpload = files.gw360 || (files.sesi && files.sesi.length > 0) || (files.premis && files.premis.length > 0) || miaProofFile;
+      const hasImagesToUpload = files.gw360 || (files.sesi && files.sesi.length > 0) || (files.premis && files.premis.length > 0) || files.mia.whatsapp || files.mia.email || files.mia.call;
 
       // Validate folderId before attempting uploads
       if (hasImagesToUpload && !folderId) {
@@ -865,9 +890,24 @@ const LaporanMajuPage = () => {
           files.premis.forEach((file) => uploadPromises.push(uploadImage(file, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => imageUrls.premis.push(url))));
         }
 
-        // Upload MIA proof if present
-        if (miaProofFile) {
-          uploadPromises.push(uploadMiaProof(miaProofFile, folderId, menteeNameForUpload, sessionNumberForUpload).then((url) => (imageUrls.mia = url)));
+        // Upload 3 MIA proof images
+        if (files.mia.whatsapp) {
+          uploadPromises.push(
+            uploadImage(files.mia.whatsapp, folderId, menteeNameForUpload, sessionNumberForUpload)
+              .then((url) => (imageUrls.mia.whatsapp = url))
+          );
+        }
+        if (files.mia.email) {
+          uploadPromises.push(
+            uploadImage(files.mia.email, folderId, menteeNameForUpload, sessionNumberForUpload)
+              .then((url) => (imageUrls.mia.email = url))
+          );
+        }
+        if (files.mia.call) {
+          uploadPromises.push(
+            uploadImage(files.mia.call, folderId, menteeNameForUpload, sessionNumberForUpload)
+              .then((url) => (imageUrls.mia.call = url))
+          );
         }
 
         // Wait for all uploads to complete
@@ -1398,25 +1438,64 @@ const LaporanMajuPage = () => {
                   disabled
                 />
                 <TextArea
-                  label="Alasan / Sebab Usahawan MIA"
-                  name="miaReason"
+                  label="Alasan / Sebab Usahawan MIA *"
                   value={miaReason}
                   onChange={(e) => setMiaReason(e.target.value)}
+                  placeholder="Cth: Telah dihubungi 3 kali melalui WhatsApp pada 01/08/2025, 03/08/2025, dan 05/08/2025. Dihantar e-mel pada 06/08/2025. Dipanggil 2 kali tetapi tiada jawapan. Usahawan tidak memberikan sebarang maklum balas."
                   required
-                  rows={4}
-                  placeholder="Cth: Telah dihubungi 3 kali melalui WhatsApp pada 01/08/2025, tiada jawapan."
                 />
-                <FileInput
-                  label="Muat Naik Bukti (Cth: Screenshot Perbualan)"
-                  name="miaProof"
-                  onFileChange={handleMiaProofFileChange} // <--- Ensure this uses the new handler
-                  multiple={false}
-                />
-                {miaProofFile && (
-                  <div className="mt-2 text-sm text-gray-600">
-                    File selected: {miaProofFile.name}
+
+                <div className="space-y-4 mt-4">
+                  <h3 className="font-semibold text-gray-700">Bukti Percubaan Menghubungi (3 jenis diperlukan)</h3>
+
+                  {/* WhatsApp Proof */}
+                  <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                    <FileInput
+                      label={`${MIA_PROOF_TYPES.WHATSAPP.label} *`}
+                      onChange={(e) => handleMIAFileChange('whatsapp', e.target.files)}
+                      required
+                      isImageUpload={true}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      {MIA_PROOF_TYPES.WHATSAPP.description}
+                    </p>
+                    {files.mia.whatsapp && (
+                      <p className="text-sm text-green-600 mt-2">✓ {files.mia.whatsapp.name}</p>
+                    )}
                   </div>
-                )}
+
+                  {/* Email Proof */}
+                  <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                    <FileInput
+                      label={`${MIA_PROOF_TYPES.EMAIL.label} *`}
+                      onChange={(e) => handleMIAFileChange('email', e.target.files)}
+                      required
+                      isImageUpload={true}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      {MIA_PROOF_TYPES.EMAIL.description}
+                    </p>
+                    {files.mia.email && (
+                      <p className="text-sm text-green-600 mt-2">✓ {files.mia.email.name}</p>
+                    )}
+                  </div>
+
+                  {/* Call Proof */}
+                  <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                    <FileInput
+                      label={`${MIA_PROOF_TYPES.CALL.label} *`}
+                      onChange={(e) => handleMIAFileChange('call', e.target.files)}
+                      required
+                      isImageUpload={true}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      {MIA_PROOF_TYPES.CALL.description}
+                    </p>
+                    {files.mia.call && (
+                      <p className="text-sm text-green-600 mt-2">✓ {files.mia.call.name}</p>
+                    )}
+                  </div>
+                </div>
               </Section>
             </div>
           ) : (

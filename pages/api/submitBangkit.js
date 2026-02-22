@@ -145,6 +145,13 @@ const mapBangkitDataToSheetRow = (data, miaRequestId = null) => {
   // row[80] = ''; // CC (reserved)
   // row[81] = ''; // CD (reserved)
 
+  // CE-CI (82-86): Enhanced MIA Proof Workflow (5 columns)
+  row[82] = data?.imageUrls?.mia?.whatsapp || '';   // CE MIA_PROOF_WHATSAPP
+  row[83] = data?.imageUrls?.mia?.email || '';      // CF MIA_PROOF_EMAIL
+  row[84] = data?.imageUrls?.mia?.call || '';       // CG MIA_PROOF_CALL
+  row[85] = miaRequestId || '';                     // CH MIA_REQUEST_ID (UUID from mia_requests table)
+  row[86] = data?.status === 'MIA' ? 'requested' : ''; // CI MIA_REQUEST_STATUS
+
   return row;
 };
 
