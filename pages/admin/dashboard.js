@@ -579,10 +579,8 @@ export default function AdminProgressDashboard({ userEmail, isReadOnlyUser, acce
             )}
           </div>
           <div className="flex flex-wrap gap-3">
-            <Link href="/admin/verify-users">
-              <a className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium transition-colors shadow-sm text-sm">
-                Manage Users
-              </a>
+            <Link href="/admin/verify-users" className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium transition-colors shadow-sm text-sm">
+              Manage Users
             </Link>
             <button
               onClick={() => fetchData(true)}
