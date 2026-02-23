@@ -48,16 +48,15 @@ export default async function handler(req, res) {
             reviewed_at: new Date().toISOString(),
             reviewed_by: session.user.email,
             rejection_reason: status === 'rejected' ? rejectionReason : null,
-            // If approved, you might want to auto-approve payment status too?
-            // payment_status: status === 'approved' ? 'approved' : 'pending' 
-            // Keeping payment_status separate for now unless PRD explicitly requested immediate payment approval
-        };
 
-        // PRD said: "Laporan Approve muncul di dashboard Payment Admin." 
-        // Usually this implies status='approved' is enough, but let's check if we need to update payment_status.
-        // "Butang Hijau: Approve & Forward to Payment" -> Implies moving to next stage.
-        // If I update `payment_status` to 'pending_payment' or just keep `status` as 'approved', queries filtering for 'approved' will catch it.
-        // Let's stick to status updates for now.
+            // Update payment status based on approval
+            payment_status: status === 'approved' ? 'approved' :
+                           status === 'rejected' ? 'rejected' :
+                           'pending',
+
+            // Set approval timestamp for approved reports
+            approved_at: status === 'approved' ? new Date().toISOString() : null,
+        };
 
         const { error: updateError } = await supabase
             .from('reports')

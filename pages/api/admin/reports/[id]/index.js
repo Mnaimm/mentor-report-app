@@ -105,7 +105,11 @@ export default async function handler(req, res) {
             rumusan: report.rumusan,
             pemerhatian: report.pemerhatian,
             inisiatif: report.inisiatif, // JSONB array
+            mentoring_findings: report.mentoring_findings, // JSONB array
             status: report.status,
+            image_urls: report.image_urls, // JSONB object (sesi, gw360, premis, etc.)
+            premis_dilawat: report.premis_dilawat, // Boolean
+            payment_status: report.payment_status, // String
             document_url: finalDocUrl, // Return the synced URL
             sheets_row_number: report.sheets_row_number
         };

@@ -12,8 +12,8 @@ const csp = [
   "font-src 'self' data:",
   // Allow OAuth/API calls during auth + your existing Apps Script usage + LogRocket (comprehensive)
   "connect-src 'self' https://script.google.com https://script.googleusercontent.com https://*.googleapis.com https://accounts.google.com https://www.googleapis.com https://*.logrocket.io https://*.lr-in.com https://*.lr-intake.com https://*.lr-ingest.com https://*.logrocket.com https://r.lr-in.com https://r.lr-intake.com ws://localhost:* wss://localhost:*",
-  // Allow Google OAuth pages in frames during the handoff
-  "frame-src 'self' https://accounts.google.com",
+  // Allow Google OAuth pages + Google Docs/Drive preview in frames
+  "frame-src 'self' https://accounts.google.com https://docs.google.com https://drive.google.com",
   "object-src 'none'",
   "base-uri 'self'",
   // Allow form posts to your prod domain and Google OAuth

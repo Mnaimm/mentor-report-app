@@ -13,10 +13,33 @@ export default function ReviewReport({ userEmail, isReadOnlyUser, accessDenied }
     const [actionLoading, setActionLoading] = useState(false);
     const [rejectionReason, setRejectionReason] = useState('');
     const [showRejectModal, setShowRejectModal] = useState(false);
+    const [previewError, setPreviewError] = useState(false);
+
+    // Navigation state
+    const [pendingReports, setPendingReports] = useState([]);
+    const [currentIndex, setCurrentIndex] = useState(-1);
 
     useEffect(() => {
         if (id) fetchReport();
+        fetchPendingReports();
     }, [id]);
+
+    // Keyboard shortcuts
+    useEffect(() => {
+        const handleKeyPress = (e) => {
+            // Ignore if user is typing in input/textarea
+            if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+
+            if (e.key === 'ArrowLeft' && currentIndex > 0) {
+                navigateToReport(pendingReports[currentIndex - 1].id);
+            } else if (e.key === 'ArrowRight' && currentIndex < pendingReports.length - 1) {
+                navigateToReport(pendingReports[currentIndex + 1].id);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyPress);
+        return () => window.removeEventListener('keydown', handleKeyPress);
+    }, [currentIndex, pendingReports]);
 
     const fetchReport = async () => {
         try {
@@ -30,6 +53,25 @@ export default function ReviewReport({ userEmail, isReadOnlyUser, accessDenied }
         } finally {
             setLoading(false);
         }
+    };
+
+    const fetchPendingReports = async () => {
+        try {
+            const res = await fetch('/api/admin/reports?status=submitted');
+            const json = await res.json();
+            if (json.success && json.data) {
+                setPendingReports(json.data);
+                // Find current report's position
+                const index = json.data.findIndex(r => r.id === id);
+                setCurrentIndex(index);
+            }
+        } catch (err) {
+            console.error('Error fetching pending reports:', err);
+        }
+    };
+
+    const navigateToReport = (reportId) => {
+        router.push(`/admin/verification/${reportId}`);
     };
 
     const handleReview = async (status, reason = null) => {
@@ -65,9 +107,35 @@ export default function ReviewReport({ userEmail, isReadOnlyUser, accessDenied }
             {/* Header */}
             <div className="bg-white shadow-sm border-b px-6 py-3 flex justify-between items-center z-10">
                 <div className="flex items-center gap-4">
-                    <Link href="/admin/verification" className="text-gray-500 hover:text-gray-700">
+                    <Link href="/admin/verification" className="text-gray-500 hover:text-gray-700 font-medium">
                         ← Back
                     </Link>
+
+                    {/* Navigation Buttons */}
+                    {pendingReports.length > 0 && currentIndex >= 0 && (
+                        <div className="flex items-center gap-2 border-l pl-4">
+                            <button
+                                onClick={() => navigateToReport(pendingReports[currentIndex - 1].id)}
+                                disabled={currentIndex === 0}
+                                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                title="Previous (←)"
+                            >
+                                ← Previous
+                            </button>
+                            <span className="text-sm text-gray-600 font-medium px-2">
+                                Report {currentIndex + 1} of {pendingReports.length}
+                            </span>
+                            <button
+                                onClick={() => navigateToReport(pendingReports[currentIndex + 1].id)}
+                                disabled={currentIndex === pendingReports.length - 1}
+                                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                title="Next (→)"
+                            >
+                                Next →
+                            </button>
+                        </div>
+                    )}
+
                     <h1 className="text-lg font-bold text-gray-800">
                         Scanning: {report.mentor_name}
                         <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full">
@@ -140,8 +208,8 @@ export default function ReviewReport({ userEmail, isReadOnlyUser, accessDenied }
                                 {report.program === 'Bangkit' && report.session_number == 1 && (
                                     <ComplianceItem
                                         label="GrowthWheel Chart"
-                                        passed={!!report.image_urls?.growthwheel}
-                                        subtext={report.image_urls?.growthwheel ? "Chart attached" : "Required for Session 1"}
+                                        passed={!!report.image_urls?.gw360}
+                                        subtext={report.image_urls?.gw360 ? "Chart attached" : "Required for Session 1"}
                                     />
                                 )}
 
@@ -199,25 +267,50 @@ export default function ReviewReport({ userEmail, isReadOnlyUser, accessDenied }
                     )}
                     <div className="flex-1 bg-white rounded-lg shadow-lg border overflow-hidden">
                         {report.document_url ? (
-                            <iframe
-                                src={(() => {
-                                    const url = report.document_url;
+                            previewError ? (
+                                // Fallback UI when preview fails
+                                <div className="flex flex-col items-center justify-center h-full p-8 bg-gray-50">
+                                    <div className="text-6xl mb-4">📄</div>
+                                    <h3 className="text-xl font-semibold text-gray-700 mb-2">Preview Unavailable</h3>
+                                    <p className="text-gray-500 text-center mb-6 max-w-md">
+                                        The document preview could not load. This may be due to permission settings or document type.
+                                    </p>
+                                    <a
+                                        href={report.document_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium shadow-sm flex items-center gap-2"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                        </svg>
+                                        Open in Google Docs
+                                    </a>
+                                </div>
+                            ) : (
+                                <iframe
+                                    src={(() => {
+                                        const url = report.document_url;
 
-                                    // Robust Embed Strategy: Use Local Proxy to Stream Content
-                                    // This bypasses X-Frame-Options and Auth wall entirely
+                                        // Extract Google Doc/Drive ID from URL
+                                        const docId = url.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
+                                        if (docId) {
+                                            // Use Google's native document preview
+                                            return `https://docs.google.com/document/d/${docId}/preview`;
+                                        }
 
-                                    // Extract ID from docs/drive link
-                                    const docId = url.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
-                                    if (docId) {
-                                        return `/api/admin/proxy-drive/${docId}`;
-                                    }
-
-                                    // Fallback for non-Drive URLs
-                                    return `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
-                                })()}
-                                className="w-full h-full rounded-lg shadow-lg border bg-white"
-                                title="Document Preview"
-                            />
+                                        // Fallback for non-Drive URLs
+                                        return `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
+                                    })()}
+                                    className="w-full h-full border-0"
+                                    title="Document Preview"
+                                    allow="autoplay"
+                                    onError={(e) => {
+                                        console.error('Google Docs preview failed:', e);
+                                        setPreviewError(true);
+                                    }}
+                                />
+                            )
                         ) : (
                             <div className="text-center p-8 bg-white rounded-lg shadow">
                                 <div className="text-5xl mb-4">📄</div>
