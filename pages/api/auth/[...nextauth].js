@@ -1,6 +1,12 @@
 import NextAuth from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
-import { supabase } from '../../../lib/supabaseClient';
+import { createClient } from '@supabase/supabase-js';
+
+// Use service role key to bypass RLS for authentication checks
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 export const authOptions = {
   providers: [
@@ -24,28 +30,39 @@ export const authOptions = {
 
       try {
         // Check if user exists in mentors table
-        const { data: mentor, error: mentorError } = await supabase
+        const { data: mentor, error: mentorError } = await supabaseAdmin
           .from('mentors')
           .select('email')
           .eq('email', email)
           .single();
 
-        if (mentor) return true;
+        if (mentor) {
+          console.log(`✅ Login allowed for ${email} (found in mentors table)`);
+          return true;
+        }
 
         // Check if user exists in user_roles table (admins, etc)
         // We limit to 1 because we just need to know if they have ANY role
-        const { data: roles } = await supabase
+        const { data: roles, error: rolesError } = await supabaseAdmin
           .from('user_roles')
           .select('email')
           .eq('email', email)
           .limit(1);
 
-        if (roles && roles.length > 0) return true;
+        if (rolesError) {
+          console.error(`❌ Error checking user_roles for ${email}:`, rolesError);
+          return false;
+        }
 
-        console.log(`Login denied for ${email}: User not found in mentors or user_roles.`);
+        if (roles && roles.length > 0) {
+          console.log(`✅ Login allowed for ${email} (found in user_roles table)`);
+          return true;
+        }
+
+        console.log(`❌ Login denied for ${email}: User not found in mentors or user_roles.`);
         return false;
       } catch (error) {
-        console.error('SignIn error:', error);
+        console.error('❌ SignIn callback error:', error);
         return false;
       }
     },
