@@ -142,6 +142,13 @@ export default function Navbar() {
                       >
                         MIA
                       </Link>
+                      <Link
+                        href="/admin/payment-review"
+                        className={`block px-4 py-2 text-sm ${isCurrentPage('/admin/payment-review') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:bg-blue-50'}`}
+                        onClick={(e) => isCurrentPage('/admin/payment-review') && e.preventDefault()}
+                      >
+                        Payment Review
+                      </Link>
                     </div>
                   </div>
                 )}
@@ -326,6 +333,19 @@ export default function Navbar() {
                         }}
                       >
                         MIA
+                      </Link>
+                      <Link
+                        href="/admin/payment-review"
+                        className={`block px-3 py-2 rounded-md text-sm transition-colors ${isCurrentPage('/admin/payment-review') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
+                        onClick={(e) => {
+                          if (isCurrentPage('/admin/payment-review')) {
+                            e.preventDefault();
+                          } else {
+                            setMobileMenuOpen(false);
+                          }
+                        }}
+                      >
+                        Payment Review
                       </Link>
                     </div>
                   </div>
