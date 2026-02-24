@@ -1027,7 +1027,7 @@ const LaporanMajuPage = () => {
           RUMUSAN_DAN_LANGKAH_KEHADAPAN: formData.RUMUSAN_DAN_LANGKAH_KEHADAPAN || '',
           MIA_STATUS: 'Tidak MIA',
           MIA_REASON: '',
-          MIA_PROOF_URL: imageUrls.mia,
+          MIA_PROOF_URL: '', // Empty string for non-MIA reports (not the object)
           // UPWARD MOBILITY - Store as JSON for MAJU AppScript
           UPWARD_MOBILITY_JSON: JSON.stringify({
             UM_STATUS: formData.UPWARD_MOBILITY.UM_STATUS || '',
