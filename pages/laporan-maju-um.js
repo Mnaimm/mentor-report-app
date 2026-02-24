@@ -32,8 +32,9 @@ const getTodayDate = () => {
     // Server-side: return empty string or a default
     return '';
   }
-  // Client-side: use date-fns format
-  return getTodayDate();
+  // Client-side: return today's date in YYYY-MM-DD format
+  const today = new Date();
+  return today.toISOString().split('T')[0];
 };
 
 // Helper function to safely parse JSON
