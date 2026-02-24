@@ -72,14 +72,14 @@ export default function Navbar() {
                 </Link>
 
                 {/* Dropdown for Laporan options */}
-                <div className="relative group">
+                <div className="relative group pb-2">
                   <button className="text-gray-700 hover:text-blue-600 px-2 lg:px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1 whitespace-nowrap">
                     Laporan
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                   </button>
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 hidden group-hover:block">
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 pt-2 z-50 hidden group-hover:block">
                     <Link
                       href="/laporan-bangkit"
                       className={`block px-4 py-2 text-sm ${isCurrentPage('/laporan-bangkit') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:bg-blue-50'}`}
@@ -99,14 +99,14 @@ export default function Navbar() {
 
                 {/* Admin Menu (only for admin users) */}
                 {isAdmin && (
-                  <div className="relative group">
+                  <div className="relative group pb-2">
                     <button className="text-gray-700 hover:text-blue-600 px-2 lg:px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1 whitespace-nowrap">
                       Admin
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                     </button>
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 hidden group-hover:block">
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 pt-2 z-50 hidden group-hover:block">
                       <Link
                         href="/admin/dashboard"
                         className={`block px-4 py-2 text-sm ${isCurrentPage('/admin/dashboard') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:bg-blue-50'}`}
@@ -120,6 +120,27 @@ export default function Navbar() {
                         onClick={(e) => isCurrentPage('/admin/usahawan') && e.preventDefault()}
                       >
                         Direktori Usahawan
+                      </Link>
+                      <Link
+                        href="/admin/lawatan-premis"
+                        className={`block px-4 py-2 text-sm ${isCurrentPage('/admin/lawatan-premis') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:bg-blue-50'}`}
+                        onClick={(e) => isCurrentPage('/admin/lawatan-premis') && e.preventDefault()}
+                      >
+                        Lawatan Premis
+                      </Link>
+                      <Link
+                        href="/admin/verification"
+                        className={`block px-4 py-2 text-sm ${isCurrentPage('/admin/verification') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:bg-blue-50'}`}
+                        onClick={(e) => isCurrentPage('/admin/verification') && e.preventDefault()}
+                      >
+                        Verification
+                      </Link>
+                      <Link
+                        href="/admin/mia"
+                        className={`block px-4 py-2 text-sm ${isCurrentPage('/admin/mia') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:bg-blue-50'}`}
+                        onClick={(e) => isCurrentPage('/admin/mia') && e.preventDefault()}
+                      >
+                        MIA
                       </Link>
                     </div>
                   </div>
@@ -266,6 +287,45 @@ export default function Navbar() {
                         }}
                       >
                         Direktori Usahawan
+                      </Link>
+                      <Link
+                        href="/admin/lawatan-premis"
+                        className={`block px-3 py-2 rounded-md text-sm transition-colors ${isCurrentPage('/admin/lawatan-premis') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
+                        onClick={(e) => {
+                          if (isCurrentPage('/admin/lawatan-premis')) {
+                            e.preventDefault();
+                          } else {
+                            setMobileMenuOpen(false);
+                          }
+                        }}
+                      >
+                        Lawatan Premis
+                      </Link>
+                      <Link
+                        href="/admin/verification"
+                        className={`block px-3 py-2 rounded-md text-sm transition-colors ${isCurrentPage('/admin/verification') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
+                        onClick={(e) => {
+                          if (isCurrentPage('/admin/verification')) {
+                            e.preventDefault();
+                          } else {
+                            setMobileMenuOpen(false);
+                          }
+                        }}
+                      >
+                        Verification
+                      </Link>
+                      <Link
+                        href="/admin/mia"
+                        className={`block px-3 py-2 rounded-md text-sm transition-colors ${isCurrentPage('/admin/mia') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
+                        onClick={(e) => {
+                          if (isCurrentPage('/admin/mia')) {
+                            e.preventDefault();
+                          } else {
+                            setMobileMenuOpen(false);
+                          }
+                        }}
+                      >
+                        MIA
                       </Link>
                     </div>
                   </div>
