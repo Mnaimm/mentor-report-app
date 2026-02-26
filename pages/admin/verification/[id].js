@@ -4,6 +4,7 @@ import { getSession } from 'next-auth/react';
 import Link from 'next/link';
 import { canAccessAdmin, isReadOnly } from '../../../lib/auth';
 import AccessDenied from '../../../components/AccessDenied';
+import RejectReportModal from '../../../components/RejectReportModal';
 
 export default function ReviewReport({ userEmail, isReadOnlyUser, accessDenied }) {
     const router = useRouter();
@@ -13,7 +14,9 @@ export default function ReviewReport({ userEmail, isReadOnlyUser, accessDenied }
     const [actionLoading, setActionLoading] = useState(false);
     const [rejectionReason, setRejectionReason] = useState('');
     const [showRejectModal, setShowRejectModal] = useState(false);
+    const [showRevisionModal, setShowRevisionModal] = useState(false);
     const [previewError, setPreviewError] = useState(false);
+    const [toast, setToast] = useState(null);
 
     // Navigation state
     const [pendingReports, setPendingReports] = useState([]);
@@ -98,12 +101,56 @@ export default function ReviewReport({ userEmail, isReadOnlyUser, accessDenied }
         }
     };
 
+    const handleRevisionRequest = async (revisionData) => {
+        setActionLoading(true);
+        try {
+            const res = await fetch(`/api/admin/reports/${id}/request-revision`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(revisionData)
+            });
+
+            const json = await res.json();
+            if (!json.success) throw new Error(json.error);
+
+            // Show success toast
+            setToast({
+                type: 'success',
+                message: 'Permintaan semakan telah dihantar kepada mentor'
+            });
+
+            // Close modal and redirect after short delay
+            setShowRevisionModal(false);
+            setTimeout(() => {
+                router.push('/admin/verification');
+            }, 1500);
+        } catch (err) {
+            setToast({
+                type: 'error',
+                message: `Gagal menghantar permintaan: ${err.message}`
+            });
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
     if (accessDenied) return <AccessDenied userEmail={userEmail} />;
     if (loading) return <div className="min-h-screen flex items-center justify-center">Loading Report...</div>;
     if (!report) return <div className="p-10 text-center">Report not found</div>;
 
     return (
         <div className="flex flex-col h-screen bg-gray-100 overflow-hidden">
+            {/* Toast Notification */}
+            {toast && (
+                <div className="fixed top-4 right-4 z-50 animate-fade-in">
+                    <div className={`${toast.type === 'success' ? 'bg-green-500' : 'bg-red-500'} text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 max-w-md`}>
+                        <span className="text-lg">{toast.type === 'success' ? '✓' : '✗'}</span>
+                        <span className="flex-1">{toast.message}</span>
+                        <button onClick={() => setToast(null)} className="text-white hover:text-gray-200">×</button>
+                    </div>
+                </div>
+            )}
+
             {/* Header */}
             <div className="bg-white shadow-sm border-b px-6 py-3 flex justify-between items-center z-10">
                 <div className="flex items-center gap-4">
@@ -150,6 +197,13 @@ export default function ReviewReport({ userEmail, isReadOnlyUser, accessDenied }
                         className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 font-medium disabled:opacity-50"
                     >
                         ❌ Reject
+                    </button>
+                    <button
+                        onClick={() => setShowRevisionModal(true)}
+                        disabled={actionLoading || isReadOnlyUser}
+                        className="px-4 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 font-medium disabled:opacity-50"
+                    >
+                        📝 Minta Semakan
                     </button>
                     <button
                         onClick={() => handleReview('approved')}
@@ -353,6 +407,14 @@ export default function ReviewReport({ userEmail, isReadOnlyUser, accessDenied }
                     </div>
                 </div>
             )}
+
+            {/* Revision Request Modal */}
+            <RejectReportModal
+                isOpen={showRevisionModal}
+                onClose={() => setShowRevisionModal(false)}
+                onSubmit={handleRevisionRequest}
+                isSubmitting={actionLoading}
+            />
         </div>
     );
 }

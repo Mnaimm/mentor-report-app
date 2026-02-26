@@ -1,6 +1,7 @@
 // pages/laporan-sesi.js
 import React, { useState, useEffect } from 'react';
 import { useSession, signIn } from 'next-auth/react';
+import { useRouter } from 'next/router';
 import Link from 'next/link';
 import {
   GRADE_CRITERIA_MAP,
@@ -181,6 +182,12 @@ const MenteeInfoCard = ({ companyName, address, phone }) => (
 // --- Main Page Component ---
 export default function LaporanSesiPage() {
   const { data: session, status } = useSession();
+  const router = useRouter();
+
+  // REVISION MODE STATE
+  const [isRevisionMode, setIsRevisionMode] = useState(false);
+  const [existingReportId, setExistingReportId] = useState(null);
+  const [revisionData, setRevisionData] = useState(null);
 
   const [allMentees, setAllMentees] = useState([]);
   const [uniqueMentors, setUniqueMentors] = useState([]);
@@ -307,6 +314,132 @@ export default function LaporanSesiPage() {
     fetchInitialData();
   }, [status, session?.user?.email, isAdmin]);
 
+  // --- REVISION MODE DETECTION AND REPORT FETCHING ---
+  useEffect(() => {
+    const detectRevisionMode = async () => {
+      // Check if we're in revision mode
+      if (router.query.mode === 'revision' && router.query.reportId && status === 'authenticated') {
+        const reportId = router.query.reportId;
+
+        console.log('🔄 Revision mode detected for report:', reportId);
+
+        try {
+          // Fetch the existing report from Supabase
+          const response = await fetch(`/api/reports/${reportId}`);
+
+          if (!response.ok) {
+            throw new Error('Failed to fetch report');
+          }
+
+          const report = await response.json();
+
+          // Security check: verify report belongs to this mentor
+          if (report.mentor_email !== session.user.email) {
+            setError('Access denied - You can only revise your own reports');
+            return;
+          }
+
+          // Verify status is review_requested
+          if (report.status !== 'review_requested') {
+            setError('Only reports with status "review_requested" can be revised');
+            return;
+          }
+
+          // Set revision mode flags
+          setIsRevisionMode(true);
+          setExistingReportId(reportId);
+          setRevisionData(report);
+
+          // Pre-fill form fields from the existing report
+          // This will be done in the next useEffect that watches revisionData
+
+          console.log('✅ Revision mode activated for report:', reportId);
+
+        } catch (err) {
+          console.error('❌ Error fetching report for revision:', err);
+          setError('Failed to load report for revision: ' + err.message);
+        }
+      }
+    };
+
+    detectRevisionMode();
+  }, [router.query.mode, router.query.reportId, status, session?.user?.email]);
+
+  // --- PRE-FILL FORM FROM REVISION DATA ---
+  useEffect(() => {
+    if (!revisionData || !isRevisionMode) return;
+
+    console.log('📝 Pre-filling form with revision data...');
+
+    try {
+      // Find the mentee in the mapping data
+      const mentee = allMentees.find(m =>
+        m.Usahawan === revisionData.mentee_name ||
+        m.No_IC === revisionData.mentee_ic
+      );
+
+      if (mentee) {
+        setSelectedMentee(mentee);
+      }
+
+      // Set session number (LOCKED in revision mode)
+      setCurrentSession(revisionData.session_number);
+
+      // Set MIA status
+      setIsMIA(revisionData.mia_status === 'MIA');
+
+      // Pre-fill form state
+      const preFillData = {
+        inisiatif: revisionData.inisiatif || [{ focusArea: '', keputusan: '', keputusanCustom: undefined, pelanTindakan: '' }],
+        kemaskiniInisiatif: revisionData.kemaskini_inisiatif || [],
+        teknologi: revisionData.teknologi || [{ sistem: '', tujuan: '' }],
+        jualanTahunSebelum: revisionData.jualan_tahun_sebelum || { tahun: new Date().getFullYear() - 1, setahun: '', bulananMin: '', bulananMaks: '' },
+        jualanTerkini: revisionData.jualan_terkini || Array(12).fill(''),
+        pemerhatian: revisionData.pemerhatian || '',
+        rumusan: revisionData.rumusan || '',
+        rumusanSesi2Plus: revisionData.rumusan || '',
+        refleksi: {
+          perasaan: revisionData.refleksi_perasaan || '',
+          skor: revisionData.refleksi_skor || '',
+          alasan: revisionData.refleksi_alasan || '',
+          eliminate: revisionData.refleksi_eliminate || '',
+          raise: revisionData.refleksi_raise || '',
+          reduce: revisionData.refleksi_reduce || '',
+          create: revisionData.refleksi_create || ''
+        },
+        sesi: {
+          date: revisionData.session_date || new Date().toISOString().split('T')[0],
+          time: revisionData.session_time || '',
+          platform: revisionData.session_platform || 'Face to Face',
+          lokasiF2F: revisionData.session_location_f2f || '',
+          premisDilawat: revisionData.premis_dilawat || false
+        },
+        tambahan: {
+          jenisBisnes: revisionData.business_type || '',
+          produkServis: revisionData.product_service || '',
+          pautanMediaSosial: revisionData.social_media_links || ''
+        },
+        latarBelakangUsahawan: revisionData.business_background || '',
+        mia: {
+          alasan: revisionData.mia_reason || ''
+        },
+        upwardMobility: revisionData.upward_mobility_data || { ...INITIAL_UPWARD_MOBILITY_STATE }
+      };
+
+      setFormState(preFillData);
+
+      // Note: Image files cannot be pre-filled from URLs
+      // If photo categories are flagged for revision, they will need to be re-uploaded
+      // We'll handle this in the UI with appropriate messaging
+
+      console.log('✅ Form pre-filled successfully');
+
+    } catch (err) {
+      console.error('❌ Error pre-filling form:', err);
+      setError('Error loading report data: ' + err.message);
+    }
+  }, [revisionData, isRevisionMode, allMentees]);
+
   // --- Autosave effect: save to localStorage on changes ---
   useEffect(() => {
     if (!autosaveArmed) return;
@@ -334,6 +467,28 @@ export default function LaporanSesiPage() {
     setFilteredMentees(allMentees.filter((m) => m.Mentor === mentorName));
     setSelectedMentee(null);
     setAutosaveArmed(false);
+  };
+
+  // --- REVISION MODE: Check if a field category needs highlighting ---
+  const shouldHighlightField = (category) => {
+    if (!isRevisionMode || !revisionData?.revision_reason) return false;
+    return revisionData.revision_reason.includes(category);
+  };
+
+  // --- REVISION MODE: Get field highlight classes ---
+  const getFieldHighlightClass = (category) => {
+    if (!shouldHighlightField(category)) return '';
+    return 'border-amber-500 border-2 ring-2 ring-amber-200';
+  };
+
+  // --- REVISION MODE: Render field warning badge ---
+  const renderFieldWarning = (category) => {
+    if (!shouldHighlightField(category)) return null;
+    return (
+      <div className="mb-2 p-2 bg-amber-50 border-l-4 border-amber-500 rounded-r text-sm">
+        <span className="text-amber-800 font-semibold">⚠️ Perlu dikemaskini</span>
+      </div>
+    );
   };
 
   // --- Helper: normalize previous inisiatif from backend to text labels
@@ -987,7 +1142,7 @@ export default function LaporanSesiPage() {
       // Update stage: saving to database
       setSubmissionStage({
         stage: 'saving',
-        message: 'Saving report to Google Sheets...',
+        message: isRevisionMode ? 'Updating report...' : 'Saving report to Google Sheets...',
         detail: 'This may take up to 30 seconds'
       });
 
@@ -997,7 +1152,12 @@ export default function LaporanSesiPage() {
       let result;
 
       try {
-        const response = await fetch('/api/submitBangkit', {
+        // Route to revision API if in revision mode, otherwise normal submit
+        const apiUrl = isRevisionMode
+          ? `/api/admin/reports/${existingReportId}/revise`
+          : '/api/submitBangkit';
+
+        const response = await fetch(apiUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(reportData),
@@ -1062,30 +1222,41 @@ export default function LaporanSesiPage() {
       // Update stage: complete
       setSubmissionStage({
         stage: 'complete',
-        message: 'Report submitted successfully!',
+        message: isRevisionMode ? 'Report updated successfully!' : 'Report submitted successfully!',
         detail: ''
       });
 
-      setSuccess('✅ Laporan Bangkit dan Upward Mobility berjaya dihantar! Borang sedang direset...');
-      window.scrollTo(0, 0);
+      if (isRevisionMode) {
+        // REVISION MODE: Redirect to My Reports page
+        setSuccess('✅ Laporan telah dikemaskini dan dihantar semula untuk semakan! Mengalihkan ke halaman laporan...');
+        window.scrollTo(0, 0);
 
-      // Prepare Receipt Data
-      const receiptData = {
-        submissionId: result?.dualWrite?.supabaseReports?.recordId || `ROW-${result?.rowNumber || 'UNKNOWN'}`,
-        submittedAt: new Date().toISOString(),
-        menteeName: selectedMentee?.Usahawan || 'Usahawan',
-        sessionNumber: currentSession,
-        program: 'Bangkit'
-      };
-      setSubmissionResult(receiptData);
-      setIsReceiptModalOpen(true);
+        setTimeout(() => {
+          router.push('/mentor/my-reports');
+        }, 2000);
+      } else {
+        // NORMAL MODE: Show receipt and reset form
+        setSuccess('✅ Laporan Bangkit dan Upward Mobility berjaya dihantar! Borang sedang direset...');
+        window.scrollTo(0, 0);
 
-      // Reduced timeout and immediate feedback
-      setTimeout(() => {
-        resetForm();
-        setSuccess('');
-        setSubmissionStage({ stage: '', message: '', detail: '' });
-      }, 1500); // Reduced from 3000ms to 1500ms
+        // Prepare Receipt Data
+        const receiptData = {
+          submissionId: result?.dualWrite?.supabaseReports?.recordId || `ROW-${result?.rowNumber || 'UNKNOWN'}`,
+          submittedAt: new Date().toISOString(),
+          menteeName: selectedMentee?.Usahawan || 'Usahawan',
+          sessionNumber: currentSession,
+          program: 'Bangkit'
+        };
+        setSubmissionResult(receiptData);
+        setIsReceiptModalOpen(true);
+
+        // Reduced timeout and immediate feedback
+        setTimeout(() => {
+          resetForm();
+          setSuccess('');
+          setSubmissionStage({ stage: '', message: '', detail: '' });
+        }, 1500);
+      }
     } catch (err) {
       // Determine stage-specific error message
       let errorMessage = err.message;
@@ -1145,7 +1316,8 @@ export default function LaporanSesiPage() {
         </Section>
 
         <Section title="Prestasi Jualan">
-          <div className="p-4 border rounded-lg">
+          {renderFieldWarning('Tiada data kewangan')}
+          <div className={`p-4 border rounded-lg ${getFieldHighlightClass('Tiada data kewangan')}`}>
             <h3 className="font-semibold text-md mb-2">Jualan Tahun Sebelum</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <InputField label="RM Setahun" type="number" value={formState.jualanTahunSebelum?.setahun || ''} onChange={(e) => handleInputChange('jualanTahunSebelum', 'setahun', e.target.value)} />
@@ -1153,7 +1325,7 @@ export default function LaporanSesiPage() {
               <InputField label="RM Bulanan Maksima" type="number" value={formState.jualanTahunSebelum?.bulananMaks || ''} onChange={(e) => handleInputChange('jualanTahunSebelum', 'bulananMaks', e.target.value)} />
             </div>
           </div>
-          <div className="p-4 border rounded-lg mt-4">
+          <div className={`p-4 border rounded-lg mt-4 ${getFieldHighlightClass('Tiada data kewangan')}`}>
             <h3 className="font-semibold text-md mb-2">Jualan Bulanan Terkini</h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {['Januari', 'Februari', 'Mac', 'April', 'Mei', 'Jun', 'Julai', 'Ogos', 'September', 'Oktober', 'November', 'Disember'].map((month, i) => (
@@ -1164,7 +1336,9 @@ export default function LaporanSesiPage() {
         </Section>
 
         <Section title="Status Perniagaan Keseluruhan" description="Pemerhatian Mentor/Coach berdasarkan panduan.">
-          <TextArea
+          {renderFieldWarning('Latar belakang usahawan tidak mencukupi')}
+          <div className={getFieldHighlightClass('Latar belakang usahawan tidak mencukupi')}>
+            <TextArea
             label="Status Perniagaan Keseluruhan"
             rows={10}
             value={formState.pemerhatian || ''}
@@ -1187,7 +1361,8 @@ Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun la
 - Penambahan pekerja
 - Adaptasi teknologi
 - Peningkatan skil/pengetahuan`}
-          />
+            />
+          </div>
         </Section>
 
         <Section title="Keputusan Mentee - Inisiatif yang mahu diambil" description="Berdasarkan pemerhatian, pilih Fokus Area dan Keputusan yang perlu diambil.">
@@ -1272,7 +1447,9 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
 
           <div className="space-y-6">
             {/* --- Section 3: Status & Mobiliti --- */}
-            <div className="bg-white p-6 rounded-lg shadow-sm border-l-4 border-orange-500">
+            <div className={`bg-white p-6 rounded-lg shadow-sm border-l-4 border-orange-500 ${getFieldHighlightClass('Maklumat Upward Mobility tidak ada / tidak mencukupi') || getFieldHighlightClass('Tiada ulasan Upward Mobility')}`}>
+              {renderFieldWarning('Maklumat Upward Mobility tidak ada / tidak mencukupi')}
+              {renderFieldWarning('Tiada ulasan Upward Mobility')}
               <Section title={
                 <div className="flex items-center justify-between">
                   <span>Bahagian 3: Status & Mobiliti Usahawan</span>
@@ -1597,9 +1774,16 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
         </div>
 
         <Section title="Muat Naik Gambar (Sesi 1)">
-          <FileInput label="Gambar Carta GrowthWheel 360°" onChange={(e) => handleFileChange('gw', e.target.files)} required isImageUpload={true} />
-          <FileInput label="Satu (1) Gambar Individu Usahawan (Profil)" onChange={(e) => handleFileChange('profil', e.target.files)} required isImageUpload={true} />
-          <FileInput label="Dua (2) Gambar Sesi Mentoring" multiple onChange={(e) => handleFileChange('sesi', e.target.files, true)} required isImageUpload={true} />
+          {renderFieldWarning('Tiada gambar Growth Wheel')}
+          <div className={getFieldHighlightClass('Tiada gambar Growth Wheel')}>
+            <FileInput label="Gambar Carta GrowthWheel 360°" onChange={(e) => handleFileChange('gw', e.target.files)} required isImageUpload={true} />
+          </div>
+
+          {renderFieldWarning('Gambar sesi tidak ada / tidak mencukupi')}
+          <div className={getFieldHighlightClass('Gambar sesi tidak ada / tidak mencukupi')}>
+            <FileInput label="Satu (1) Gambar Individu Usahawan (Profil)" onChange={(e) => handleFileChange('profil', e.target.files)} required isImageUpload={true} />
+            <FileInput label="Dua (2) Gambar Sesi Mentoring" multiple onChange={(e) => handleFileChange('sesi', e.target.files, true)} required isImageUpload={true} />
+          </div>
 
           {/* Lawatan Premis checkbox */}
           <div className="mt-6">
@@ -1744,7 +1928,9 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
 
           <div className="space-y-6">
             {/* --- Section 3: Status & Mobiliti --- */}
-            <div className="bg-white p-6 rounded-lg shadow-sm border-l-4 border-orange-500">
+            <div className={`bg-white p-6 rounded-lg shadow-sm border-l-4 border-orange-500 ${getFieldHighlightClass('Maklumat Upward Mobility tidak ada / tidak mencukupi') || getFieldHighlightClass('Tiada ulasan Upward Mobility')}`}>
+              {renderFieldWarning('Maklumat Upward Mobility tidak ada / tidak mencukupi')}
+              {renderFieldWarning('Tiada ulasan Upward Mobility')}
               <Section title={
                 <div className="flex items-center justify-between">
                   <span>Bahagian 3: Status & Mobiliti Usahawan</span>
@@ -2388,6 +2574,43 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
           </div>
         )}
 
+        {/* REVISION MODE BANNER */}
+        {isRevisionMode && revisionData && (
+          <div className="bg-amber-50 border-l-4 border-amber-500 p-6 rounded-r-lg shadow-sm">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <svg className="h-6 w-6 text-amber-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3 flex-1">
+                <h3 className="text-lg font-bold text-amber-900 mb-2">
+                  📝 Mod Semakan Semula - Sila Perbaiki Laporan Anda
+                </h3>
+                <p className="text-sm text-amber-800 mb-3">
+                  Laporan anda telah disemak oleh pentadbir dan memerlukan beberapa pembaikan. Sila kemaskini bahagian yang ditandakan di bawah.
+                </p>
+                <div className="bg-white border border-amber-200 rounded-lg p-4">
+                  <h4 className="font-semibold text-amber-900 mb-2">Perkara yang perlu diperbaiki:</h4>
+                  <ul className="list-disc list-inside space-y-1 text-sm text-amber-800">
+                    {(revisionData.revision_reason || []).map((reason, idx) => (
+                      <li key={idx} className="font-medium">{reason}</li>
+                    ))}
+                  </ul>
+                  {revisionData.revision_notes && (
+                    <div className="mt-3 pt-3 border-t border-amber-200">
+                      <p className="text-sm font-semibold text-amber-900">Nota tambahan dari pentadbir:</p>
+                      <p className="text-sm text-amber-800 mt-1 italic">&quot;{revisionData.revision_notes}&quot;</p>
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-amber-700 mt-3">
+                  ⚠️ Nombor sesi telah dikunci dan tidak boleh diubah. Hanya kemaskini medan yang ditandakan.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
           <Section title="1. Pemilihan Usahawan">
@@ -2411,7 +2634,13 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
             </div>
             {selectedMentee && (
               <div className="text-center mt-6">
-                <span className="text-lg font-bold text-white bg-blue-600 px-4 py-2 rounded-full">Sesi #{currentSession}</span>
+                <span className="text-lg font-bold text-white bg-blue-600 px-4 py-2 rounded-full">
+                  Sesi #{currentSession}
+                  {isRevisionMode && <span className="ml-2 text-xs">🔒 (Dikunci)</span>}
+                </span>
+                {isRevisionMode && (
+                  <p className="text-xs text-gray-600 mt-2">Nombor sesi tidak boleh diubah dalam mod semakan</p>
+                )}
               </div>
             )}
           </Section>
@@ -2495,8 +2724,21 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
               )}
 
               <div className="text-center">
-                <button type="submit" disabled={isSubmitting || compressionProgress.show} className="w-full md:w-auto bg-green-600 text-white font-bold py-3 px-12 rounded-lg hover:bg-green-700 disabled:bg-gray-400">
-                  {compressionProgress.show ? '🔄 Compressing Images...' : isSubmitting ? '📤 Menghantar...' : 'Hantar Laporan Sesi ' + currentSession}
+                <button
+                  type="submit"
+                  disabled={isSubmitting || compressionProgress.show}
+                  className={`w-full md:w-auto font-bold py-3 px-12 rounded-lg disabled:bg-gray-400 ${
+                    isRevisionMode
+                      ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                      : 'bg-green-600 hover:bg-green-700 text-white'
+                  }`}
+                >
+                  {compressionProgress.show
+                    ? '🔄 Compressing Images...'
+                    : isSubmitting
+                      ? (isRevisionMode ? '📝 Mengemas kini...' : '📤 Menghantar...')
+                      : (isRevisionMode ? '✏️ Kemaskini Laporan' : 'Hantar Laporan Sesi ' + currentSession)
+                  }
                 </button>
                 {saveStatus && <div className="mt-2 text-xs text-gray-500">{saveStatus}</div>}
               </div>

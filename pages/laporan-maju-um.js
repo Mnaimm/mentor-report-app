@@ -1,6 +1,7 @@
 // pages/laporan-maju.js
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSession, signIn } from 'next-auth/react';
+import { useRouter } from 'next/router';
 import Section from '../components/Section';
 import InputField from '../components/InputField';
 import SelectField from '../components/SelectField';
@@ -80,7 +81,13 @@ const EnhancedTextArea = ({ label, name, value, onChange, helperText, rows = 5, 
 
 const LaporanMajuPage = () => {
   const { data: session, status } = useSession();
+  const router = useRouter();
   const isAdmin = session?.user?.email && process.env.NEXT_PUBLIC_ADMIN_EMAILS?.includes(session.user.email);
+
+  // REVISION MODE STATE
+  const [isRevisionMode, setIsRevisionMode] = useState(false);
+  const [existingReportId, setExistingReportId] = useState(null);
+  const [revisionData, setRevisionData] = useState(null);
 
   const initialFormState = {
     // These match your LaporanMaju sheet headers for direct submission
@@ -263,6 +270,125 @@ const LaporanMajuPage = () => {
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData, autosaveArmed]);
+
+  // --- REVISION MODE DETECTION AND REPORT FETCHING ---
+  useEffect(() => {
+    const detectRevisionMode = async () => {
+      if (router.query.mode === 'revision' && router.query.reportId && status === 'authenticated') {
+        const reportId = router.query.reportId;
+
+        console.log('🔄 Revision mode detected for Maju report:', reportId);
+
+        try {
+          const response = await fetch(`/api/reports/${reportId}`);
+
+          if (!response.ok) {
+            throw new Error('Failed to fetch report');
+          }
+
+          const report = await response.json();
+
+          // Security check
+          if (report.mentor_email !== session.user.email) {
+            setMessage('Access denied - You can only revise your own reports');
+            setMessageType('error');
+            return;
+          }
+
+          // Verify status
+          if (report.status !== 'review_requested') {
+            setMessage('Only reports with status "review_requested" can be revised');
+            setMessageType('error');
+            return;
+          }
+
+          setIsRevisionMode(true);
+          setExistingReportId(reportId);
+          setRevisionData(report);
+
+          console.log('✅ Revision mode activated for Maju report:', reportId);
+
+        } catch (err) {
+          console.error('❌ Error fetching report for revision:', err);
+          setMessage('Failed to load report for revision: ' + err.message);
+          setMessageType('error');
+        }
+      }
+    };
+
+    detectRevisionMode();
+  }, [router.query.mode, router.query.reportId, status, session?.user?.email]);
+
+  // --- PRE-FILL FORM FROM REVISION DATA ---
+  useEffect(() => {
+    if (!revisionData || !isRevisionMode) return;
+
+    console.log('📝 Pre-filling Maju form with revision data...');
+
+    try {
+      // Find the mentee in the mapping data
+      const mentee = allMenteesMapping.find(m =>
+        m.Usahawan === revisionData.nama_mentee ||
+        m.No_IC === revisionData.mentee_ic
+      );
+
+      // Set session number (LOCKED in revision mode)
+      setCurrentSessionNumber(revisionData.session_number);
+
+      // Set MIA status
+      setIsMIA(revisionData.mia_status === 'MIA');
+      if (revisionData.mia_status === 'MIA') {
+        setMiaReason(revisionData.mia_reason || '');
+      }
+
+      // Pre-fill form data
+      const preFillData = {
+        Timestamp: revisionData.submission_date || '',
+        NAMA_MENTOR: revisionData.nama_mentor || '',
+        EMAIL_MENTOR: revisionData.mentor_email || '',
+        NAMA_MENTEE: revisionData.nama_mentee || '',
+        NAMA_BISNES: revisionData.nama_bisnes || '',
+        LOKASI_BISNES: revisionData.lokasi_bisnes || '',
+        PRODUK_SERVIS: revisionData.produk_servis || '',
+        NO_TELEFON: revisionData.no_telefon || '',
+        emel: mentee?.Emel || '',
+        BATCH: revisionData.batch || '',
+        TARIKH_SESI: revisionData.session_date || getTodayDate(),
+        SESI_NUMBER: revisionData.session_number,
+        MOD_SESI: revisionData.mod_sesi || '',
+        LOKASI_F2F: revisionData.lokasi_f2f || '',
+        MASA_MULA: revisionData.masa_mula || '',
+        MASA_TAMAT: revisionData.masa_tamat || '',
+        LATARBELAKANG_USAHAWAN: revisionData.latarbelakang_usahawan || '',
+        DATA_KEWANGAN_BULANAN_JSON: revisionData.data_kewangan_bulanan || [],
+        MENTORING_FINDINGS_JSON: revisionData.mentoring_findings || [],
+        URL_GAMBAR_PREMIS_JSON: revisionData.image_urls?.premis || [],
+        URL_GAMBAR_SESI_JSON: revisionData.image_urls?.sesi || [],
+        URL_GAMBAR_GW360: revisionData.image_urls?.growthwheel || '',
+        Folder_ID: revisionData.folder_id || '',
+        Laporan_Maju_Doc_ID: revisionData.doc_url || '',
+        STATUS_PERNIAGAAN_KESELURUHAN: revisionData.status_perniagaan || '',
+        RUMUSAN_DAN_LANGKAH_KEHADAPAN: revisionData.rumusan_langkah_kehadapan || '',
+        MIA_PROOF_URL: revisionData.mia_proof_url || '',
+        UPWARD_MOBILITY: revisionData.upward_mobility_data || { ...INITIAL_UPWARD_MOBILITY_STATE }
+      };
+
+      setFormData(preFillData);
+
+      // Set previous data if needed for Sesi 2+
+      if (revisionData.session_number > 1) {
+        setPreviousMentoringFindings(revisionData.mentoring_findings || []);
+        setPreviousLatarBelakangUsahawan(revisionData.latarbelakang_usahawan || '');
+      }
+
+      console.log('✅ Maju form pre-filled successfully');
+
+    } catch (err) {
+      console.error('❌ Error pre-filling Maju form:', err);
+      setMessage('Error loading report data: ' + err.message);
+      setMessageType('error');
+    }
+  }, [revisionData, isRevisionMode, allMenteesMapping]);
 
   // Handle Mentee Selection & Load Session Data
   const handleMenteeSelect = useCallback(async (e) => {
@@ -655,6 +781,28 @@ const LaporanMajuPage = () => {
 
     // Clear any "Uploaded" status messages by resetting the page display
     console.log('✅ Form reset complete - all fields and file inputs cleared');
+  };
+
+  // --- REVISION MODE: Check if a field category needs highlighting ---
+  const shouldHighlightField = (category) => {
+    if (!isRevisionMode || !revisionData?.revision_reason) return false;
+    return revisionData.revision_reason.includes(category);
+  };
+
+  // --- REVISION MODE: Get field highlight classes ---
+  const getFieldHighlightClass = (category) => {
+    if (!shouldHighlightField(category)) return '';
+    return 'border-amber-500 border-2 ring-2 ring-amber-200';
+  };
+
+  // --- REVISION MODE: Render field warning badge ---
+  const renderFieldWarning = (category) => {
+    if (!shouldHighlightField(category)) return null;
+    return (
+      <div className="mb-2 p-2 bg-amber-50 border-l-4 border-amber-500 rounded-r text-sm">
+        <span className="text-amber-800 font-semibold">⚠️ Perlu dikemaskini</span>
+      </div>
+    );
   };
 
   // UPDATED: handleSubmit to include 'action' and 'reportType: maju'
@@ -1083,7 +1231,12 @@ const LaporanMajuPage = () => {
 
       let response;
       try {
-        response = await fetch('/api/submitMajuReportum', {
+        // Route to revision API if in revision mode, otherwise normal submit
+        const apiUrl = isRevisionMode
+          ? `/api/admin/reports/${existingReportId}/revise`
+          : '/api/submitMajuReportum';
+
+        response = await fetch(apiUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1178,40 +1331,52 @@ const LaporanMajuPage = () => {
         // Update stage: complete
         setSubmissionStage({
           stage: 'complete',
-          message: 'Report submitted successfully!',
+          message: isRevisionMode ? 'Report updated successfully!' : 'Report submitted successfully!',
           detail: ''
         });
 
-        // Show Receipt Modal
-        const receiptData = {
-          submissionId: result?.dualWrite?.supabaseReports?.recordId || `ROW-${result?.rowNumber || 'UNKNOWN'}`,
-          submittedAt: new Date().toISOString(),
-          menteeName: formData.NAMA_MENTEE || 'Usahawan',
-          sessionNumber: currentSessionNumber,
-          program: 'Maju & Upward Mobility'
-        };
-        setSubmissionResult(receiptData);
-        setIsReceiptModalOpen(true);
+        if (isRevisionMode) {
+          // REVISION MODE: Redirect to My Reports page
+          setMessage('✅ Laporan telah dikemaskini dan dihantar semula untuk semakan! Mengalihkan ke halaman laporan...');
+          setMessageType('success');
+          window.scrollTo(0, 0);
 
-        // Clear saved draft before resetting
-        try {
-          const draftKey = getDraftKey(
-            formData.NAMA_MENTEE,
-            currentSessionNumber,
-            session?.user?.email
-          );
-          localStorage.removeItem(draftKey);
-          console.log('🗑️ [PHASE 5] Draft cleared after successful submission');
-        } catch (error) {
-          console.error('Failed to clear draft:', error);
+          setTimeout(() => {
+            router.push('/mentor/my-reports');
+          }, 2000);
+        } else {
+          // NORMAL MODE: Show receipt and reset form
+          // Show Receipt Modal
+          const receiptData = {
+            submissionId: result?.dualWrite?.supabaseReports?.recordId || `ROW-${result?.rowNumber || 'UNKNOWN'}`,
+            submittedAt: new Date().toISOString(),
+            menteeName: formData.NAMA_MENTEE || 'Usahawan',
+            sessionNumber: currentSessionNumber,
+            program: 'Maju & Upward Mobility'
+          };
+          setSubmissionResult(receiptData);
+          setIsReceiptModalOpen(true);
+
+          // Clear saved draft before resetting
+          try {
+            const draftKey = getDraftKey(
+              formData.NAMA_MENTEE,
+              currentSessionNumber,
+              session?.user?.email
+            );
+            localStorage.removeItem(draftKey);
+            console.log('🗑️ [PHASE 5] Draft cleared after successful submission');
+          } catch (error) {
+            console.error('Failed to clear draft:', error);
+          }
+
+          console.log('🔄 [PHASE 5] Resetting form...');
+          resetForm();
+          setSubmissionStage({ stage: '', message: '', detail: '' }); // Clear stage after reset
+          setMessage(''); // Clear inline message
+
+          console.log('✅ [COMPLETE] Submission process completed successfully');
         }
-
-        console.log('🔄 [PHASE 5] Resetting form...');
-        resetForm();
-        setSubmissionStage({ stage: '', message: '', detail: '' }); // Clear stage after reset
-        setMessage(''); // Clear inline message
-
-        console.log('✅ [COMPLETE] Submission process completed successfully');
         return;
 
       } else if (result.partialSuccess) {
@@ -1400,6 +1565,44 @@ const LaporanMajuPage = () => {
           </div>
         )}
 
+        {/* REVISION MODE BANNER */}
+        {isRevisionMode && revisionData && (
+          <div className="bg-amber-50 border-l-4 border-amber-500 p-6 rounded-r-lg shadow-sm">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <svg className="h-6 w-6 text-amber-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3 flex-1">
+                <h3 className="text-lg font-bold text-amber-900 mb-2">
+                  📝 Mod Semakan Semula - Sila Perbaiki Laporan Anda
+                </h3>
+                <p className="text-sm text-amber-800 mb-3">
+                  Laporan anda telah disemak oleh pentadbir dan memerlukan beberapa pembaikan. Sila kemaskini bahagian yang ditandakan di bawah.
+                </p>
+                <div className="bg-white border border-amber-200 rounded-lg p-4">
+                  <h4 className="font-semibold text-amber-900 mb-2">Perkara yang perlu diperbaiki:</h4>
+                  <ul className="list-disc list-inside space-y-1 text-sm text-amber-800">
+                    {(revisionData.revision_reason || []).map((reason, idx) => (
+                      <li key={idx} className="font-medium">{reason}</li>
+                    ))}
+                  </ul>
+                  {revisionData.revision_notes && (
+                    <div className="mt-3 pt-3 border-t border-amber-200">
+                      <p className="text-sm font-semibold text-amber-900">Nota tambahan dari pentadbir:</p>
+                      <p className="text-sm text-amber-800 mt-1 italic">&quot;{revisionData.revision_notes}&quot;</p>
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-amber-700 mt-3">
+                  ⚠️ Nombor sesi telah dikunci dan tidak boleh diubah. Hanya kemaskini medan yang ditandakan.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* MIA Checkbox always visible at the top */}
           <div className="bg-white p-6 rounded-lg shadow-sm">
@@ -1435,9 +1638,12 @@ const LaporanMajuPage = () => {
                 <InputField
                   label="Nombor Sesi"
                   name="SESI_NUMBER_DISPLAY"
-                  value={`Sesi #${currentSessionNumber}`}
+                  value={isRevisionMode ? `Sesi #${currentSessionNumber} 🔒 (Dikunci)` : `Sesi #${currentSessionNumber}`}
                   disabled
                 />
+                {isRevisionMode && (
+                  <p className="text-xs text-gray-600 mt-1">Nombor sesi tidak boleh diubah dalam mod semakan</p>
+                )}
                 <TextArea
                   label="Alasan / Sebab Usahawan MIA *"
                   value={miaReason}
@@ -1538,7 +1744,7 @@ const LaporanMajuPage = () => {
                     onChange={handleChange}
                     required
                   />
-                  <InputField label="Nombor Sesi" name="SESI_NUMBER_DISPLAY" value={`Sesi #${currentSessionNumber}`} disabled />
+                  <InputField label="Nombor Sesi" name="SESI_NUMBER_DISPLAY" value={isRevisionMode ? `Sesi #${currentSessionNumber} 🔒 (Dikunci)` : `Sesi #${currentSessionNumber}`} disabled />
                   <SelectField
                     label="Mod Sesi"
                     name="MOD_SESI"
@@ -2582,10 +2788,19 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
               </button>
               <button
                 type="submit"
-                className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400"
+                className={`px-6 py-2 text-white rounded-md disabled:bg-gray-400 ${
+                  isRevisionMode
+                    ? 'bg-amber-600 hover:bg-amber-700'
+                    : 'bg-green-600 hover:bg-green-700'
+                }`}
                 disabled={loading || compressionProgress.show}
               >
-                {compressionProgress.show ? '🔄 Compressing Images...' : loading ? '📤 Submitting...' : 'Submit Laporan Maju'}
+                {compressionProgress.show
+                  ? '🔄 Compressing Images...'
+                  : loading
+                    ? (isRevisionMode ? '📝 Mengemas kini...' : '📤 Submitting...')
+                    : (isRevisionMode ? '✏️ Kemaskini Laporan' : 'Submit Laporan Maju')
+                }
               </button>
             </div>
             {saveStatus && (
