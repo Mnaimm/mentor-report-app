@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../../auth/[...nextauth]';
 import { canAccessAdmin } from '../../../../../lib/auth';
-import { updateSheetStatus } from '../../../../../lib/googleSheets';
+import { updateSheetStatus, writeVerificationToSheet } from '../../../../../lib/googleSheets';
 
 // Use SERVICE_ROLE_KEY for admin endpoints (bypasses RLS)
 const supabase = createClient(
@@ -33,10 +33,10 @@ export default async function handler(req, res) {
     }
 
     try {
-        // 1. Fetch current report to get row number & program
+        // 1. Fetch current report to get all necessary fields
         const { data: report, error: fetchError } = await supabase
             .from('reports')
-            .select('sheets_row_number, program, mentor_email')
+            .select('id, sheets_row_number, program, mentor_email, submission_date, verification_nota, base_payment_amount')
             .eq('id', id)
             .single();
 
@@ -50,7 +50,7 @@ export default async function handler(req, res) {
             rejection_reason: status === 'rejected' ? rejectionReason : null,
 
             // Update payment status based on approval
-            payment_status: status === 'approved' ? 'approved' :
+            payment_status: status === 'approved' ? 'approved_for_payment' :
                            status === 'rejected' ? 'rejected' :
                            'pending',
 
@@ -58,6 +58,7 @@ export default async function handler(req, res) {
             approved_at: status === 'approved' ? new Date().toISOString() : null,
         };
 
+        // 3. UPDATE SUPABASE (BLOCKING - primary source of truth)
         const { error: updateError } = await supabase
             .from('reports')
             .update(updates)
@@ -65,19 +66,81 @@ export default async function handler(req, res) {
 
         if (updateError) throw updateError;
 
-        // 3. Sync to Google Sheets
-        if (report.sheets_row_number) {
-            console.log(`🔄 Syncing status '${status}' to Sheets (Row ${report.sheets_row_number})...`);
-            // Run as background promise (or await if critical) - let's await for reliability in admin actions
-            const sheetUpdated = await updateSheetStatus(
-                report.program,
-                report.sheets_row_number,
-                status,
-                rejectionReason
-            );
+        console.log(`✅ Report ${id} status updated to '${status}' in Supabase`);
 
-            if (sheetUpdated) console.log('✅ Sheet status updated.');
-            else console.warn('⚠️ Sheet status update failed or row number invalid.');
+        // 4. DUAL-WRITE TO SHEETS (NON-BLOCKING)
+        // Only write to payment tracking sheet if status is 'approved'
+        if (status === 'approved') {
+            try {
+                console.log(`🔄 Writing verification data to payment tracking sheet...`);
+
+                const verificationData = {
+                    submission_date: report.submission_date,
+                    verification_nota: report.verification_nota,
+                    base_payment_amount: report.base_payment_amount
+                };
+
+                const sheetsWritten = await writeVerificationToSheet(
+                    report.program,
+                    report.id,
+                    verificationData
+                );
+
+                if (sheetsWritten) {
+                    console.log('✅ Verification data written to payment tracking sheet');
+                } else {
+                    console.warn('⚠️ Payment tracking sheet write failed (non-blocking)');
+                }
+
+                // Log to dual_write_logs
+                await supabase.from('dual_write_logs').insert({
+                    operation_type: 'verify_approve',
+                    table_name: 'reports',
+                    record_id: report.id,
+                    supabase_success: true,
+                    sheets_success: sheetsWritten,
+                    sheets_error: sheetsWritten ? null : 'Failed to write verification data',
+                    program: report.program,
+                    created_at: new Date().toISOString()
+                });
+
+            } catch (sheetError) {
+                console.error('⚠️ Payment tracking sheet write failed (non-blocking):', sheetError);
+
+                // Log failure
+                try {
+                    await supabase.from('dual_write_logs').insert({
+                        operation_type: 'verify_approve',
+                        table_name: 'reports',
+                        record_id: report.id,
+                        supabase_success: true,
+                        sheets_success: false,
+                        sheets_error: sheetError.message,
+                        program: report.program,
+                        created_at: new Date().toISOString()
+                    });
+                } catch (logError) {
+                    console.error('⚠️ Failed to log to dual_write_logs:', logError);
+                }
+            }
+        }
+
+        // 5. Also sync to legacy Sheets (for backward compatibility)
+        if (report.sheets_row_number) {
+            try {
+                console.log(`🔄 Syncing status '${status}' to legacy Sheets (Row ${report.sheets_row_number})...`);
+                const sheetUpdated = await updateSheetStatus(
+                    report.program,
+                    report.sheets_row_number,
+                    status,
+                    rejectionReason
+                );
+
+                if (sheetUpdated) console.log('✅ Legacy sheet status updated.');
+                else console.warn('⚠️ Legacy sheet status update failed or row number invalid.');
+            } catch (legacyError) {
+                console.error('⚠️ Legacy sheet update failed (non-blocking):', legacyError);
+            }
         }
 
         return res.status(200).json({ success: true });

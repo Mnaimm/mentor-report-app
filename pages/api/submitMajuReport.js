@@ -88,193 +88,187 @@ export default async function handler(req, res) {
       }
     }
 
-    // Prepare row data
-    const rowData = mapMajuDataToSheetRow(reportData, miaRequestId);
-    console.log('📊 Prepared row data (first 5 values):', rowData.slice(0, 5));
-    console.log('📊 Folder_ID in row data (index 25):', rowData[25]);
+    // ============================================================
+    // STEP 1: SUPABASE WRITE (BLOCKING - PRIMARY SOURCE OF TRUTH)
+    // ============================================================
+    console.log('📊 Step 1: Writing to Supabase (primary source of truth)...');
 
-    // Append data to Google Sheet with 8s timeout
-    console.log('📊 Appending data to Google Sheets...');
-    const appendRes = await Promise.race([
-      sheets.spreadsheets.values.append({
-        spreadsheetId: spreadsheetId,
-        range: range,
-        valueInputOption: 'USER_ENTERED',
-        insertDataOption: 'INSERT_ROWS',
-        requestBody: { values: [rowData] },
-      }),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Google Sheets API timeout after 10 seconds')), 10000)
-      )
-    ]);
-    console.log('✅ Sheet append successful');
+    // Prepare Supabase payload - MUST match 'reports' table schema
+    const supabasePayload = {
+      // Program & Metadata
+      program: 'Maju',
+      source: 'web_form',
+      status: 'submitted',
+      submission_date: new Date().toISOString(),
 
-    // Extract the row number where data was appended
-    const updatedRange = appendRes.data?.updates?.updatedRange || '';
-    console.log('📊 Updated range:', updatedRange);
-    
-    // Parse row number from something like "LaporanMaju!A3:AC3"
-    const newRowNumber = updatedRange.match(/!A(\d+):/)?.[1];
-    console.log('🔢 Extracted row number:', newRowNumber);
+      // Mentor Info
+      nama_mentor: reportData.NAMA_MENTOR || null,
+      mentor_email: reportData.EMAIL_MENTOR || null,
 
-    if (!newRowNumber) {
-      throw new Error('Could not determine the row number where data was inserted.');
+      // Mentee Info (use reports table column names!)
+      nama_mentee: reportData.NAMA_MENTEE || null,       // Maju uses 'nama_mentee'
+      nama_bisnes: reportData.NAMA_BISNES || null,
+      lokasi_bisnes: reportData.LOKASI_BISNES || null,
+      produk_servis: reportData.PRODUK_SERVIS || null,
+      no_telefon: reportData.NO_TELEFON || null,
+
+      // Session Info
+      session_date: reportData.TARIKH_SESI || null,
+      session_number: reportData.SESI_NUMBER || null,
+      mod_sesi: reportData.MOD_SESI || null,
+      lokasi_f2f: reportData.LOKASI_F2F || null,
+      masa_mula: reportData.MASA_MULA || null,
+      masa_tamat: reportData.MASA_TAMAT || null,
+
+      // Business Information
+      latarbelakang_usahawan: reportData.LATARBELAKANG_USAHAWAN || null,
+      status_perniagaan: reportData.STATUS_PERNIAGAAN_KESELURUHAN || null,
+      rumusan_langkah_kehadapan: reportData.RUMUSAN_DAN_LANGKAH_KEHADAPAN || null,
+
+      // Financial Data (JSONB array)
+      data_kewangan_bulanan: reportData.DATA_KEWANGAN_BULANAN_JSON || [],
+
+      // Mentoring Findings (JSONB array)
+      mentoring_findings: reportData.MENTORING_FINDINGS_JSON || [],
+
+      // Reflection
+      refleksi_mentor_perasaan: reportData.REFLEKSI_MENTOR_PERASAAN || null,
+      refleksi_mentor_komitmen: reportData.REFLEKSI_MENTOR_KOMITMEN || null,
+      refleksi_mentor_lain: reportData.REFLEKSI_MENTOR_LAIN || null,
+
+      // Images (JSONB object with nested structure)
+      image_urls: {
+        premis: reportData.URL_GAMBAR_PREMIS_JSON || [],
+        sesi: reportData.URL_GAMBAR_SESI_JSON || [],
+        growthwheel: reportData.URL_GAMBAR_GW360 || '',
+        mia: reportData.imageUrls?.mia || null  // Can be object with {whatsapp, email, call} or null
+      },
+
+      // Folder & Document IDs
+      folder_id: reportData.Folder_ID || null,
+      doc_url: reportData.Laporan_Maju_Doc_ID || null,  // Maju has doc_url immediately
+
+      // MIA Status (TEXT field: 'Tidak MIA' or 'MIA', NOT boolean!)
+      mia_status: reportData.MIA_STATUS || 'Tidak MIA',
+      mia_reason: reportData.MIA_REASON || null,
+      mia_proof_url: reportData.imageUrls?.mia?.whatsapp || null,  // Legacy field - use WhatsApp proof for backward compatibility
+      mia_proof_whatsapp: reportData.imageUrls?.mia?.whatsapp || null,
+      mia_proof_email: reportData.imageUrls?.mia?.email || null,
+      mia_proof_call: reportData.imageUrls?.mia?.call || null,
+
+      // Payment fields (defaults)
+      payment_status: 'pending'
+    };
+
+    // INSERT INTO SUPABASE (BLOCKING)
+    const { data: insertedData, error: supabaseInsertError } = await supabase
+      .from('reports')
+      .insert(supabasePayload)
+      .select();
+
+    if (supabaseInsertError) {
+      console.error('❌ Supabase insert failed:', supabaseInsertError);
+      throw new Error(`Supabase insert failed: ${supabaseInsertError.message}`);
     }
 
-    // Document will be generated automatically by Apps Script time-driven trigger
-    console.log(`✅ Data saved to row ${newRowNumber}. Document will be generated automatically.`);
+    const supabaseRecordId = insertedData?.[0]?.id || null;
+    console.log(`✅ Supabase write successful. Record ID: ${supabaseRecordId}`);
+
+    // If MIA submission, update mia_request with the report_id link
+    if (reportData.MIA_STATUS === 'MIA' && miaRequestId && supabaseRecordId) {
+      try {
+        const { error: updateError } = await supabase
+          .from('mia_requests')
+          .update({ report_id: supabaseRecordId })
+          .eq('id', miaRequestId);
+
+        if (updateError) {
+          console.error('⚠️ Failed to link MIA request to report (non-blocking):', updateError);
+        } else {
+          console.log(`✅ Linked MIA request ${miaRequestId} to report ${supabaseRecordId}`);
+        }
+      } catch (error) {
+        console.error('⚠️ MIA request update failed (non-blocking):', error);
+      }
+    }
 
     // ============================================================
-    // DUAL-WRITE TO SUPABASE (NON-BLOCKING)
+    // STEP 2: GOOGLE SHEETS WRITE (NON-BLOCKING - SECONDARY)
     // ============================================================
-    let supabaseSuccess = false;
-    let supabaseError = null;
-    let supabaseRecordId = null;
+    let newRowNumber = null;
+    let sheetsSuccess = false;
+    let sheetsError = null;
 
     try {
-      console.log('📊 Starting Supabase dual-write for MAJU report...');
+      console.log('📊 Step 2: Writing to Google Sheets (secondary, non-blocking)...');
 
-      // Prepare Supabase payload - MUST match 'reports' table schema
-      const supabasePayload = {
-        // Program & Metadata
-        program: 'Maju',
-        source: 'web_form',
-        status: 'submitted',
-        submission_date: new Date().toISOString(),
-        sheets_row_number: newRowNumber,
+      // Prepare row data WITH report_id in column P (index 15)
+      const rowData = mapMajuDataToSheetRow(reportData, miaRequestId);
+      rowData[15] = supabaseRecordId; // Column P = report_id
 
-        // Mentor Info
-        nama_mentor: reportData.NAMA_MENTOR || null,
-        mentor_email: reportData.EMAIL_MENTOR || null,
+      console.log('📊 Prepared row data (first 5 values):', rowData.slice(0, 5));
+      console.log('📊 Folder_ID in row data (index 25):', rowData[25]);
+      console.log('📊 report_id in row data (index 15):', rowData[15]);
 
-        // Mentee Info (use reports table column names!)
-        nama_mentee: reportData.NAMA_MENTEE || null,       // Maju uses 'nama_mentee'
-        nama_bisnes: reportData.NAMA_BISNES || null,
-        lokasi_bisnes: reportData.LOKASI_BISNES || null,
-        produk_servis: reportData.PRODUK_SERVIS || null,
-        no_telefon: reportData.NO_TELEFON || null,
+      // Append data to Google Sheet with timeout
+      const appendRes = await Promise.race([
+        sheets.spreadsheets.values.append({
+          spreadsheetId: spreadsheetId,
+          range: range,
+          valueInputOption: 'USER_ENTERED',
+          insertDataOption: 'INSERT_ROWS',
+          requestBody: { values: [rowData] },
+        }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Google Sheets API timeout after 10 seconds')), 10000)
+        )
+      ]);
 
-        // Session Info
-        session_date: reportData.TARIKH_SESI || null,
-        session_number: reportData.SESI_NUMBER || null,
-        mod_sesi: reportData.MOD_SESI || null,
-        lokasi_f2f: reportData.LOKASI_F2F || null,
-        masa_mula: reportData.MASA_MULA || null,
-        masa_tamat: reportData.MASA_TAMAT || null,
+      // Extract the row number where data was appended
+      const updatedRange = appendRes.data?.updates?.updatedRange || '';
+      console.log('📊 Updated range:', updatedRange);
 
-        // Business Information
-        latarbelakang_usahawan: reportData.LATARBELAKANG_USAHAWAN || null,
-        status_perniagaan: reportData.STATUS_PERNIAGAAN_KESELURUHAN || null,
-        rumusan_langkah_kehadapan: reportData.RUMUSAN_DAN_LANGKAH_KEHADAPAN || null,
+      // Parse row number from something like "LaporanMaju!A3:AC3"
+      newRowNumber = updatedRange.match(/!A(\d+):/)?.[1];
+      console.log('🔢 Extracted row number:', newRowNumber);
 
-        // Financial Data (JSONB array)
-        data_kewangan_bulanan: reportData.DATA_KEWANGAN_BULANAN_JSON || [],
+      if (newRowNumber) {
+        sheetsSuccess = true;
+        console.log(`✅ Sheets write successful. Row: ${newRowNumber}. Document will be generated automatically.`);
 
-        // Mentoring Findings (JSONB array)
-        mentoring_findings: reportData.MENTORING_FINDINGS_JSON || [],
-
-        // Reflection
-        refleksi_mentor_perasaan: reportData.REFLEKSI_MENTOR_PERASAAN || null,
-        refleksi_mentor_komitmen: reportData.REFLEKSI_MENTOR_KOMITMEN || null,
-        refleksi_mentor_lain: reportData.REFLEKSI_MENTOR_LAIN || null,
-
-        // Images (JSONB object with nested structure)
-        image_urls: {
-          premis: reportData.URL_GAMBAR_PREMIS_JSON || [],
-          sesi: reportData.URL_GAMBAR_SESI_JSON || [],
-          growthwheel: reportData.URL_GAMBAR_GW360 || '',
-          mia: reportData.imageUrls?.mia || null  // Can be object with {whatsapp, email, call} or null
-        },
-
-        // Folder & Document IDs
-        folder_id: reportData.Folder_ID || null,
-        doc_url: reportData.Laporan_Maju_Doc_ID || null,  // Maju has doc_url immediately
-
-        // MIA Status (TEXT field: 'Tidak MIA' or 'MIA', NOT boolean!)
-        mia_status: reportData.MIA_STATUS || 'Tidak MIA',
-        mia_reason: reportData.MIA_REASON || null,
-        mia_proof_url: reportData.imageUrls?.mia?.whatsapp || null,  // Legacy field - use WhatsApp proof for backward compatibility
-        mia_proof_whatsapp: reportData.imageUrls?.mia?.whatsapp || null,
-        mia_proof_email: reportData.imageUrls?.mia?.email || null,
-        mia_proof_call: reportData.imageUrls?.mia?.call || null,
-
-        // Payment fields (defaults)
-        payment_status: 'pending'
-      };
-
-      const { data: insertedData, error: supabaseInsertError } = await supabase
-        .from('reports')  // ✅ FIXED: Use existing 'reports' table (same for Bangkit & Maju)
-        .insert(supabasePayload)
-        .select();
-
-      if (supabaseInsertError) throw supabaseInsertError;
-
-      supabaseSuccess = true;
-      supabaseRecordId = insertedData?.[0]?.id || null;
-      console.log(`✅ Supabase dual-write successful. Record ID: ${supabaseRecordId}`);
-
-      // If MIA submission, update mia_request with the report_id link
-      if (reportData.MIA_STATUS === 'MIA' && miaRequestId && supabaseRecordId) {
-        try {
-          const { error: updateError } = await supabase
-            .from('mia_requests')
-            .update({ report_id: supabaseRecordId })
-            .eq('id', miaRequestId);
-
-          if (updateError) {
-            console.error('⚠️ Failed to link MIA request to report (non-blocking):', updateError);
-          } else {
-            console.log(`✅ Linked MIA request ${miaRequestId} to report ${supabaseRecordId}`);
-          }
-        } catch (error) {
-          console.error('⚠️ MIA request update failed (non-blocking):', error);
-        }
+        // Update Supabase with sheets_row_number (non-blocking)
+        await supabase
+          .from('reports')
+          .update({ sheets_row_number: newRowNumber })
+          .eq('id', supabaseRecordId);
+      } else {
+        throw new Error('Could not determine the row number where data was inserted.');
       }
-
-      // Log success to dual_write_monitoring
-      await supabase.from('dual_write_monitoring').insert({
-        source_system: 'google_sheets',
-        target_system: 'supabase',
-        operation_type: 'insert',
-        table_name: 'reports',  // ✅ FIXED: Correct table name
-        record_id: supabaseRecordId,
-        google_sheets_row: newRowNumber,
-        status: 'success',
-        timestamp: new Date().toISOString(),
-        metadata: {
-          mentor_email: reportData.EMAIL_MENTOR,
-          mentee_name: reportData.NAMA_MENTEE,
-          session_number: reportData.SESI_NUMBER
-        }
-      });
 
     } catch (error) {
-      supabaseError = error.message;
-      console.error('⚠️ Supabase dual-write failed (non-blocking):', error);
+      sheetsError = error.message;
+      console.error('⚠️ Google Sheets write failed (non-blocking):', error);
+      // DO NOT throw - Sheets failure is non-blocking
+    }
 
-      // Log failure to dual_write_monitoring (best effort)
-      try {
-        await supabase.from('dual_write_monitoring').insert({
-          source_system: 'google_sheets',
-          target_system: 'supabase',
-          operation_type: 'insert',
-          table_name: 'reports',  // ✅ FIXED: Correct table name
-          google_sheets_row: newRowNumber,
-          status: 'failed',
-          error_message: error.message,
-          timestamp: new Date().toISOString(),
-          metadata: {
-            mentor_email: reportData.EMAIL_MENTOR,
-            mentee_name: reportData.NAMA_MENTEE,
-            session_number: reportData.SESI_NUMBER
-          }
-        });
-      } catch (monitoringError) {
-        console.error('⚠️ Failed to log to dual_write_monitoring:', monitoringError);
-      }
+    // Log to dual_write_logs
+    try {
+      await supabase.from('dual_write_logs').insert({
+        operation_type: 'submit_report',
+        table_name: 'reports',
+        record_id: supabaseRecordId,
+        supabase_success: true,
+        sheets_success: sheetsSuccess,
+        sheets_error: sheetsError,
+        sheets_row_number: newRowNumber,
+        program: 'Maju',
+        created_at: new Date().toISOString()
+      });
+    } catch (logError) {
+      console.error('⚠️ Failed to log to dual_write_logs:', logError);
     }
     // ============================================================
-    // END DUAL-WRITE TO SUPABASE
+    // END PRIMARY DUAL-WRITE (Supabase + Sheets)
     // ============================================================
 
     // Invalidate cache on successful submission
@@ -296,7 +290,19 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       message: 'Laporan berjaya dihantar! Dokumen akan dicipta secara automatik dalam masa 1-2 minit.',
-      rowNumber: newRowNumber
+      recordId: supabaseRecordId,
+      rowNumber: newRowNumber,
+      dualWrite: {
+        supabaseReports: {
+          success: true, // Always true if we reach this point
+          recordId: supabaseRecordId
+        },
+        sheetsWrite: {
+          success: sheetsSuccess,
+          rowNumber: newRowNumber,
+          error: sheetsError
+        }
+      }
     });
 
   } catch (error) {

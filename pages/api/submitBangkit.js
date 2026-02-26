@@ -298,43 +298,200 @@ export default async function handler(req, res) {
 
     // Only Bangkit is handled by this endpoint now
     // Maju has its own dedicated endpoint: /api/submitMajuReport
-    if (programType === 'bangkit') {
-      spreadsheetId = process.env.GOOGLE_SHEETS_REPORT_ID;
-      const bangkitTab = process.env.Bangkit_TAB || 'Bangkit';
-      range = `${bangkitTab}!A1`; // Bangkit tab (columns A-CI: 0-86)
-      rowData = mapBangkitDataToSheetRow(reportData, miaRequestId);
-      if (!spreadsheetId) {
-        throw new Error('Missing GOOGLE_SHEETS_REPORT_ID environment variable for Bangkit program.');
-      }
-      console.log('🔗 Bangkit Sheet ID:', spreadsheetId, '- Tab:', bangkitTab);
-    } else {
+    if (programType !== 'bangkit') {
       return res.status(400).json({
         error: 'Invalid programType. This endpoint only handles "bangkit". Use /api/submitMajuReport for Maju reports.'
       });
     }
 
-    // Append data to the determined Google Sheet and tab with 8s timeout
-    console.log(`📊 Attempting to append data to ${programType} sheet...`);
-    const appendRes = await Promise.race([
-      sheets.spreadsheets.values.append({
-        spreadsheetId: spreadsheetId,
-        range: range,
-        valueInputOption: 'USER_ENTERED',
-        insertDataOption: 'INSERT_ROWS',
-        requestBody: { values: [rowData] },
-      }),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Google Sheets API timeout after 10 seconds')), 10000)
-      )
-    ]);
-    console.log(`✅ Sheet append successful for ${programType}`);
+    // ============================================================
+    // STEP 1: SUPABASE WRITE (BLOCKING - PRIMARY SOURCE OF TRUTH)
+    // ============================================================
+    console.log('📊 Step 1: Writing to Supabase (primary source of truth)...');
 
-    // Get the row number where data was appended
-    const updatedRange = appendRes.data?.updates?.updatedRange || '';
-    const newRowNumber = getRowNumberFromUpdatedRange(updatedRange);
+    // Resolve entrepreneur ID BEFORE inserting into reports
+    const entrepreneurEmail =
+      reportData.emailUsahawan ||
+      reportData.entrepreneurEmail ||
+      reportData.email;
 
-    // Document will be generated automatically by Apps Script time-driven trigger
-    console.log(`✅ Data saved to row ${newRowNumber}. Document will be generated automatically.`);
+    if (!entrepreneurEmail) {
+      throw new Error('Entrepreneur email not found in report data');
+    }
+
+    const { data: entrepreneur, error: entrepreneurError } = await supabase
+      .from('entrepreneurs')
+      .select('id')
+      .eq('email', entrepreneurEmail.toLowerCase().trim())
+      .single();
+
+    if (entrepreneurError || !entrepreneur) {
+      throw new Error(`Entrepreneur not found: ${entrepreneurEmail}`);
+    }
+
+    console.log(`✅ Entrepreneur resolved: ${entrepreneur.id}`);
+
+    // Prepare Supabase payload - MUST match 'reports' table schema
+    const supabasePayload = {
+      // Program & Metadata
+      program: 'Bangkit',
+      source: 'web_form',
+      status: 'submitted',
+      submission_date: new Date().toISOString(),
+
+      // Foreign Keys
+      entrepreneur_id: entrepreneur.id,
+
+      // Mentor Info
+      mentor_email: reportData?.mentorEmail || null,
+      nama_mentor: reportData?.namaMentor || null,
+
+      // Entrepreneur/Mentee Info (use reports table column names!)
+      nama_usahawan: reportData?.usahawan || null,      // NOT 'mentee_name'
+      nama_syarikat: reportData?.namaSyarikat || null,  // NOT 'company_name'
+
+      // Session Info
+      session_number: reportData?.sesiLaporan || null,
+      session_date: reportData?.sesi?.date || null,
+      masa_mula: reportData?.sesi?.time || null,        // NOT 'session_time'
+      mod_sesi: reportData?.sesi?.platform || null,     // NOT 'session_platform'
+      lokasi_f2f: reportData?.sesi?.lokasiF2F || null,  // NOT 'session_location'
+
+      // Business Info
+      produk_servis: reportData?.tambahan?.produkServis || null,
+      pautan_media_sosial: reportData?.tambahan?.pautanMediaSosial || null,
+
+      // Initiatives (JSONB array)
+      inisiatif: reportData?.inisiatif || [],
+      kemaskini_inisiatif: reportData?.kemaskiniInisiatif?.join('\n\n') || null,
+
+      // Sales data (JSONB - can be null or array)
+      jualan_terkini: reportData?.jualanTerkini || null,
+
+      // Observations & Summary
+      pemerhatian: reportData?.pemerhatian || null,
+      rumusan: reportData?.rumusan || null,
+
+      // Reflection (JSONB object)
+      refleksi: reportData?.refleksi || null,
+
+      // GrowthWheel scores (JSONB array)
+      gw_skor: reportData?.gwSkor || null,
+
+      // Images (JSONB object with nested structure)
+      image_urls: {
+        sesi: reportData?.imageUrls?.sesi || [],
+        growthwheel: reportData?.imageUrls?.growthwheel || '',
+        profil: reportData?.imageUrls?.profil || '',
+        premis: reportData?.imageUrls?.premis || [],
+        mia: reportData?.imageUrls?.mia || null  // Can be object with {whatsapp, email, call} or null
+      },
+
+      // Premises visit
+      premis_dilawat: reportData?.premisDilawatChecked || false,
+
+      // MIA status (TEXT field: 'Selesai' or 'MIA', NOT boolean!)
+      mia_status: reportData?.status || 'Selesai',
+      mia_proof_url: reportData?.imageUrls?.mia?.whatsapp || null,  // Legacy field - use WhatsApp proof for backward compatibility
+      mia_reason: reportData?.mia?.alasan || null,
+
+      // Folder ID for Google Drive integration
+      folder_id: reportData?.folder_id || null,
+
+      // Payment fields (defaults)
+      payment_status: 'pending'
+    };
+
+    // INSERT INTO SUPABASE (BLOCKING)
+    const { data: insertedData, error: supabaseInsertError } = await supabase
+      .from('reports')
+      .insert(supabasePayload)
+      .select();
+
+    if (supabaseInsertError) {
+      console.error('❌ Supabase insert failed:', supabaseInsertError);
+      throw new Error(`Supabase insert failed: ${supabaseInsertError.message}`);
+    }
+
+    const supabaseRecordId = insertedData?.[0]?.id || null;
+    console.log(`✅ Supabase write successful. Record ID: ${supabaseRecordId}`);
+
+    // ============================================================
+    // STEP 2: GOOGLE SHEETS WRITE (NON-BLOCKING - SECONDARY)
+    // ============================================================
+    let newRowNumber = null;
+    let sheetsSuccess = false;
+    let sheetsError = null;
+
+    try {
+      console.log('📊 Step 2: Writing to Google Sheets (secondary, non-blocking)...');
+
+      spreadsheetId = process.env.GOOGLE_SHEETS_REPORT_ID;
+      const bangkitTab = process.env.Bangkit_TAB || 'Bangkit';
+      range = `${bangkitTab}!A1`; // Bangkit tab (columns A-CI: 0-86)
+
+      if (!spreadsheetId) {
+        throw new Error('Missing GOOGLE_SHEETS_REPORT_ID environment variable for Bangkit program.');
+      }
+
+      console.log('🔗 Bangkit Sheet ID:', spreadsheetId, '- Tab:', bangkitTab);
+
+      // Map data to Sheet row WITH report_id in column P (index 15)
+      rowData = mapBangkitDataToSheetRow(reportData, miaRequestId);
+      rowData[15] = supabaseRecordId; // Column P = report_id
+
+      // Append data to Google Sheet with timeout
+      const appendRes = await Promise.race([
+        sheets.spreadsheets.values.append({
+          spreadsheetId: spreadsheetId,
+          range: range,
+          valueInputOption: 'USER_ENTERED',
+          insertDataOption: 'INSERT_ROWS',
+          requestBody: { values: [rowData] },
+        }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Google Sheets API timeout after 10 seconds')), 10000)
+        )
+      ]);
+
+      // Get the row number where data was appended
+      const updatedRange = appendRes.data?.updates?.updatedRange || '';
+      newRowNumber = getRowNumberFromUpdatedRange(updatedRange);
+      sheetsSuccess = true;
+
+      console.log(`✅ Sheets write successful. Row: ${newRowNumber}. Document will be generated automatically.`);
+
+      // Update Supabase with sheets_row_number (non-blocking)
+      await supabase
+        .from('reports')
+        .update({ sheets_row_number: newRowNumber })
+        .eq('id', supabaseRecordId);
+
+    } catch (error) {
+      sheetsError = error.message;
+      console.error('⚠️ Google Sheets write failed (non-blocking):', error);
+      // DO NOT throw - Sheets failure is non-blocking
+    }
+
+    // Log to dual_write_logs
+    try {
+      await supabase.from('dual_write_logs').insert({
+        operation_type: 'submit_report',
+        table_name: 'reports',
+        record_id: supabaseRecordId,
+        supabase_success: true,
+        sheets_success: sheetsSuccess,
+        sheets_error: sheetsError,
+        sheets_row_number: newRowNumber,
+        program: 'Bangkit',
+        created_at: new Date().toISOString()
+      });
+    } catch (logError) {
+      console.error('⚠️ Failed to log to dual_write_logs:', logError);
+    }
+    // ============================================================
+    // END PRIMARY DUAL-WRITE (Supabase + Sheets)
+    // ============================================================
 
 
 
@@ -396,168 +553,7 @@ export default async function handler(req, res) {
     // END UPWARD MOBILITY GOOGLE SHEET DUAL-WRITE
     // ============================================================
 
-    // ============================================================
-    // DUAL-WRITE TO SUPABASE (NON-BLOCKING)
-    // ============================================================
-    let supabaseSuccess = false;
-    let supabaseError = null;
-    let supabaseRecordId = null;
-
-    try {
-      console.log('📊 Starting Supabase dual-write for Bangkit session report...');
-
-      // Resolve entrepreneur ID BEFORE inserting into reports
-      const entrepreneurEmail =
-        reportData.emailUsahawan ||
-        reportData.entrepreneurEmail ||
-        reportData.email;
-
-      if (!entrepreneurEmail) {
-        throw new Error('Entrepreneur email not found in report data');
-      }
-
-      const { data: entrepreneur, error: entrepreneurError } = await supabase
-        .from('entrepreneurs')
-        .select('id')
-        .eq('email', entrepreneurEmail.toLowerCase().trim())
-        .single();
-
-      if (entrepreneurError || !entrepreneur) {
-        throw new Error(`Entrepreneur not found: ${entrepreneurEmail}`);
-      }
-
-      console.log(`✅ Entrepreneur resolved: ${entrepreneur.id}`);
-
-      // Prepare Supabase payload - MUST match 'reports' table schema
-      const supabasePayload = {
-        // Program & Metadata
-        program: 'Bangkit',
-        source: 'web_form',
-        status: 'submitted',
-        submission_date: new Date().toISOString(),
-        sheets_row_number: newRowNumber,
-
-        // Foreign Keys
-        entrepreneur_id: entrepreneur.id,
-
-        // Mentor Info
-        mentor_email: reportData?.mentorEmail || null,
-        nama_mentor: reportData?.namaMentor || null,
-
-        // Entrepreneur/Mentee Info (use reports table column names!)
-        nama_usahawan: reportData?.usahawan || null,      // NOT 'mentee_name'
-        nama_syarikat: reportData?.namaSyarikat || null,  // NOT 'company_name'
-
-        // Session Info
-        session_number: reportData?.sesiLaporan || null,
-        session_date: reportData?.sesi?.date || null,
-        masa_mula: reportData?.sesi?.time || null,        // NOT 'session_time'
-        mod_sesi: reportData?.sesi?.platform || null,     // NOT 'session_platform'
-        lokasi_f2f: reportData?.sesi?.lokasiF2F || null,  // NOT 'session_location'
-
-        // Business Info
-        produk_servis: reportData?.tambahan?.produkServis || null,
-        pautan_media_sosial: reportData?.tambahan?.pautanMediaSosial || null,
-
-        // Initiatives (JSONB array)
-        inisiatif: reportData?.inisiatif || [],
-        kemaskini_inisiatif: reportData?.kemaskiniInisiatif?.join('\n\n') || null,
-
-        // Sales data (JSONB - can be null or array)
-        jualan_terkini: reportData?.jualanTerkini || null,
-
-        // Observations & Summary
-        pemerhatian: reportData?.pemerhatian || null,
-        rumusan: reportData?.rumusan || null,
-
-        // Reflection (JSONB object)
-        refleksi: reportData?.refleksi || null,
-
-        // GrowthWheel scores (JSONB array)
-        gw_skor: reportData?.gwSkor || null,
-
-        // Images (JSONB object with nested structure)
-        image_urls: {
-          sesi: reportData?.imageUrls?.sesi || [],
-          growthwheel: reportData?.imageUrls?.growthwheel || '',
-          profil: reportData?.imageUrls?.profil || '',
-          premis: reportData?.imageUrls?.premis || [],
-          mia: reportData?.imageUrls?.mia || null  // Can be object with {whatsapp, email, call} or null
-        },
-
-        // Premises visit
-        premis_dilawat: reportData?.premisDilawatChecked || false,
-
-        // MIA status (TEXT field: 'Selesai' or 'MIA', NOT boolean!)
-        mia_status: reportData?.status || 'Selesai',
-        mia_proof_url: reportData?.imageUrls?.mia?.whatsapp || null,  // Legacy field - use WhatsApp proof for backward compatibility
-        mia_reason: reportData?.mia?.alasan || null,
-
-        // Folder ID for Google Drive integration
-        folder_id: reportData?.folder_id || null,
-
-        // Payment fields (defaults)
-        payment_status: 'pending'
-      };
-
-      const { data: insertedData, error: supabaseInsertError } = await supabase
-        .from('reports')  // ✅ FIXED: Use existing 'reports' table
-        .insert(supabasePayload)
-        .select();
-
-      if (supabaseInsertError) throw supabaseInsertError;
-
-      supabaseSuccess = true;
-      supabaseRecordId = insertedData?.[0]?.id || null;
-      console.log(`✅ Supabase dual-write successful. Record ID: ${supabaseRecordId}`);
-
-      // Log success to dual_write_monitoring
-      await supabase.from('dual_write_monitoring').insert({
-        source_system: 'google_sheets',
-        target_system: 'supabase',
-        operation_type: 'insert',
-        table_name: 'reports',  // ✅ FIXED: Correct table name
-        record_id: supabaseRecordId,
-        google_sheets_row: newRowNumber,
-        status: 'success',
-        timestamp: new Date().toISOString(),
-        metadata: {
-          mentor_email: reportData?.mentorEmail,
-          mentee_name: reportData?.usahawan,
-          session_number: reportData?.sesiLaporan,
-          program: 'Bangkit'
-        }
-      });
-
-    } catch (error) {
-      supabaseError = error.message;
-      console.error('⚠️ Supabase dual-write failed (non-blocking):', error);
-
-      // Log failure to dual_write_monitoring (best effort)
-      try {
-        await supabase.from('dual_write_monitoring').insert({
-          source_system: 'google_sheets',
-          target_system: 'supabase',
-          operation_type: 'insert',
-          table_name: 'reports',  // ✅ FIXED: Correct table name
-          google_sheets_row: newRowNumber,
-          status: 'failed',
-          error_message: error.message,
-          timestamp: new Date().toISOString(),
-          metadata: {
-            mentor_email: reportData?.mentorEmail,
-            mentee_name: reportData?.usahawan,
-            session_number: reportData?.sesiLaporan,
-            program: 'Bangkit'
-          }
-        });
-      } catch (monitoringError) {
-        console.error('⚠️ Failed to log to dual_write_monitoring:', monitoringError);
-      }
-    }
-    // ============================================================
-    // END DUAL-WRITE TO SUPABASE
-    // ============================================================
+    // (Old Supabase dual-write section removed - now done in Step 1 above)
 
     // ============================================================
     // DUAL-WRITE TO UPWARD_MOBILITY_REPORTS TABLE (NON-BLOCKING)
@@ -769,22 +765,23 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       message: 'Laporan Bangkit dan Upward Mobility berjaya dihantar! Dokumen akan dicipta secara automatik dalam masa 1-2 minit.',
+      recordId: supabaseRecordId,
       rowNumber: newRowNumber,
       dualWrite: {
+        supabaseReports: {
+          success: true, // Always true if we reach this point
+          recordId: supabaseRecordId
+        },
         bangkitSheet: {
-          success: true,
-          rowNumber: newRowNumber
+          success: sheetsSuccess,
+          rowNumber: newRowNumber,
+          error: sheetsError
         },
         upwardMobilitySheet: {
           success: umSheetSuccess,
           rowNumber: umSheetRowNumber,
           error: umSheetError,
           skipped: reportData.status === 'MIA' || !reportData.UPWARD_MOBILITY_JSON
-        },
-        supabaseReports: {
-          success: supabaseSuccess,
-          recordId: supabaseRecordId,
-          error: supabaseError
         },
         supabaseUpwardMobility: {
           success: umSuccess,
