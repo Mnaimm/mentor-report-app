@@ -239,6 +239,7 @@ export default async function handler(req, res) {
 
                 // Status updates
                 status: 'submitted',
+                payment_status: 'pending',
                 revision_reason: null,
                 revision_notes: null,
                 revision_requested_by: null,
@@ -299,6 +300,7 @@ export default async function handler(req, res) {
 
                 // Update status back to 'submitted' (to re-trigger admin review)
                 status: 'submitted',
+                payment_status: 'pending',
 
                 // Clear revision fields
                 revision_reason: null,
@@ -383,7 +385,7 @@ export default async function handler(req, res) {
         // 3. Log to dual_write_logs
         try {
             await supabase.from('dual_write_logs').insert({
-                operation_type: 'revise_report',
+                operation_type: 'revision_submit',
                 table_name: 'reports',
                 record_id: id,
                 supabase_success: true,
