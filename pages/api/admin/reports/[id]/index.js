@@ -111,7 +111,8 @@ export default async function handler(req, res) {
             premis_dilawat: report.premis_dilawat, // Boolean
             payment_status: report.payment_status, // String
             document_url: finalDocUrl, // Return the synced URL
-            sheets_row_number: report.sheets_row_number
+            sheets_row_number: report.sheets_row_number,
+            revision_count: report.revision_count || 0 // Revision tracking
         };
 
         return res.status(200).json({ success: true, data: responseData, synced: urlUpdated });

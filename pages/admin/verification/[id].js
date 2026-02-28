@@ -183,11 +183,16 @@ export default function ReviewReport({ userEmail, isReadOnlyUser, accessDenied }
                         </div>
                     )}
 
-                    <h1 className="text-lg font-bold text-gray-800">
+                    <h1 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                         Scanning: {report.mentor_name}
-                        <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full">
+                        <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full">
                             {report.program} - Session {report.session_number}
                         </span>
+                        {report.revision_count >= 1 && (
+                            <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-xs rounded-full font-semibold border border-amber-300">
+                                📝 Semakan Ke-{report.revision_count + 1}
+                            </span>
+                        )}
                     </h1>
                 </div>
                 <div className="flex gap-2">
