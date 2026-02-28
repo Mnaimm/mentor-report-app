@@ -469,10 +469,27 @@ export default async function handler(req, res) {
       completionRate: 0 // Can calculate if needed
     };
 
-    // 6. Recent reports - skip for now (can be added later if needed)
+    // 6. Get revision request count (reports with status = 'review_requested')
+    let revisionRequestCount = 0;
+    try {
+      const { data: revisionReports, error: revisionError } = await supabase
+        .from('reports')
+        .select('id')
+        .eq('mentor_email', userEmail)
+        .eq('status', 'review_requested');
+
+      if (!revisionError && revisionReports) {
+        revisionRequestCount = revisionReports.length;
+        console.log(`📝 Found ${revisionRequestCount} reports needing revision for ${userEmail}`);
+      }
+    } catch (e) {
+      console.warn('⚠️ Error fetching revision request count:', e);
+    }
+
+    // 7. Recent reports - skip for now (can be added later if needed)
     const recentReports = [];
 
-    // 7. Upcoming sessions (sessions due in next 14 days)
+    // 8. Upcoming sessions (sessions due in next 14 days)
     const upcomingSessions = mentees
       .filter(m => m.nextDueDate && m.daysUntilDue !== null && m.daysUntilDue >= 0 && m.daysUntilDue <= 14)
       .sort((a, b) => a.daysUntilDue - b.daysUntilDue)
@@ -485,7 +502,7 @@ export default async function handler(req, res) {
         status: m.status
       }));
 
-    // 8. Payment summary
+    // 9. Payment summary
     const paymentSummary = {
       totalRequests: paymentRequests.length,
       pendingApproval: paymentRequests.filter(p => p.status === 'pending_approval').length,
@@ -512,6 +529,7 @@ export default async function handler(req, res) {
       recentReports,
       upcomingSessions,
       paymentSummary,
+      revisionRequestCount,
       timestamp: new Date().toISOString()
     });
 

@@ -243,6 +243,29 @@ export default function MentorDashboard() {
           Selamat kembali, {session?.user?.name || 'Mentor'}! Pantau kemajuan usahawan anda di sini.
         </p>
 
+        {/* REVISION REQUEST ALERT */}
+        {dashboardData?.revisionRequestCount > 0 && (
+          <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-lg shadow-sm mb-6">
+            <div className="flex items-center gap-3">
+              <div className="text-3xl">📝</div>
+              <div className="flex-1">
+                <p className="font-bold text-amber-900 text-lg mb-1">
+                  Tindakan Diperlukan: Semakan Laporan
+                </p>
+                <p className="text-amber-800">
+                  Anda mempunyai <span className="font-bold">{dashboardData.revisionRequestCount} laporan</span> yang memerlukan semakan semula
+                </p>
+              </div>
+              <button
+                onClick={() => router.push('/mentor/my-reports?filter=review_requested')}
+                className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium shadow-sm whitespace-nowrap"
+              >
+                Lihat Laporan →
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Enhanced Summary Panel */}
         {dashboardData && (
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6 mt-4 shadow-sm">
