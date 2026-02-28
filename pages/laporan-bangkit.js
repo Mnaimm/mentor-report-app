@@ -1778,12 +1778,61 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
           {renderFieldWarning('Tiada gambar Growth Wheel')}
           <div className={getFieldHighlightClass('Tiada gambar Growth Wheel')}>
             <FileInput label="Gambar Carta GrowthWheel 360°" onChange={(e) => handleFileChange('gw', e.target.files)} required isImageUpload={true} />
+            {isRevisionMode && revisionData?.image_urls?.growthwheel && (
+              <div className="mt-2">
+                <p className="text-sm text-gray-600">Existing GrowthWheel Image:</p>
+                <div className="flex flex-wrap gap-2">
+                  <a
+                    href={revisionData.image_urls.growthwheel}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-500 hover:underline text-sm"
+                  >
+                    View Image
+                  </a>
+                </div>
+              </div>
+            )}
           </div>
 
           {renderFieldWarning('Gambar sesi tidak ada / tidak mencukupi')}
           <div className={getFieldHighlightClass('Gambar sesi tidak ada / tidak mencukupi')}>
             <FileInput label="Satu (1) Gambar Individu Usahawan (Profil)" onChange={(e) => handleFileChange('profil', e.target.files)} required isImageUpload={true} />
+            {isRevisionMode && revisionData?.image_urls?.profil && (
+              <div className="mt-2">
+                <p className="text-sm text-gray-600">Existing Profile Image:</p>
+                <div className="flex flex-wrap gap-2">
+                  <a
+                    href={revisionData.image_urls.profil}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-500 hover:underline text-sm"
+                  >
+                    View Image
+                  </a>
+                </div>
+              </div>
+            )}
+
             <FileInput label="Dua (2) Gambar Sesi Mentoring" multiple onChange={(e) => handleFileChange('sesi', e.target.files, true)} required isImageUpload={true} />
+            {isRevisionMode && revisionData?.image_urls?.sesi && revisionData.image_urls.sesi.length > 0 && (
+              <div className="mt-2">
+                <p className="text-sm text-gray-600">Existing Session Images:</p>
+                <div className="flex flex-wrap gap-2">
+                  {revisionData.image_urls.sesi.map((url, index) => (
+                    <a
+                      key={index}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-500 hover:underline text-sm"
+                    >
+                      Image {index + 1}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Lawatan Premis checkbox */}
@@ -1796,6 +1845,24 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
           {formState.sesi.premisDilawat && (
             <div>
               <FileInput label="Gambar Lawatan Premis *" multiple onChange={(e) => handleFileChange('premis', e.target.files, true)} required isImageUpload={true} />
+              {isRevisionMode && revisionData?.image_urls?.premis && revisionData.image_urls.premis.length > 0 && (
+                <div className="mt-2">
+                  <p className="text-sm text-gray-600">Existing Premises Images:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {revisionData.image_urls.premis.map((url, index) => (
+                      <a
+                        key={index}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-500 hover:underline text-sm"
+                      >
+                        Image {index + 1}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
               <p className="mt-1 text-sm text-gray-600 italic">
                 Gambar bahagian depan premis bisnes mentee, Gambar-gambar ruang dalam bisnes mentee, Gambar-gambar aset yang ada (terutama yang dibeli menggunakan geran BIMB), selfie depan premise
               </p>
@@ -2429,6 +2496,19 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
 
         <Section title={`Muat Naik Gambar (Sesi ${currentSession})`}>
           <FileInput label="Gambar Sesi Mentoring" multiple onChange={(e) => handleFileChange('sesi', e.target.files, true)} required isImageUpload={true} />
+          {isRevisionMode && revisionData?.image_urls?.sesi && revisionData.image_urls.sesi.length > 0 && (
+            <div className="mt-2">
+              <p className="text-sm text-gray-600">Existing Session Images:</p>
+              <div className="flex flex-wrap gap-2">
+                {revisionData.image_urls.sesi.map((url, index) => (
+                  <a key={index} href={url} target="_blank" rel="noopener noreferrer"
+                     className="text-blue-500 hover:underline text-sm">
+                    Image {index + 1}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
           {!previousData.premisDilawat && (
             <div>
               <div className="text-sm text-yellow-800 bg-yellow-50 border border-yellow-200 rounded p-2 mb-2">
@@ -2440,6 +2520,19 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                 onChange={(e) => handleFileChange('premis', e.target.files, true)}
                 isImageUpload={true}
               />
+              {isRevisionMode && revisionData?.image_urls?.premis && revisionData.image_urls.premis.length > 0 && (
+                <div className="mt-2">
+                  <p className="text-sm text-gray-600">Existing Premises Images:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {revisionData.image_urls.premis.map((url, index) => (
+                      <a key={index} href={url} target="_blank" rel="noopener noreferrer"
+                         className="text-blue-500 hover:underline text-sm">
+                        Image {index + 1}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
               <p className="mt-1 text-sm text-gray-600 italic">
                 Gambar bahagian depan premis bisnes mentee, Gambar-gambar ruang dalam bisnes mentee, Gambar-gambar aset yang ada (terutama yang dibeli menggunakan geran BIMB), selfie depan premise
               </p>
