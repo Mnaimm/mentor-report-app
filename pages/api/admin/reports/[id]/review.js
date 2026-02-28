@@ -143,6 +143,111 @@ export default async function handler(req, res) {
             }
         }
 
+        // 6. REGENERATE DOC FOR REVISED REPORTS (NON-BLOCKING)
+        if (status === 'approved') {
+            try {
+                // Fetch full report data including revision_count
+                const { data: fullReport, error: fullReportError } = await supabase
+                    .from('reports')
+                    .select('id, revision_count, sheets_row_number, program')
+                    .eq('id', id)
+                    .single();
+
+                if (!fullReportError && fullReport && fullReport.revision_count > 0) {
+                    console.log(`🔄 Report has revision_count=${fullReport.revision_count}, triggering PDF regeneration...`);
+
+                    // Determine which GAS to call based on program
+                    const isBangkit = fullReport.program?.toLowerCase().includes('bangkit');
+                    const isMaju = fullReport.program?.toLowerCase().includes('maju');
+
+                    let gasUrl = '';
+                    let programType = '';
+
+                    if (isBangkit) {
+                        gasUrl = process.env.BANGKIT_GAS_URL;
+                        programType = 'bangkit';
+                    } else if (isMaju) {
+                        gasUrl = process.env.MAJU_GAS_URL;
+                        programType = 'maju';
+                    }
+
+                    if (gasUrl && fullReport.sheets_row_number) {
+                        // Call GAS regenerateDoc action
+                        const gasPayload = {
+                            action: 'regenerateDoc',
+                            rowNumber: fullReport.sheets_row_number,
+                            programType: programType
+                        };
+
+                        console.log(`🚀 Calling ${programType.toUpperCase()} GAS regenerateDoc for row ${fullReport.sheets_row_number}`);
+
+                        const gasResponse = await fetch(gasUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(gasPayload)
+                        });
+
+                        const gasResult = await gasResponse.json();
+
+                        if (gasResult.success) {
+                            console.log(`✅ PDF regenerated successfully: ${gasResult.docId}`);
+
+                            // Update doc_url in Supabase if returned
+                            if (gasResult.docUrl) {
+                                await supabase
+                                    .from('reports')
+                                    .update({ doc_url: gasResult.docUrl })
+                                    .eq('id', id);
+
+                                console.log(`✅ Updated doc_url in Supabase`);
+                            }
+
+                            // Log success
+                            await supabase.from('dual_write_logs').insert({
+                                operation_type: 'pdf_regenerate',
+                                table_name: 'reports',
+                                record_id: fullReport.id,
+                                supabase_success: true,
+                                sheets_success: true,
+                                program: fullReport.program,
+                                created_at: new Date().toISOString(),
+                                metadata: {
+                                    revision_count: fullReport.revision_count,
+                                    new_doc_id: gasResult.docId,
+                                    trigger: 'approval_after_revision'
+                                }
+                            });
+                        } else {
+                            console.error(`⚠️ GAS regenerateDoc failed (non-blocking):`, gasResult.error);
+
+                            // Log failure
+                            await supabase.from('dual_write_logs').insert({
+                                operation_type: 'pdf_regenerate',
+                                table_name: 'reports',
+                                record_id: fullReport.id,
+                                supabase_success: true,
+                                sheets_success: false,
+                                sheets_error: gasResult.error || 'GAS call failed',
+                                program: fullReport.program,
+                                created_at: new Date().toISOString(),
+                                metadata: {
+                                    revision_count: fullReport.revision_count,
+                                    trigger: 'approval_after_revision'
+                                }
+                            });
+                        }
+                    } else if (!fullReport.sheets_row_number) {
+                        console.warn(`⚠️ Cannot regenerate PDF: sheets_row_number is missing for report ${id}`);
+                    } else {
+                        console.warn(`⚠️ Cannot regenerate PDF: GAS URL not configured for program ${fullReport.program}`);
+                    }
+                }
+            } catch (regenerateError) {
+                console.error('⚠️ PDF regeneration failed (non-blocking):', regenerateError);
+                // Don't let regeneration failure block the approval response
+            }
+        }
+
         return res.status(200).json({ success: true });
 
     } catch (err) {
