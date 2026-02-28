@@ -980,10 +980,11 @@ const LaporanMajuPage = () => {
     try {
       // Image upload phase - process all images first
       console.log('📸 Starting batch image upload...');
+      // Initialize imageUrls with existing URLs in revision mode, empty otherwise
       const imageUrls = {
-        gw360: '',
-        sesi: [],
-        premis: [],
+        gw360: isRevisionMode ? (formData.URL_GAMBAR_GW360 || '') : '',
+        sesi: isRevisionMode ? [...(formData.URL_GAMBAR_SESI_JSON || [])] : [],  // Copy existing
+        premis: isRevisionMode ? [...(formData.URL_GAMBAR_PREMIS_JSON || [])] : [],
         mia: {
           whatsapp: '',
           email: '',

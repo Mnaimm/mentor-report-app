@@ -849,15 +849,16 @@ export default function LaporanSesiPage() {
     setSubmissionStage({ stage: 'preparing', message: 'Preparing submission...', detail: '' });
 
     try {
+      // Initialize imageUrls with existing URLs in revision mode, empty otherwise
       const imageUrls = {
-        growthwheel: '',
-        profil: '',
-        sesi: [],
-        premis: [],
+        growthwheel: isRevisionMode ? (revisionData?.image_urls?.growthwheel || '') : '',
+        profil: isRevisionMode ? (revisionData?.image_urls?.profil || '') : '',
+        sesi: isRevisionMode ? [...(revisionData?.image_urls?.sesi || [])] : [],  // Copy existing
+        premis: isRevisionMode ? [...(revisionData?.image_urls?.premis || [])] : [],
         mia: {
-          whatsapp: '',
-          email: '',
-          call: ''
+          whatsapp: isRevisionMode ? (revisionData?.image_urls?.mia?.whatsapp || '') : '',
+          email: isRevisionMode ? (revisionData?.image_urls?.mia?.email || '') : '',
+          call: isRevisionMode ? (revisionData?.image_urls?.mia?.call || '') : ''
         }
       };
       const uploadPromises = [];
