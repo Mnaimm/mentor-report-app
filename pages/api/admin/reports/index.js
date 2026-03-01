@@ -43,6 +43,10 @@ export default async function handler(req, res) {
         session_number,
         submission_date,
         status,
+        payment_status,
+        mia_status,
+        premis_dilawat,
+        base_payment_amount,
         entrepreneur_id,
         mentor_id
       `, { count: 'exact' })
@@ -74,7 +78,11 @@ export default async function handler(req, res) {
             program: r.program,
             session_number: r.session_number,
             submission_date: r.submission_date,
-            status: r.status
+            status: r.status,
+            payment_status: r.payment_status,
+            mia_status: r.mia_status,
+            premis_dilawat: r.premis_dilawat,
+            base_payment_amount: r.base_payment_amount
         }));
 
         return res.status(200).json({

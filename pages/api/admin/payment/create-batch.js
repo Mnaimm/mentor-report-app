@@ -25,7 +25,7 @@ export default async function handler(req, res) {
         return res.status(403).json({ success: false, error: 'Access denied - Payment Admin role required' });
     }
 
-    const { batchName, paymentDate, notes, reportIds } = req.body;
+    const { batchName, paymentDate, notes, approvedBy, reportIds } = req.body;
 
     if (!batchName || !paymentDate || !reportIds || reportIds.length === 0) {
         return res.status(400).json({ success: false, error: 'Missing required fields' });
@@ -70,6 +70,7 @@ export default async function handler(req, res) {
                 payment_date: paymentDate,
                 notes: notes || null,
                 created_by: session.user.email,
+                approved_by: approvedBy || null,
                 status: 'pending',
                 total_amount: totalAmount,
                 total_reports: reports.length,

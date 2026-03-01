@@ -604,11 +604,8 @@ export default function PaymentReview({ userEmail, accessDenied }) {
                         ) : batches.length === 0 ? (
                             <div className="bg-white rounded-lg shadow p-10 text-center">
                                 <div className="text-5xl mb-4">📦</div>
-                                <h3 className="text-xl font-semibold text-gray-700">Coming Soon</h3>
-                                <p className="text-gray-500 mt-2">Payment batch history will be available here.</p>
-                                <p className="text-xs text-gray-400 mt-4">
-                                    Note: API endpoint /api/admin/payment/batches needs to be created
-                                </p>
+                                <h3 className="text-xl font-semibold text-gray-700">No Payment Batches Yet</h3>
+                                <p className="text-gray-500 mt-2">No payment batches have been created. Create your first batch in the "Giliran Bayaran" tab.</p>
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -708,11 +705,8 @@ export default function PaymentReview({ userEmail, accessDenied }) {
                         ) : mentorSummary.length === 0 ? (
                             <div className="bg-white rounded-lg shadow p-10 text-center">
                                 <div className="text-5xl mb-4">📊</div>
-                                <h3 className="text-xl font-semibold text-gray-700">Coming Soon</h3>
-                                <p className="text-gray-500 mt-2">Mentor payment summary will be available here.</p>
-                                <p className="text-xs text-gray-400 mt-4">
-                                    Note: API endpoint /api/admin/payment/mentor-summary needs to be created
-                                </p>
+                                <h3 className="text-xl font-semibold text-gray-700">No Mentor Data Available</h3>
+                                <p className="text-gray-500 mt-2">No reports found in the system yet. Mentor summaries will appear once reports are submitted.</p>
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

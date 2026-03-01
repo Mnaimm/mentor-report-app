@@ -87,6 +87,20 @@ export default async function handler(req, res) {
 
         console.log(`📊 Fetched ${reports.length} report records`);
 
+        // 4.5. UPDATE REPORTS TABLE: Set payment_status to 'paid' (BLOCKING - critical fix)
+        const { error: reportsUpdateError } = await supabase
+            .from('reports')
+            .update({
+                payment_status: 'paid',
+                paid_at: paidDate,
+                updated_at: new Date().toISOString()
+            })
+            .in('id', reportIds);
+
+        if (reportsUpdateError) throw reportsUpdateError;
+
+        console.log(`✅ Updated payment_status to 'paid' for ${reportIds.length} reports`);
+
         // 5. DUAL-WRITE TO GOOGLE SHEETS (NON-BLOCKING)
         let sheetsUpdatedCount = 0;
         const sheetsErrors = [];

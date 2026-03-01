@@ -42,8 +42,6 @@ export default function VerificationDashboard({ userEmail, isReadOnlyUser, acces
 
     // Helper to categorize report status
     const getReportCategory = (report) => {
-        // Note: API currently doesn't return payment_status, mia_status, premis_dilawat
-        // These checks are placeholders until API is updated
         const paymentStatus = report.payment_status || 'pending';
         const miaStatus = report.mia_status || 'Tidak MIA';
 
