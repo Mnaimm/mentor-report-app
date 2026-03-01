@@ -14,7 +14,7 @@ function getRowNumberFromUpdatedRange(updatedRange) {
  * Ensure this matches your 'Bangkit' sheet column headers.
  */
 const mapBangkitDataToSheetRow = (data) => {
-  const row = Array(100).fill(''); // Adjust size if needed
+  const row = Array(91).fill(''); // Updated from 87 to 91 for kemaskini maklumat fields
 
   // A–J
   row[0] = new Date().toISOString();                     // 0  Timestamp
@@ -91,6 +91,12 @@ const mapBangkitDataToSheetRow = (data) => {
   (data?.gwSkor || []).slice(0, 20).forEach((v, i) => {
     row[54 + i] = v ?? '';
   });
+
+  // CJ-CM: Original contact info and kemaskini maklumat (positions 87-90)
+  row[87] = data?.alamatPerniagaan || '';                    // CJ LOKASI_BISNES original
+  row[88] = data?.noTelefon || '';                           // CK NO_TELEFON original
+  row[89] = data?.kemaskiniMaklumat?.alamat_baharu || '';    // CL ALAMAT_BAHARU
+  row[90] = data?.kemaskiniMaklumat?.telefon_baharu || '';   // CM TELEFON_BAHARU
 
   return row;
 };
@@ -237,6 +243,9 @@ export default async function handler(req, res) {
         mia_status: reportData?.status || 'Selesai',
         mia_proof_url: reportData?.imageUrls?.mia || null,
         mia_reason: reportData?.mia?.alasan || null,
+
+        // KEMASKINI MAKLUMAT (Updated Contact Info)
+        kemaskini_maklumat: reportData?.kemaskiniMaklumat || null,
 
         // Folder ID for Google Drive integration
         folder_id: reportData?.folder_id || null,

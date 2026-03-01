@@ -199,6 +199,7 @@ export default function LaporanSesiPage() {
   const [currentSession, setCurrentSession] = useState(1);
   const [menteeStatus, setMenteeStatus] = useState('');
   const [isMIA, setIsMIA] = useState(false);
+  const [maklumatBerubah, setMaklumatBerubah] = useState(false);
   const [previousData, setPreviousData] = useState({ sales: [], inisiatif: [], premisDilawat: false });
 
   const initialFormState = {
@@ -216,6 +217,8 @@ export default function LaporanSesiPage() {
     mia: { alasan: '' },
     // UPWARD MOBILITY FIELDS (MANDATORY for ALL Bangkit sessions)
     upwardMobility: { ...INITIAL_UPWARD_MOBILITY_STATE },
+    // KEMASKINI MAKLUMAT (Updated Contact Info)
+    kemaskiniMaklumat: { telefon_baharu: '', alamat_baharu: '' },
   };
   const [formState, setFormState] = useState(initialFormState);
   const [files, setFiles] = useState({
@@ -1105,6 +1108,7 @@ export default function LaporanSesiPage() {
         batch: selectedMentee?.Batch || '', // Added Batch from selectedMentee
         alamatPerniagaan: selectedMentee?.Alamat || '',
         noTelefon: selectedMentee?.No_Tel || '',
+        kemaskiniMaklumat: maklumatBerubah ? formState.kemaskiniMaklumat : null,
       };
 
       // UPWARD MOBILITY - Only include for non-MIA submissions
@@ -1294,6 +1298,59 @@ export default function LaporanSesiPage() {
           <div className="p-4 bg-gray-50 rounded-lg">
             <MenteeInfoCard companyName={selectedMentee.Nama_Syarikat} address={selectedMentee.Alamat} phone={selectedMentee.No_Tel} />
           </div>
+
+          {/* Maklumat Berubah - Only show when NOT in MIA mode */}
+          {!isMIA && (
+            <div className="space-y-4 mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={maklumatBerubah}
+                  onChange={(e) => {
+                    setMaklumatBerubah(e.target.checked);
+                    if (!e.target.checked) {
+                      // Clear fields when unchecked
+                      handleInputChange('kemaskiniMaklumat', 'telefon_baharu', '');
+                      handleInputChange('kemaskiniMaklumat', 'alamat_baharu', '');
+                    }
+                  }}
+                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                />
+                <span className="text-sm font-medium text-gray-700">Maklumat Berubah</span>
+              </label>
+
+              {maklumatBerubah && (
+                <div className="space-y-3 mt-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      No. Telefon Baharu
+                    </label>
+                    <input
+                      type="text"
+                      value={formState.kemaskiniMaklumat.telefon_baharu}
+                      onChange={(e) => handleInputChange('kemaskiniMaklumat', 'telefon_baharu', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Cth: 012-345 6789"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Alamat Baharu
+                    </label>
+                    <textarea
+                      value={formState.kemaskiniMaklumat.alamat_baharu}
+                      onChange={(e) => handleInputChange('kemaskiniMaklumat', 'alamat_baharu', e.target.value)}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Masukkan alamat perniagaan baharu"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="pt-4 mt-4 border-t space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <InputField label="Jenis Bisnes" value={formState.tambahan.jenisBisnes} onChange={(e) => handleInputChange('tambahan', 'jenisBisnes', e.target.value)} required />
@@ -1891,6 +1948,58 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
           {formState.sesi.platform === 'Face to Face' && (
             <div className="mt-4">
               <InputField label="Lokasi Sesi (Jika F2F)" value={formState.sesi.lokasiF2F} onChange={(e) => handleInputChange('sesi', 'lokasiF2F', e.target.value)} placeholder="Cth: Pejabat usahawan, ABC Cafe" required />
+            </div>
+          )}
+
+          {/* Maklumat Berubah - Only show when NOT in MIA mode */}
+          {!isMIA && (
+            <div className="space-y-4 mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={maklumatBerubah}
+                  onChange={(e) => {
+                    setMaklumatBerubah(e.target.checked);
+                    if (!e.target.checked) {
+                      // Clear fields when unchecked
+                      handleInputChange('kemaskiniMaklumat', 'telefon_baharu', '');
+                      handleInputChange('kemaskiniMaklumat', 'alamat_baharu', '');
+                    }
+                  }}
+                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                />
+                <span className="text-sm font-medium text-gray-700">Maklumat Berubah</span>
+              </label>
+
+              {maklumatBerubah && (
+                <div className="space-y-3 mt-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      No. Telefon Baharu
+                    </label>
+                    <input
+                      type="text"
+                      value={formState.kemaskiniMaklumat.telefon_baharu}
+                      onChange={(e) => handleInputChange('kemaskiniMaklumat', 'telefon_baharu', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Cth: 012-345 6789"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Alamat Baharu
+                    </label>
+                    <textarea
+                      value={formState.kemaskiniMaklumat.alamat_baharu}
+                      onChange={(e) => handleInputChange('kemaskiniMaklumat', 'alamat_baharu', e.target.value)}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Masukkan alamat perniagaan baharu"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </Section>

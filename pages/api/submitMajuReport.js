@@ -156,6 +156,9 @@ export default async function handler(req, res) {
       mia_proof_email: reportData.imageUrls?.mia?.email || null,
       mia_proof_call: reportData.imageUrls?.mia?.call || null,
 
+      // KEMASKINI MAKLUMAT (Updated Contact Info)
+      kemaskini_maklumat: reportData.KEMASKINI_MAKLUMAT || null,
+
       // Payment fields (defaults)
       payment_status: 'pending'
     };
@@ -397,6 +400,8 @@ function mapMajuDataToSheetRow(data, miaRequestId = null) {
     data.imageUrls?.mia?.email || '',            // BH MIA_PROOF_EMAIL
     data.imageUrls?.mia?.call || '',             // BI MIA_PROOF_CALL
     miaRequestId || '',                          // BJ MIA_REQUEST_ID (UUID from mia_requests table)
-    data.MIA_STATUS === 'MIA' ? 'requested' : '' // BK MIA_REQUEST_STATUS
+    data.MIA_STATUS === 'MIA' ? 'requested' : '', // BK MIA_REQUEST_STATUS
+    data.KEMASKINI_MAKLUMAT?.alamat_baharu || '', // BL ALAMAT_BAHARU
+    data.KEMASKINI_MAKLUMAT?.telefon_baharu || '' // BM TELEFON_BAHARU
   ];
 }

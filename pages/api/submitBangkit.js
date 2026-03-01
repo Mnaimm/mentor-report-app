@@ -19,7 +19,7 @@ function getRowNumberFromUpdatedRange(updatedRange) {
  * Columns BC-CB (54-81): Upward Mobility data (28 columns)
  */
 const mapBangkitDataToSheetRow = (data, miaRequestId = null) => {
-  const row = Array(87).fill(''); // Columns 0-86 (87 total) - extended for MIA enhancements
+  const row = Array(91).fill(''); // Columns 0-90 (91 total) - extended for MIA enhancements + kemaskini maklumat
 
   // A–J (0-9): Basic session info
   row[0] = new Date().toISOString();                     // A  Timestamp
@@ -152,6 +152,12 @@ const mapBangkitDataToSheetRow = (data, miaRequestId = null) => {
   row[85] = miaRequestId || '';                     // CH MIA_REQUEST_ID (UUID from mia_requests table)
   row[86] = data?.status === 'MIA' ? 'requested' : ''; // CI MIA_REQUEST_STATUS
 
+  // CJ-CM (87-90): Original contact info and kemaskini maklumat (4 columns)
+  row[87] = data?.alamatPerniagaan || '';                    // CJ LOKASI_BISNES original
+  row[88] = data?.noTelefon || '';                           // CK NO_TELEFON original
+  row[89] = data?.kemaskiniMaklumat?.alamat_baharu || '';    // CL ALAMAT_BAHARU
+  row[90] = data?.kemaskiniMaklumat?.telefon_baharu || '';   // CM TELEFON_BAHARU
+
   return row;
 };
 
@@ -174,8 +180,8 @@ const mapUMToUpwardMobilitySheetRow = (reportData, umData) => {
   row[6] = reportData?.usahawan || '';                   // G  Nama Penuh Usahawan
   row[7] = reportData?.namaSyarikat || '';               // H  Nama Perniagaan
   row[8] = reportData?.tambahan?.produkServis || '';     // I  Jenis Perniagaan / Produk
-  row[9] = reportData?.alamatPerniagaan || ''; // J  Alamat Perniagaan
-  row[10] = reportData?.noTelefon || '';         // K  Nombor Telefon
+  row[9] = reportData?.kemaskiniMaklumat?.alamat_baharu || reportData?.alamatPerniagaan || '';  // J  Alamat Perniagaan (use new if available)
+  row[10] = reportData?.kemaskiniMaklumat?.telefon_baharu || reportData?.noTelefon || '';       // K  Nombor Telefon (use new if available)
 
   // 🚫 Columns L-AR (11-43): Legacy fields - LEAVE EMPTY (33 columns)
   // These are from the standalone UM form and must not be overwritten
@@ -396,6 +402,9 @@ export default async function handler(req, res) {
       mia_status: reportData?.status || 'Selesai',
       mia_proof_url: reportData?.imageUrls?.mia?.whatsapp || null,  // Legacy field - use WhatsApp proof for backward compatibility
       mia_reason: reportData?.mia?.alasan || null,
+
+      // KEMASKINI MAKLUMAT (Updated Contact Info)
+      kemaskini_maklumat: reportData?.kemaskiniMaklumat || null,
 
       // Folder ID for Google Drive integration
       folder_id: reportData?.folder_id || null,

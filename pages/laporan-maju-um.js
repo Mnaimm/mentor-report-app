@@ -122,6 +122,11 @@ const LaporanMajuPage = () => {
     MIA_PROOF_URL: '',
     // UPWARD MOBILITY FIELDS (Sections 3-6)
     UPWARD_MOBILITY: { ...INITIAL_UPWARD_MOBILITY_STATE },
+    // KEMASKINI MAKLUMAT (Updated Contact Info)
+    KEMASKINI_MAKLUMAT: {
+      telefon_baharu: '',
+      alamat_baharu: ''
+    },
   };
 
   const [formData, setFormData] = useState(initialFormState);
@@ -139,6 +144,7 @@ const LaporanMajuPage = () => {
   const [messageType, setMessageType] = useState('');
   const [isMIA, setIsMIA] = useState(false);
   const [miaReason, setMiaReason] = useState('');
+  const [maklumatBerubah, setMaklumatBerubah] = useState(false);
   const [files, setFiles] = useState({
     gw360: null,
     sesi: [],
@@ -1177,6 +1183,8 @@ const LaporanMajuPage = () => {
           MIA_STATUS: 'Tidak MIA',
           MIA_REASON: '',
           MIA_PROOF_URL: '', // Empty string for non-MIA reports (not the object)
+          // KEMASKINI MAKLUMAT - Updated contact information
+          KEMASKINI_MAKLUMAT: maklumatBerubah ? formData.KEMASKINI_MAKLUMAT : null,
           // UPWARD MOBILITY - Store as JSON for MAJU AppScript
           UPWARD_MOBILITY_JSON: JSON.stringify({
             UM_STATUS: formData.UPWARD_MOBILITY.UM_STATUS || '',
@@ -1737,6 +1745,76 @@ const LaporanMajuPage = () => {
                   <InputField label="Lokasi Bisnes" name="LOKASI_BISNES" value={formData.LOKASI_BISNES} disabled />
                   <InputField label="Produk/Servis" name="PRODUK_SERVIS" value={formData.PRODUK_SERVIS} disabled />
                   <InputField label="No Telefon Mentee" name="NO_TELEFON" value={formData.NO_TELEFON} disabled />
+
+                  {/* Maklumat Berubah - Only show when NOT in MIA mode */}
+                  {!isMIA && (
+                    <div className="space-y-4 mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <label className="flex items-center space-x-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={maklumatBerubah}
+                          onChange={(e) => {
+                            setMaklumatBerubah(e.target.checked);
+                            if (!e.target.checked) {
+                              // Clear fields when unchecked
+                              setFormData(prev => ({
+                                ...prev,
+                                KEMASKINI_MAKLUMAT: {
+                                  telefon_baharu: '',
+                                  alamat_baharu: ''
+                                }
+                              }));
+                            }
+                          }}
+                          className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-sm font-medium text-gray-700">Maklumat Berubah</span>
+                      </label>
+
+                      {maklumatBerubah && (
+                        <div className="space-y-3 mt-3">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              No. Telefon Baharu
+                            </label>
+                            <input
+                              type="text"
+                              value={formData.KEMASKINI_MAKLUMAT.telefon_baharu}
+                              onChange={(e) => setFormData(prev => ({
+                                ...prev,
+                                KEMASKINI_MAKLUMAT: {
+                                  ...prev.KEMASKINI_MAKLUMAT,
+                                  telefon_baharu: e.target.value
+                                }
+                              }))}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                              placeholder="Cth: 012-345 6789"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Alamat Baharu
+                            </label>
+                            <textarea
+                              value={formData.KEMASKINI_MAKLUMAT.alamat_baharu}
+                              onChange={(e) => setFormData(prev => ({
+                                ...prev,
+                                KEMASKINI_MAKLUMAT: {
+                                  ...prev.KEMASKINI_MAKLUMAT,
+                                  alamat_baharu: e.target.value
+                                }
+                              }))}
+                              rows={3}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                              placeholder="Masukkan alamat perniagaan baharu"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <InputField
                     label="Tarikh Sesi"
                     name="TARIKH_SESI"
