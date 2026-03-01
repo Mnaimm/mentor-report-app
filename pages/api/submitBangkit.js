@@ -174,8 +174,8 @@ const mapUMToUpwardMobilitySheetRow = (reportData, umData) => {
   row[6] = reportData?.usahawan || '';                   // G  Nama Penuh Usahawan
   row[7] = reportData?.namaSyarikat || '';               // H  Nama Perniagaan
   row[8] = reportData?.tambahan?.produkServis || '';     // I  Jenis Perniagaan / Produk
-  row[9] = reportData?.tambahan?.alamatPerniagaan || ''; // J  Alamat Perniagaan
-  row[10] = reportData?.tambahan?.nomorTelefon || '';    // K  Nombor Telefon
+  row[9] = reportData?.alamatPerniagaan || ''; // J  Alamat Perniagaan
+  row[10] = reportData?.noTelefon || '';         // K  Nombor Telefon
 
   // 🚫 Columns L-AR (11-43): Legacy fields - LEAVE EMPTY (33 columns)
   // These are from the standalone UM form and must not be overwritten
@@ -360,6 +360,8 @@ export default async function handler(req, res) {
       // Business Info
       produk_servis: reportData?.tambahan?.produkServis || null,
       pautan_media_sosial: reportData?.tambahan?.pautanMediaSosial || null,
+      alamat_perniagaan: reportData?.alamatPerniagaan || null,
+      no_telefon: reportData?.noTelefon || null,
 
       // Initiatives (JSONB array)
       inisiatif: reportData?.inisiatif || [],

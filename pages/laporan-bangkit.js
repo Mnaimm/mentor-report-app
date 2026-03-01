@@ -1103,6 +1103,8 @@ export default function LaporanSesiPage() {
         premisDilawatChecked: !!formState.sesi?.premisDilawat,
         programType: 'bangkit', // Added programType
         batch: selectedMentee?.Batch || '', // Added Batch from selectedMentee
+        alamatPerniagaan: selectedMentee?.Alamat || '',
+        noTelefon: selectedMentee?.No_Tel || '',
       };
 
       // UPWARD MOBILITY - Only include for non-MIA submissions
