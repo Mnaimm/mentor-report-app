@@ -39,6 +39,7 @@ export default async function handler(req, res) {
         mentor_email,
         nama_mentor,
         nama_usahawan,
+        nama_mentee,
         program,
         session_number,
         submission_date,
@@ -74,7 +75,8 @@ export default async function handler(req, res) {
         const formattedData = data.map(r => ({
             id: r.id,
             mentor_name: r.nama_mentor || r.mentor_email,
-            mentee_name: r.nama_usahawan || 'Unknown Mentee',
+            // Check both nama_usahawan (older field) and nama_mentee (newer field)
+            mentee_name: r.nama_usahawan || r.nama_mentee || 'Unknown Mentee',
             program: r.program,
             session_number: r.session_number,
             submission_date: r.submission_date,
