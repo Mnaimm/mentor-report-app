@@ -183,6 +183,26 @@ export default async function handler(req, res) {
     try {
       console.log('📊 Starting Supabase dual-write for Bangkit session report...');
 
+      // CRITICAL: Look up mentor_id from mentors table using mentor email
+      let mentorId = null;
+      if (reportData?.mentorEmail) {
+        const { data: mentorData, error: mentorError } = await supabase
+          .from('mentors')
+          .select('id')
+          .eq('email', reportData.mentorEmail)
+          .single();
+
+        if (mentorError) {
+          console.error('⚠️ Mentor lookup failed:', mentorError);
+          throw new Error(`Mentor not found for email: ${reportData.mentorEmail}`);
+        }
+
+        mentorId = mentorData.id;
+        console.log(`✅ Mentor ID resolved: ${mentorId} for ${reportData.mentorEmail}`);
+      } else {
+        throw new Error('Mentor email is required but missing from report data');
+      }
+
       // Prepare Supabase payload - MUST match 'reports' table schema
       const supabasePayload = {
         // Program & Metadata
@@ -192,7 +212,8 @@ export default async function handler(req, res) {
         submission_date: new Date().toISOString(),
         sheets_row_number: newRowNumber,
 
-        // Mentor Info
+        // Mentor Info (REQUIRED: mentor_id is NOT NULL in database)
+        mentor_id: mentorId,
         mentor_email: reportData?.mentorEmail || null,
         nama_mentor: reportData?.namaMentor || null,
 
