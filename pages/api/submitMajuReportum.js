@@ -172,25 +172,29 @@ export default async function handler(req, res) {
       // ============================================================
       // RESOLVE ENTREPRENEUR_ID (required NOT NULL foreign key)
       // ============================================================
-      const entrepreneurEmail =
-        reportData.emel ||
-        reportData.emailUsahawan ||
-        reportData.entrepreneurEmail;
+      // ✅ Require explicit emel field for MAJU
+      const rawEntrepreneurEmail = reportData.emel;
 
-      if (!entrepreneurEmail) {
-        throw new Error('Entrepreneur email not found in MAJU report data (missing emel field)');
+      if (!rawEntrepreneurEmail) {
+        throw new Error('Missing emel in MAJU payload. Cannot resolve entrepreneur.');
       }
 
-      console.log(`🔍 Looking up entrepreneur by email: ${entrepreneurEmail}`);
+      const normalizedEmail = rawEntrepreneurEmail.toLowerCase().trim();
+
+      console.log('🔍 Resolving MAJU entrepreneur using email:', normalizedEmail);
 
       const { data: entrepreneur, error: entrepreneurError } = await supabase
         .from('entrepreneurs')
         .select('id')
-        .eq('email', entrepreneurEmail.toLowerCase().trim())
-        .single();
+        .eq('email', normalizedEmail)
+        .maybeSingle();
 
-      if (entrepreneurError || !entrepreneur) {
-        throw new Error(`Entrepreneur not found for email: ${entrepreneurEmail}. Error: ${entrepreneurError?.message || 'No match'}`);
+      if (entrepreneurError) {
+        throw new Error(`Entrepreneur lookup failed: ${entrepreneurError.message}`);
+      }
+
+      if (!entrepreneur) {
+        throw new Error(`Entrepreneur not found in DB for email: ${normalizedEmail}`);
       }
 
       const entrepreneurId = entrepreneur.id;
@@ -364,23 +368,27 @@ export default async function handler(req, res) {
         if (mentorError) throw new Error(`Mentor not found: ${mentorError.message}`);
 
         // Fetch entrepreneur ID (reuse same email used for reports table)
-        const entrepreneurEmail =
-          reportData.emel ||
-          reportData.emailUsahawan ||
-          reportData.entrepreneurEmail;
+        // ✅ Require explicit emel field for MAJU UM
+        const rawEntrepreneurEmail = reportData.emel;
 
-        if (!entrepreneurEmail) {
-          throw new Error('Entrepreneur email not found in MAJU report data (missing emel field)');
+        if (!rawEntrepreneurEmail) {
+          throw new Error('Missing emel in MAJU payload for UM write.');
         }
+
+        const normalizedEmail = rawEntrepreneurEmail.toLowerCase().trim();
 
         const { data: entrepreneur, error: entrepreneurError } = await supabase
           .from('entrepreneurs')
           .select('id')
-          .eq('email', entrepreneurEmail.toLowerCase().trim())
-          .single();
+          .eq('email', normalizedEmail)
+          .maybeSingle();
 
-        if (entrepreneurError || !entrepreneur) {
-          throw new Error(`Entrepreneur not found: ${entrepreneurEmail}`);
+        if (entrepreneurError) {
+          throw new Error(`Entrepreneur lookup failed: ${entrepreneurError.message}`);
+        }
+
+        if (!entrepreneur) {
+          throw new Error(`Entrepreneur not found for UM: ${normalizedEmail}`);
         }
 
         console.log(`✅ Entrepreneur resolved for UM: ${entrepreneur.id}`);

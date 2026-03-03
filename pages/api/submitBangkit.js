@@ -316,23 +316,30 @@ export default async function handler(req, res) {
     console.log('📊 Step 1: Writing to Supabase (primary source of truth)...');
 
     // Resolve entrepreneur ID BEFORE inserting into reports
-    const entrepreneurEmail =
-      reportData.emailUsahawan ||
-      reportData.entrepreneurEmail ||
-      reportData.email;
+    // ✅ Require explicit entrepreneur email (do NOT fallback to mentor email)
+    const rawEntrepreneurEmail = reportData.emailUsahawan;
 
-    if (!entrepreneurEmail) {
-      throw new Error('Entrepreneur email not found in report data');
+    if (!rawEntrepreneurEmail) {
+      throw new Error('Missing emailUsahawan in payload. Cannot resolve entrepreneur.');
     }
+
+    const normalizedEmail = rawEntrepreneurEmail.toLowerCase().trim();
+
+    console.log('🔍 Resolving entrepreneur using email:', normalizedEmail);
 
     const { data: entrepreneur, error: entrepreneurError } = await supabase
       .from('entrepreneurs')
       .select('id')
-      .eq('email', entrepreneurEmail.toLowerCase().trim())
-      .single();
+      .eq('email', normalizedEmail)
+      .maybeSingle();   // ✅ safer than .single()
 
-    if (entrepreneurError || !entrepreneur) {
-      throw new Error(`Entrepreneur not found: ${entrepreneurEmail}`);
+    if (entrepreneurError) {
+      console.error('❌ Entrepreneur lookup failed:', entrepreneurError);
+      throw new Error(`Entrepreneur lookup failed: ${entrepreneurError.message}`);
+    }
+
+    if (!entrepreneur) {
+      throw new Error(`Entrepreneur not found in DB for email: ${normalizedEmail}`);
     }
 
     console.log(`✅ Entrepreneur resolved: ${entrepreneur.id}`);
@@ -601,24 +608,27 @@ export default async function handler(req, res) {
         if (mentorError) throw new Error(`Mentor not found: ${mentorError.message}`);
 
         // Fetch entrepreneur ID (email-based lookup)
-        const entrepreneurEmail =
-          reportData.emailUsahawan ||
-          reportData.entrepreneurEmail ||
-          reportData.email ||
-          reportRecord?.email;
+        // ✅ Require explicit entrepreneur email (do NOT fallback to mentor email)
+        const rawEntrepreneurEmail = reportData.emailUsahawan;
 
-        if (!entrepreneurEmail) {
-          throw new Error('Entrepreneur email not found in report data');
+        if (!rawEntrepreneurEmail) {
+          throw new Error('Missing emailUsahawan in payload for UM write.');
         }
+
+        const normalizedEmail = rawEntrepreneurEmail.toLowerCase().trim();
 
         const { data: entrepreneur, error: entrepreneurError } = await supabase
           .from('entrepreneurs')
           .select('id')
-          .eq('email', entrepreneurEmail.toLowerCase().trim())
-          .single();
+          .eq('email', normalizedEmail)
+          .maybeSingle();
 
-        if (entrepreneurError || !entrepreneur) {
-          throw new Error(`Entrepreneur not found: ${entrepreneurEmail}`);
+        if (entrepreneurError) {
+          throw new Error(`Entrepreneur lookup failed: ${entrepreneurError.message}`);
+        }
+
+        if (!entrepreneur) {
+          throw new Error(`Entrepreneur not found for UM: ${normalizedEmail}`);
         }
 
         // Build schema-whitelisted UM payload (aligned with upward_mobility_reports table)
