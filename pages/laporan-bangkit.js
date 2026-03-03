@@ -1728,6 +1728,17 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                             </label>
                           </div>
                         </div>
+                      ) : item.type === 'number_rm' ? (
+                        <InputField
+                          label={item.label + ' *'}
+                          type="number"
+                          value={formState.upwardMobility[item.field]}
+                          onChange={(e) => handleUMChange(item.field, e.target.value)}
+                          placeholder={item.placeholder}
+                          min="0"
+                          step="0.01"
+                          required
+                        />
                       ) : (
                         <InputField
                           label={item.label + ' *'}
@@ -2493,6 +2504,17 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                             </label>
                           </div>
                         </div>
+                      ) : item.type === 'number_rm' ? (
+                        <InputField
+                          label={item.label + ' *'}
+                          type="number"
+                          value={formState.upwardMobility[item.field]}
+                          onChange={(e) => handleUMChange(item.field, e.target.value)}
+                          placeholder={item.placeholder}
+                          min="0"
+                          step="0.01"
+                          required
+                        />
                       ) : (
                         <InputField
                           label={item.label + ' *'}
