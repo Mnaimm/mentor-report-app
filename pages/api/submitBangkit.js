@@ -518,7 +518,7 @@ export default async function handler(req, res) {
 
     // Log to dual_write_logs
     try {
-      await supabase.from('dual_write_logs').insert({
+      await supabaseAdmin.from('dual_write_logs').insert({
         operation_type: 'submit_report',
         table_name: 'reports',
         record_id: supabaseRecordId,
@@ -757,7 +757,7 @@ export default async function handler(req, res) {
         console.log(`✅ UM dual-write successful. Record ID: ${umRecordId}`);
 
         // Log success to dual_write_monitoring
-        await supabase.from('dual_write_monitoring').insert({
+        await supabaseAdmin.from('dual_write_monitoring').insert({
           source_system: 'google_sheets',
           target_system: 'supabase',
           operation_type: 'insert',
@@ -780,7 +780,7 @@ export default async function handler(req, res) {
 
         // Log failure to dual_write_monitoring (best effort)
         try {
-          await supabase.from('dual_write_monitoring').insert({
+          await supabaseAdmin.from('dual_write_monitoring').insert({
             source_system: 'google_sheets',
             target_system: 'supabase',
             operation_type: 'insert',
