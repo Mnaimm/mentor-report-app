@@ -366,6 +366,14 @@ export default async function handler(req, res) {
 
     console.log(`✅ Entrepreneur resolved: ${entrepreneur.id}`);
 
+    const normalizedMentorEmail = (reportData.mentorEmail || '').toLowerCase().trim();
+    const { data: mentorRecord } = await supabase
+      .from('mentors')
+      .select('id')
+      .eq('email', normalizedMentorEmail)
+      .limit(1)
+      .maybeSingle();
+
     // Prepare Supabase payload - MUST match 'reports' table schema
     const supabasePayload = {
       // Program & Metadata
@@ -378,6 +386,7 @@ export default async function handler(req, res) {
       entrepreneur_id: entrepreneur.id,
 
       // Mentor Info
+      mentor_id: mentorRecord?.id || null,
       mentor_email: reportData?.mentorEmail || null,
       nama_mentor: reportData?.namaMentor || null,
 
@@ -620,14 +629,17 @@ export default async function handler(req, res) {
 
         if (reportFetchError) throw reportFetchError;
 
-        // Fetch mentor ID
+        const normalizedMentorEmail = (reportData.mentorEmail || '').toLowerCase().trim();
+
         const { data: mentorData, error: mentorError } = await supabase
           .from('mentors')
           .select('id')
-          .eq('email', reportRecord.mentor_email)
-          .single();
+          .eq('email', normalizedMentorEmail)
+          .limit(1)
+          .maybeSingle();
 
-        if (mentorError) throw new Error(`Mentor not found: ${mentorError.message}`);
+        if (mentorError) throw new Error(`Mentor lookup failed: ${mentorError.message}`);
+        if (!mentorData) throw new Error(`Mentor not found for email: ${normalizedMentorEmail}`);
 
         // Fetch entrepreneur ID
         const usahawanName = (reportData.usahawan || '').trim();
