@@ -1,15 +1,8 @@
 // pages/api/submitReport.js
 import { google } from 'googleapis';
-import { createClient } from '@supabase/supabase-js';
 import cache from '../../lib/simple-cache';
-import { supabase } from '../../lib/supabaseClient';
+import { supabase, supabaseAdmin } from '../../lib/supabaseClient';
 import { prepareMIARequestPayload, MIA_STATUS } from '../../lib/mia';
-
-// Use SERVICE_ROLE_KEY for admin lookup (bypasses RLS)
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
 
 
 /** Extract the row number from "SheetName!A37:T37" */
@@ -244,6 +237,12 @@ export default async function handler(req, res) {
   }
 
   try {
+    console.log(' Supabase admin client check:', {
+      hasAdmin: !!supabaseAdmin,
+      url: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'present' : 'MISSING',
+      serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'present' : 'MISSING',
+    });
+
     const reportData = req.body;
     const { programType } = reportData; // Extract programType from the payload
 
@@ -292,7 +291,7 @@ export default async function handler(req, res) {
           proofCallUrl: reportData.imageUrls?.mia?.call
         }, 'bangkit');
 
-        const { data: miaRequestData, error: miaError } = await supabase
+        const { data: miaRequestData, error: miaError } = await supabaseAdmin
           .from('mia_requests')
           .insert(miaPayload)
           .select()
@@ -318,9 +317,9 @@ export default async function handler(req, res) {
     }
 
     // ============================================================
-    // STEP 1: SUPABASE WRITE (BLOCKING - PRIMARY SOURCE OF TRUTH)
+    // STEP 1: supabaseAdmin WRITE (BLOCKING - PRIMARY SOURCE OF TRUTH)
     // ============================================================
-    console.log('📊 Step 1: Writing to Supabase (primary source of truth)...');
+    console.log('📊 Step 1: Writing to supabaseAdmin (primary source of truth)...');
 
     // ── Entrepreneur lookup ──────────────────────────────────────
     let entrepreneur = null;
@@ -361,14 +360,14 @@ export default async function handler(req, res) {
     console.log(`✅ Entrepreneur resolved: ${entrepreneur.id}`);
 
     const normalizedMentorEmail = (reportData.mentorEmail || '').toLowerCase().trim();
-    const { data: mentorRecord } = await supabase
+    const { data: mentorRecord } = await supabaseAdmin
       .from('mentors')
       .select('id')
       .eq('email', normalizedMentorEmail)
       .limit(1)
       .maybeSingle();
 
-    // Prepare Supabase payload - MUST match 'reports' table schema
+    // Prepare supabaseAdmin payload - MUST match 'reports' table schema
     const supabasePayload = {
       // Program & Metadata
       program: 'Bangkit',
@@ -445,19 +444,22 @@ export default async function handler(req, res) {
       payment_status: 'pending'
     };
 
-    // INSERT INTO SUPABASE (BLOCKING)
-    const { data: insertedData, error: supabaseInsertError } = await supabase
+    // INSERT INTO supabaseAdmin (BLOCKING)
+    console.log(' Attempting reports insert with client type:',
+      supabaseAdmin === supabase ? 'SAME CLIENT (bug!)' : 'admin client'
+    );
+    const { data: insertedData, error: supabaseInsertError } = await supabaseAdmin
       .from('reports')
       .insert(supabasePayload)
       .select();
 
     if (supabaseInsertError) {
-      console.error('❌ Supabase insert failed:', supabaseInsertError);
-      throw new Error(`Supabase insert failed: ${supabaseInsertError.message}`);
+      console.error('❌ supabaseAdmin insert failed:', supabaseInsertError);
+      throw new Error(`supabaseAdmin insert failed: ${supabaseInsertError.message}`);
     }
 
     const supabaseRecordId = insertedData?.[0]?.id || null;
-    console.log(`✅ Supabase write successful. Record ID: ${supabaseRecordId}`);
+    console.log(`✅ supabaseAdmin write successful. Record ID: ${supabaseRecordId}`);
 
     // ============================================================
     // STEP 2: GOOGLE SHEETS WRITE (NON-BLOCKING - SECONDARY)
@@ -504,8 +506,8 @@ export default async function handler(req, res) {
 
       console.log(`✅ Sheets write successful. Row: ${newRowNumber}. Document will be generated automatically.`);
 
-      // Update Supabase with sheets_row_number (non-blocking)
-      await supabase
+      // Update supabaseAdmin with sheets_row_number (non-blocking)
+      await supabaseAdmin
         .from('reports')
         .update({ sheets_row_number: newRowNumber })
         .eq('id', supabaseRecordId);
@@ -533,7 +535,7 @@ export default async function handler(req, res) {
       console.error('⚠️ Failed to log to dual_write_logs:', logError);
     }
     // ============================================================
-    // END PRIMARY DUAL-WRITE (Supabase + Sheets)
+    // END PRIMARY DUAL-WRITE (supabaseAdmin + Sheets)
     // ============================================================
 
 
@@ -596,7 +598,7 @@ export default async function handler(req, res) {
     // END UPWARD MOBILITY GOOGLE SHEET DUAL-WRITE
     // ============================================================
 
-    // (Old Supabase dual-write section removed - now done in Step 1 above)
+    // (Old supabaseAdmin dual-write section removed - now done in Step 1 above)
 
     // ============================================================
     // DUAL-WRITE TO UPWARD_MOBILITY_REPORTS TABLE (NON-BLOCKING)
@@ -615,7 +617,7 @@ export default async function handler(req, res) {
         const umData = JSON.parse(reportData.UPWARD_MOBILITY_JSON);
 
         // Get mentor and entrepreneur IDs from reports table record
-        const { data: reportRecord, error: reportFetchError } = await supabase
+        const { data: reportRecord, error: reportFetchError } = await supabaseAdmin
           .from('reports')
           .select('id, mentor_email, nama_mentee')
           .eq('id', supabaseRecordId)
@@ -625,7 +627,7 @@ export default async function handler(req, res) {
 
         const normalizedMentorEmail = (reportData.mentorEmail || '').toLowerCase().trim();
 
-        const { data: mentorData, error: mentorError } = await supabase
+        const { data: mentorData, error: mentorError } = await supabaseAdmin
           .from('mentors')
           .select('id')
           .eq('email', normalizedMentorEmail)
@@ -745,7 +747,7 @@ export default async function handler(req, res) {
 
         console.log('📋 UM payload keys:', Object.keys(umSupabasePayload));
 
-        const { data: insertedUM, error: umInsertError } = await supabase
+        const { data: insertedUM, error: umInsertError } = await supabaseAdmin
           .from('upward_mobility_reports')
           .insert(umSupabasePayload)
           .select();
@@ -759,7 +761,7 @@ export default async function handler(req, res) {
         // Log success to dual_write_monitoring
         await supabaseAdmin.from('dual_write_monitoring').insert({
           source_system: 'google_sheets',
-          target_system: 'supabase',
+          target_system: 'supabaseAdmin',
           operation_type: 'insert',
           table_name: 'upward_mobility_reports',
           record_id: umRecordId,
@@ -782,7 +784,7 @@ export default async function handler(req, res) {
         try {
           await supabaseAdmin.from('dual_write_monitoring').insert({
             source_system: 'google_sheets',
-            target_system: 'supabase',
+            target_system: 'supabaseAdmin',
             operation_type: 'insert',
             table_name: 'upward_mobility_reports',
             google_sheets_row: newRowNumber,
