@@ -115,6 +115,13 @@ export default function Navbar() {
                         Dashboard
                       </Link>
                       <Link
+                        href="/admin/progress"
+                        className={`block px-4 py-2 text-sm ${isCurrentPage('/admin/progress') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:bg-blue-50'}`}
+                        onClick={(e) => isCurrentPage('/admin/progress') && e.preventDefault()}
+                      >
+                        Progress
+                      </Link>
+                      <Link
                         href="/admin/usahawan"
                         className={`block px-4 py-2 text-sm ${isCurrentPage('/admin/usahawan') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:bg-blue-50'}`}
                         onClick={(e) => isCurrentPage('/admin/usahawan') && e.preventDefault()}
@@ -281,6 +288,19 @@ export default function Navbar() {
                         }}
                       >
                         Dashboard
+                      </Link>
+                      <Link
+                        href="/admin/progress"
+                        className={`block px-3 py-2 rounded-md text-sm transition-colors ${isCurrentPage('/admin/progress') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
+                        onClick={(e) => {
+                          if (isCurrentPage('/admin/progress')) {
+                            e.preventDefault();
+                          } else {
+                            setMobileMenuOpen(false);
+                          }
+                        }}
+                      >
+                        Progress
                       </Link>
                       <Link
                         href="/admin/usahawan"
