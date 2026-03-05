@@ -315,29 +315,41 @@ export default async function handler(req, res) {
     // ============================================================
     console.log('📊 Step 1: Writing to Supabase (primary source of truth)...');
 
-    // Resolve entrepreneur ID BEFORE inserting into reports
-    const usahawanName = (reportData.usahawan || '').trim();
+    // ── Entrepreneur lookup ──────────────────────────────────────
+    let entrepreneur = null;
 
-    if (!usahawanName) {
-      throw new Error('Missing usahawan name in payload.');
+    // Try email first (most reliable, comes from mapping sheet Emel field)
+    const rawEmail = (reportData.emailUsahawan || '').toLowerCase().trim();
+    if (rawEmail) {
+      const { data: byEmail } = await supabase
+        .from('entrepreneurs')
+        .select('id')
+        .eq('email', rawEmail)
+        .maybeSingle();
+      if (byEmail) entrepreneur = byEmail;
     }
 
-    console.log(' Resolving entrepreneur - name:', usahawanName,
-      '| mentor:', reportData.mentorEmail);
-
-    const { data: entrepreneur, error: entrepreneurError } = await supabase
-      .from('entrepreneurs')
-      .select('id')
-      .ilike('name', `%${usahawanName}%`)
-      .maybeSingle();
-
-    if (entrepreneurError) {
-      throw new Error(`Entrepreneur lookup failed: ${entrepreneurError.message}`);
+    // Fallback: name ILIKE (in case email is missing or mismatched)
+    if (!entrepreneur) {
+      const usahawanName = (reportData.usahawan || '').trim();
+      console.log('⚠️ Email lookup failed, trying name fallback:', usahawanName);
+      if (usahawanName) {
+        const { data: byName } = await supabase
+          .from('entrepreneurs')
+          .select('id')
+          .ilike('name', usahawanName)
+          .maybeSingle();
+        if (byName) entrepreneur = byName;
+      }
     }
 
     if (!entrepreneur) {
-      throw new Error(`Entrepreneur not found in DB for name: ${usahawanName}`);
+      throw new Error(
+        `Entrepreneur not found. Email: ${rawEmail || 'none'}, Name: ${reportData.usahawan || 'none'}`
+      );
     }
+    console.log('✅ Entrepreneur resolved:', entrepreneur.id);
+    // ─────────────────────────────────────────────────────────────
 
     console.log(`✅ Entrepreneur resolved: ${entrepreneur.id}`);
 
@@ -616,29 +628,41 @@ export default async function handler(req, res) {
         if (mentorError) throw new Error(`Mentor lookup failed: ${mentorError.message}`);
         if (!mentorData) throw new Error(`Mentor not found for email: ${normalizedMentorEmail}`);
 
-        // Fetch entrepreneur ID
-        const usahawanName = (reportData.usahawan || '').trim();
+        // ── Entrepreneur lookup ──────────────────────────────────────
+        let entrepreneur = null;
 
-        if (!usahawanName) {
-          throw new Error('Missing usahawan name in payload.');
+        // Try email first (most reliable, comes from mapping sheet Emel field)
+        const rawEmail = (reportData.emailUsahawan || '').toLowerCase().trim();
+        if (rawEmail) {
+          const { data: byEmail } = await supabase
+            .from('entrepreneurs')
+            .select('id')
+            .eq('email', rawEmail)
+            .maybeSingle();
+          if (byEmail) entrepreneur = byEmail;
         }
 
-        console.log(' Resolving entrepreneur - name:', usahawanName,
-          '| mentor:', reportData.mentorEmail);
-
-        const { data: entrepreneur, error: entrepreneurError } = await supabase
-          .from('entrepreneurs')
-          .select('id')
-          .ilike('name', `%${usahawanName}%`)
-          .maybeSingle();
-
-        if (entrepreneurError) {
-          throw new Error(`Entrepreneur lookup failed: ${entrepreneurError.message}`);
+        // Fallback: name ILIKE (in case email is missing or mismatched)
+        if (!entrepreneur) {
+          const usahawanName = (reportData.usahawan || '').trim();
+          console.log('⚠️ Email lookup failed, trying name fallback:', usahawanName);
+          if (usahawanName) {
+            const { data: byName } = await supabase
+              .from('entrepreneurs')
+              .select('id')
+              .ilike('name', usahawanName)
+              .maybeSingle();
+            if (byName) entrepreneur = byName;
+          }
         }
 
         if (!entrepreneur) {
-          throw new Error(`Entrepreneur not found in DB for name: ${usahawanName}`);
+          throw new Error(
+            `Entrepreneur not found. Email: ${rawEmail || 'none'}, Name: ${reportData.usahawan || 'none'}`
+          );
         }
+        console.log('✅ Entrepreneur resolved:', entrepreneur.id);
+        // ─────────────────────────────────────────────────────────────
 
         // Build schema-whitelisted UM payload (aligned with upward_mobility_reports table)
         const umSupabasePayload = {};
