@@ -15,6 +15,8 @@ export default function VerificationDashboard({ userEmail, isReadOnlyUser, acces
     const [filterMentor, setFilterMentor] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [statsFilter, setStatsFilter] = useState('all'); // Track which stat card is active
+    const [sortField, setSortField] = useState('submission_date');
+    const [sortDir, setSortDir] = useState('desc');
     const ITEMS_PER_PAGE = 20;
 
     if (accessDenied) {
@@ -92,14 +94,30 @@ export default function VerificationDashboard({ userEmail, isReadOnlyUser, acces
         return true;
     });
 
+    // Sorting
+    const sortedReports = [...filteredReports].sort((a, b) => {
+        if (sortField === 'submission_date') {
+            const aTime = a.submission_date ? new Date(a.submission_date).getTime() : null;
+            const bTime = b.submission_date ? new Date(b.submission_date).getTime() : null;
+
+            if (aTime === null && bTime === null) return 0;
+            if (aTime === null) return 1;
+            if (bTime === null) return -1;
+
+            return sortDir === 'asc' ? aTime - bTime : bTime - aTime;
+        }
+
+        return 0;
+    });
+
     // Calculate verified stats from filtered reports
     const verifiedReports = filteredReports.filter(r => getReportCategory(r) === 'disemak');
     const verifiedCount = verifiedReports.length;
     const totalAmount = verifiedReports.reduce((sum, r) => sum + (r.base_payment_amount || 0), 0);
 
     // Pagination
-    const totalPages = Math.ceil(filteredReports.length / ITEMS_PER_PAGE);
-    const paginatedReports = filteredReports.slice(
+    const totalPages = Math.ceil(sortedReports.length / ITEMS_PER_PAGE);
+    const paginatedReports = sortedReports.slice(
         (currentPage - 1) * ITEMS_PER_PAGE,
         currentPage * ITEMS_PER_PAGE
     );
@@ -118,6 +136,16 @@ export default function VerificationDashboard({ userEmail, isReadOnlyUser, acces
         if (category === 'disemak') return 'bg-green-500';
         if (category === 'mia') return 'bg-gray-400';
         return 'bg-gray-300';
+    };
+
+    const toggleSort = (field) => {
+        if (sortField === field) {
+            setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortField(field);
+            setSortDir('desc');
+        }
+        setCurrentPage(1);
     };
 
     return (
@@ -274,7 +302,18 @@ export default function VerificationDashboard({ userEmail, isReadOnlyUser, acces
                                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Mentor</th>
                                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Mentee</th>
                                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Program</th>
-                                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase">Tarikh Masuk</th>
+                                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase">
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleSort('submission_date')}
+                                            className="inline-flex items-center gap-1 hover:text-blue-600"
+                                        >
+                                            Tarikh Masuk
+                                            <span className="text-[10px]">
+                                                {sortField === 'submission_date' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
+                                            </span>
+                                        </button>
+                                    </th>
                                     <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase">Bayaran</th>
                                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Nota</th>
                                     <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase">Action</th>
