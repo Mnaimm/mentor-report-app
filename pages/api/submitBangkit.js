@@ -328,7 +328,7 @@ export default async function handler(req, res) {
     const { data: entrepreneur, error: entrepreneurError } = await supabase
       .from('entrepreneurs')
       .select('id')
-      .ilike('name', usahawanName)
+      .ilike('name', `%${usahawanName}%`)
       .maybeSingle();
 
     if (entrepreneurError) {
@@ -629,7 +629,7 @@ export default async function handler(req, res) {
         const { data: entrepreneur, error: entrepreneurError } = await supabase
           .from('entrepreneurs')
           .select('id')
-          .ilike('name', usahawanName)
+          .ilike('name', `%${usahawanName}%`)
           .maybeSingle();
 
         if (entrepreneurError) {
