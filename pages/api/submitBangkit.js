@@ -316,30 +316,52 @@ export default async function handler(req, res) {
     console.log('📊 Step 1: Writing to Supabase (primary source of truth)...');
 
     // Resolve entrepreneur ID BEFORE inserting into reports
-    // ✅ Require explicit entrepreneur email (do NOT fallback to mentor email)
-    const rawEntrepreneurEmail = reportData.emailUsahawan;
+    const usahawanName = (reportData.usahawan || '').trim();
+    const mentorEmailNorm = (reportData.mentorEmail || '').toLowerCase().trim();
 
-    if (!rawEntrepreneurEmail) {
-      throw new Error('Missing emailUsahawan in payload. Cannot resolve entrepreneur.');
+    if (!usahawanName) {
+      throw new Error('Missing usahawan name in payload.');
     }
 
-    const normalizedEmail = rawEntrepreneurEmail.toLowerCase().trim();
+    console.log(' Resolving entrepreneur - name:', usahawanName, '| mentor:', mentorEmailNorm);
 
-    console.log('🔍 Resolving entrepreneur using email:', normalizedEmail);
+    // Step 1: Try to find via mentor_assignments JOIN (most reliable)
+    const { data: assignmentMatch } = await supabase
+      .from('mentor_assignments')
+      .select('entrepreneur_id')
+      .eq('status', 'active')
+      .eq('mentor_id',
+        (await supabase.from('mentors').select('id').eq('email', mentorEmailNorm).maybeSingle()).data?.id
+      )
+      .maybeSingle();
 
-    const { data: entrepreneur, error: entrepreneurError } = await supabase
-      .from('entrepreneurs')
-      .select('id')
-      .eq('email', normalizedEmail)
-      .maybeSingle();   // ✅ safer than .single()
+    // Step 2: Fallback - direct name lookup in entrepreneurs
+    let entrepreneur = null;
 
-    if (entrepreneurError) {
-      console.error('❌ Entrepreneur lookup failed:', entrepreneurError);
-      throw new Error(`Entrepreneur lookup failed: ${entrepreneurError.message}`);
+    if (assignmentMatch) {
+      // Verify name matches (safety check)
+      const { data: entCheck } = await supabase
+        .from('entrepreneurs')
+        .select('id, name')
+        .eq('id', assignmentMatch.entrepreneur_id)
+        .ilike('name', usahawanName)
+        .maybeSingle();
+      entrepreneur = entCheck;
     }
 
     if (!entrepreneur) {
-      throw new Error(`Entrepreneur not found in DB for email: ${normalizedEmail}`);
+      // Fallback: direct ILIKE name search
+      const { data: entFallback, error: entFallbackError } = await supabase
+        .from('entrepreneurs')
+        .select('id')
+        .ilike('name', usahawanName)
+        .maybeSingle();
+      if (entFallbackError) throw new Error(`Entrepreneur lookup failed: ${entFallbackError.message}`);
+      entrepreneur = entFallback;
+    }
+
+    if (!entrepreneur) {
+      throw new Error(`Entrepreneur not found in DB for name: ${usahawanName}`);
     }
 
     console.log(`✅ Entrepreneur resolved: ${entrepreneur.id}`);
@@ -607,28 +629,51 @@ export default async function handler(req, res) {
 
         if (mentorError) throw new Error(`Mentor not found: ${mentorError.message}`);
 
-        // Fetch entrepreneur ID (email-based lookup)
-        // ✅ Require explicit entrepreneur email (do NOT fallback to mentor email)
-        const rawEntrepreneurEmail = reportData.emailUsahawan;
+        // Fetch entrepreneur ID
+        const usahawanName = (reportData.usahawan || '').trim();
+        const mentorEmailNorm = (reportData.mentorEmail || '').toLowerCase().trim();
 
-        if (!rawEntrepreneurEmail) {
-          throw new Error('Missing emailUsahawan in payload for UM write.');
+        if (!usahawanName) {
+          throw new Error('Missing usahawan name in payload.');
         }
 
-        const normalizedEmail = rawEntrepreneurEmail.toLowerCase().trim();
-
-        const { data: entrepreneur, error: entrepreneurError } = await supabase
-          .from('entrepreneurs')
-          .select('id')
-          .eq('email', normalizedEmail)
+        // Step 1: Try to find via mentor_assignments JOIN (most reliable)
+        const { data: assignmentMatch } = await supabase
+          .from('mentor_assignments')
+          .select('entrepreneur_id')
+          .eq('status', 'active')
+          .eq('mentor_id',
+            (await supabase.from('mentors').select('id').eq('email', mentorEmailNorm).maybeSingle()).data?.id
+          )
           .maybeSingle();
 
-        if (entrepreneurError) {
-          throw new Error(`Entrepreneur lookup failed: ${entrepreneurError.message}`);
+        // Step 2: Fallback - direct name lookup in entrepreneurs
+        let entrepreneur = null;
+
+        if (assignmentMatch) {
+          // Verify name matches (safety check)
+          const { data: entCheck } = await supabase
+            .from('entrepreneurs')
+            .select('id, name')
+            .eq('id', assignmentMatch.entrepreneur_id)
+            .ilike('name', usahawanName)
+            .maybeSingle();
+          entrepreneur = entCheck;
         }
 
         if (!entrepreneur) {
-          throw new Error(`Entrepreneur not found for UM: ${normalizedEmail}`);
+          // Fallback: direct ILIKE name search
+          const { data: entFallback, error: entFallbackError } = await supabase
+            .from('entrepreneurs')
+            .select('id')
+            .ilike('name', usahawanName)
+            .maybeSingle();
+          if (entFallbackError) throw new Error(`Entrepreneur lookup failed: ${entFallbackError.message}`);
+          entrepreneur = entFallback;
+        }
+
+        if (!entrepreneur) {
+          throw new Error(`Entrepreneur not found in DB for name: ${usahawanName}`);
         }
 
         // Build schema-whitelisted UM payload (aligned with upward_mobility_reports table)
