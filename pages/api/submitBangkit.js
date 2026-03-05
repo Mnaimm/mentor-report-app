@@ -1,8 +1,15 @@
 // pages/api/submitReport.js
 import { google } from 'googleapis';
+import { createClient } from '@supabase/supabase-js';
 import cache from '../../lib/simple-cache';
 import { supabase } from '../../lib/supabaseClient';
 import { prepareMIARequestPayload, MIA_STATUS } from '../../lib/mia';
+
+// Use SERVICE_ROLE_KEY for admin lookup (bypasses RLS)
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 
 /** Extract the row number from "SheetName!A37:T37" */
@@ -321,7 +328,7 @@ export default async function handler(req, res) {
     // Try email first (most reliable, comes from mapping sheet Emel field)
     const rawEmail = (reportData.emailUsahawan || '').toLowerCase().trim();
     if (rawEmail) {
-      const { data: byEmail } = await supabase
+      const { data: byEmail } = await supabaseAdmin
         .from('entrepreneurs')
         .select('id')
         .eq('email', rawEmail)
@@ -334,7 +341,7 @@ export default async function handler(req, res) {
       const usahawanName = (reportData.usahawan || '').trim();
       console.log('⚠️ Email lookup failed, trying name fallback:', usahawanName);
       if (usahawanName) {
-        const { data: byName } = await supabase
+        const { data: byName } = await supabaseAdmin
           .from('entrepreneurs')
           .select('id')
           .ilike('name', usahawanName)
@@ -634,7 +641,7 @@ export default async function handler(req, res) {
         // Try email first (most reliable, comes from mapping sheet Emel field)
         const rawEmail = (reportData.emailUsahawan || '').toLowerCase().trim();
         if (rawEmail) {
-          const { data: byEmail } = await supabase
+          const { data: byEmail } = await supabaseAdmin
             .from('entrepreneurs')
             .select('id')
             .eq('email', rawEmail)
@@ -647,7 +654,7 @@ export default async function handler(req, res) {
           const usahawanName = (reportData.usahawan || '').trim();
           console.log('⚠️ Email lookup failed, trying name fallback:', usahawanName);
           if (usahawanName) {
-            const { data: byName } = await supabase
+            const { data: byName } = await supabaseAdmin
               .from('entrepreneurs')
               .select('id')
               .ilike('name', usahawanName)
