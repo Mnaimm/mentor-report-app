@@ -384,6 +384,7 @@ export default async function handler(req, res) {
       nama_mentor: reportData?.namaMentor || null,
 
       // Entrepreneur/Mentee Info (use reports table column names!)
+      nama_mentee: reportData?.usahawan || null,
       nama_usahawan: reportData?.usahawan || null,      // NOT 'mentee_name'
       nama_syarikat: reportData?.namaSyarikat || null,  // NOT 'company_name'
 
