@@ -317,47 +317,22 @@ export default async function handler(req, res) {
 
     // Resolve entrepreneur ID BEFORE inserting into reports
     const usahawanName = (reportData.usahawan || '').trim();
-    const mentorEmailNorm = (reportData.mentorEmail || '').toLowerCase().trim();
 
     if (!usahawanName) {
       throw new Error('Missing usahawan name in payload.');
     }
 
-    console.log(' Resolving entrepreneur - name:', usahawanName, '| mentor:', mentorEmailNorm);
+    console.log(' Resolving entrepreneur - name:', usahawanName,
+      '| mentor:', reportData.mentorEmail);
 
-    // Step 1: Try to find via mentor_assignments JOIN (most reliable)
-    const { data: assignmentMatch } = await supabase
-      .from('mentor_assignments')
-      .select('entrepreneur_id')
-      .eq('status', 'active')
-      .eq('mentor_id',
-        (await supabase.from('mentors').select('id').eq('email', mentorEmailNorm).maybeSingle()).data?.id
-      )
+    const { data: entrepreneur, error: entrepreneurError } = await supabase
+      .from('entrepreneurs')
+      .select('id')
+      .ilike('name', usahawanName)
       .maybeSingle();
 
-    // Step 2: Fallback - direct name lookup in entrepreneurs
-    let entrepreneur = null;
-
-    if (assignmentMatch) {
-      // Verify name matches (safety check)
-      const { data: entCheck } = await supabase
-        .from('entrepreneurs')
-        .select('id, name')
-        .eq('id', assignmentMatch.entrepreneur_id)
-        .ilike('name', usahawanName)
-        .maybeSingle();
-      entrepreneur = entCheck;
-    }
-
-    if (!entrepreneur) {
-      // Fallback: direct ILIKE name search
-      const { data: entFallback, error: entFallbackError } = await supabase
-        .from('entrepreneurs')
-        .select('id')
-        .ilike('name', usahawanName)
-        .maybeSingle();
-      if (entFallbackError) throw new Error(`Entrepreneur lookup failed: ${entFallbackError.message}`);
-      entrepreneur = entFallback;
+    if (entrepreneurError) {
+      throw new Error(`Entrepreneur lookup failed: ${entrepreneurError.message}`);
     }
 
     if (!entrepreneur) {
@@ -643,45 +618,22 @@ export default async function handler(req, res) {
 
         // Fetch entrepreneur ID
         const usahawanName = (reportData.usahawan || '').trim();
-        const mentorEmailNorm = (reportData.mentorEmail || '').toLowerCase().trim();
 
         if (!usahawanName) {
           throw new Error('Missing usahawan name in payload.');
         }
 
-        // Step 1: Try to find via mentor_assignments JOIN (most reliable)
-        const { data: assignmentMatch } = await supabase
-          .from('mentor_assignments')
-          .select('entrepreneur_id')
-          .eq('status', 'active')
-          .eq('mentor_id',
-            (await supabase.from('mentors').select('id').eq('email', mentorEmailNorm).maybeSingle()).data?.id
-          )
+        console.log(' Resolving entrepreneur - name:', usahawanName,
+          '| mentor:', reportData.mentorEmail);
+
+        const { data: entrepreneur, error: entrepreneurError } = await supabase
+          .from('entrepreneurs')
+          .select('id')
+          .ilike('name', usahawanName)
           .maybeSingle();
 
-        // Step 2: Fallback - direct name lookup in entrepreneurs
-        let entrepreneur = null;
-
-        if (assignmentMatch) {
-          // Verify name matches (safety check)
-          const { data: entCheck } = await supabase
-            .from('entrepreneurs')
-            .select('id, name')
-            .eq('id', assignmentMatch.entrepreneur_id)
-            .ilike('name', usahawanName)
-            .maybeSingle();
-          entrepreneur = entCheck;
-        }
-
-        if (!entrepreneur) {
-          // Fallback: direct ILIKE name search
-          const { data: entFallback, error: entFallbackError } = await supabase
-            .from('entrepreneurs')
-            .select('id')
-            .ilike('name', usahawanName)
-            .maybeSingle();
-          if (entFallbackError) throw new Error(`Entrepreneur lookup failed: ${entFallbackError.message}`);
-          entrepreneur = entFallback;
+        if (entrepreneurError) {
+          throw new Error(`Entrepreneur lookup failed: ${entrepreneurError.message}`);
         }
 
         if (!entrepreneur) {
