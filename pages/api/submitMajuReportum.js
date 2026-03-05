@@ -1,7 +1,7 @@
 // pages/api/submitMajuReport.js
 import { google } from 'googleapis';
 import cache from '../../lib/simple-cache';
-import { supabase } from '../../lib/supabaseClient';
+import { supabaseAdmin } from '../../lib/supabaseClient';
 
 
 /** Extract the row number from "SheetName!A37:T37" */
@@ -183,7 +183,7 @@ export default async function handler(req, res) {
 
       console.log('🔍 Resolving MAJU entrepreneur using email:', normalizedEmail);
 
-      const { data: entrepreneur, error: entrepreneurError } = await supabase
+      const { data: entrepreneur, error: entrepreneurError } = await supabaseAdmin
         .from('entrepreneurs')
         .select('id')
         .eq('email', normalizedEmail)
@@ -273,7 +273,7 @@ export default async function handler(req, res) {
         session_number: supabasePayload.session_number
       });
 
-      const { data: insertedData, error: supabaseInsertError } = await supabase
+      const { data: insertedData, error: supabaseInsertError } = await supabaseAdmin
         .from('reports')  // ✅ FIXED: Use existing 'reports' table (same for Bangkit & Maju)
         .insert(supabasePayload)
         .select();
@@ -297,7 +297,7 @@ export default async function handler(req, res) {
       console.log(`✅ Supabase dual-write successful. Record ID: ${supabaseRecordId}`);
 
       // Log success to dual_write_monitoring
-      await supabase.from('dual_write_monitoring').insert({
+      await supabaseAdmin.from('dual_write_monitoring').insert({
         source_system: 'google_sheets',
         target_system: 'supabase',
         operation_type: 'insert',
@@ -319,7 +319,7 @@ export default async function handler(req, res) {
 
       // Log failure to dual_write_monitoring (best effort)
       try {
-        await supabase.from('dual_write_monitoring').insert({
+        await supabaseAdmin.from('dual_write_monitoring').insert({
           source_system: 'google_sheets',
           target_system: 'supabase',
           operation_type: 'insert',
@@ -359,7 +359,7 @@ export default async function handler(req, res) {
         const umData = JSON.parse(reportData.UPWARD_MOBILITY_JSON);
 
         // Fetch mentor ID
-        const { data: mentorData, error: mentorError } = await supabase
+        const { data: mentorData, error: mentorError } = await supabaseAdmin
           .from('mentors')
           .select('id')
           .eq('email', reportData.EMAIL_MENTOR.toLowerCase().trim())
@@ -377,7 +377,7 @@ export default async function handler(req, res) {
 
         const normalizedEmail = rawEntrepreneurEmail.toLowerCase().trim();
 
-        const { data: entrepreneur, error: entrepreneurError } = await supabase
+        const { data: entrepreneur, error: entrepreneurError } = await supabaseAdmin
           .from('entrepreneurs')
           .select('id')
           .eq('email', normalizedEmail)
@@ -470,7 +470,7 @@ export default async function handler(req, res) {
 
         console.log('📋 UM payload keys:', Object.keys(umSupabasePayload));
 
-        const { data: insertedUM, error: umInsertError } = await supabase
+        const { data: insertedUM, error: umInsertError } = await supabaseAdmin
           .from('upward_mobility_reports')
           .insert(umSupabasePayload)
           .select();
@@ -482,7 +482,7 @@ export default async function handler(req, res) {
         console.log(`✅ UM dual-write successful. Record ID: ${umRecordId}`);
 
         // Log UM success to dual_write_monitoring
-        await supabase.from('dual_write_monitoring').insert({
+        await supabaseAdmin.from('dual_write_monitoring').insert({
           source_system: 'google_sheets',
           target_system: 'supabase',
           operation_type: 'insert',
@@ -506,7 +506,7 @@ export default async function handler(req, res) {
 
         // Log UM failure to dual_write_monitoring (best effort)
         try {
-          await supabase.from('dual_write_monitoring').insert({
+          await supabaseAdmin.from('dual_write_monitoring').insert({
             source_system: 'google_sheets',
             target_system: 'supabase',
             operation_type: 'insert',
