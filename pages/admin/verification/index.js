@@ -49,6 +49,7 @@ export default function VerificationDashboard({ userEmail, isReadOnlyUser, acces
 
         if (miaStatus === 'MIA') return 'mia';
         if (!report.submission_date) return 'belum_masuk';
+        if (paymentStatus === 'paid') return 'sudah_dibayar';
         if (paymentStatus === 'approved_for_payment') return 'disemak';
         if (report.status === 'submitted' && paymentStatus === 'pending') return 'menunggu_semakan';
         return 'other';
@@ -60,6 +61,7 @@ export default function VerificationDashboard({ userEmail, isReadOnlyUser, acces
         belum_masuk: reports.filter(r => !r.submission_date && getReportCategory(r) !== 'mia').length,
         menunggu_semakan: reports.filter(r => getReportCategory(r) === 'menunggu_semakan').length,
         disemak: reports.filter(r => getReportCategory(r) === 'disemak').length,
+        sudah_dibayar: reports.filter(r => getReportCategory(r) === 'sudah_dibayar').length,
     };
 
     // Filtering
@@ -94,11 +96,14 @@ export default function VerificationDashboard({ userEmail, isReadOnlyUser, acces
         return true;
     });
 
+    const showingPaidDate = filterStatus === 'sudah_dibayar' || statsFilter === 'sudah_dibayar';
+
     // Sorting
     const sortedReports = [...filteredReports].sort((a, b) => {
         if (sortField === 'submission_date') {
-            const aTime = a.submission_date ? new Date(a.submission_date).getTime() : null;
-            const bTime = b.submission_date ? new Date(b.submission_date).getTime() : null;
+            const dateField = showingPaidDate ? 'paid_at' : 'submission_date';
+            const aTime = a[dateField] ? new Date(a[dateField]).getTime() : null;
+            const bTime = b[dateField] ? new Date(b[dateField]).getTime() : null;
 
             if (aTime === null && bTime === null) return 0;
             if (aTime === null) return 1;
@@ -134,6 +139,7 @@ export default function VerificationDashboard({ userEmail, isReadOnlyUser, acces
         if (category === 'belum_masuk') return 'bg-red-500';
         if (category === 'menunggu_semakan') return 'bg-amber-500';
         if (category === 'disemak') return 'bg-green-500';
+        if (category === 'sudah_dibayar') return 'bg-blue-500';
         if (category === 'mia') return 'bg-gray-400';
         return 'bg-gray-300';
     };
@@ -162,7 +168,7 @@ export default function VerificationDashboard({ userEmail, isReadOnlyUser, acces
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
                 {/* Jumlah */}
                 <button
                     onClick={() => setStatsFilter(statsFilter === 'all' ? 'all' : 'all')}
@@ -209,6 +215,18 @@ export default function VerificationDashboard({ userEmail, isReadOnlyUser, acces
                     <p className="text-gray-500 text-sm font-medium">Disemak</p>
                     <p className="text-3xl font-bold text-green-600">{stats.disemak}</p>
                     <p className="text-xs text-gray-500 mt-1">Payment approved</p>
+                </button>
+
+                {/* Sudah Dibayar */}
+                <button
+                    onClick={() => setStatsFilter(statsFilter === 'sudah_dibayar' ? 'all' : 'sudah_dibayar')}
+                    className={`bg-white p-6 rounded-xl shadow-md border-l-4 text-left transition-all hover:shadow-lg ${
+                        statsFilter === 'sudah_dibayar' ? 'border-blue-500 ring-2 ring-blue-200' : 'border-blue-400'
+                    }`}
+                >
+                    <p className="text-gray-500 text-sm font-medium">Sudah Dibayar</p>
+                    <p className="text-3xl font-bold text-blue-600">{stats.sudah_dibayar}</p>
+                    <p className="text-xs text-gray-500 mt-1">Payment paid</p>
                 </button>
             </div>
 
@@ -259,6 +277,7 @@ export default function VerificationDashboard({ userEmail, isReadOnlyUser, acces
                         <option value="belum_masuk">Belum Masuk</option>
                         <option value="menunggu_semakan">Menunggu Semakan</option>
                         <option value="disemak">Disemak</option>
+                        <option value="sudah_dibayar">Sudah Dibayar</option>
                         <option value="mia">MIA</option>
                     </select>
 
@@ -308,7 +327,7 @@ export default function VerificationDashboard({ userEmail, isReadOnlyUser, acces
                                             onClick={() => toggleSort('submission_date')}
                                             className="inline-flex items-center gap-1 hover:text-blue-600"
                                         >
-                                            Tarikh Masuk
+                                            {showingPaidDate ? 'Tarikh Bayar' : 'Tarikh Masuk'}
                                             <span className="text-[10px]">
                                                 {sortField === 'submission_date' ? (sortDir === 'asc' ? '▲' : '▼') : ''}
                                             </span>
@@ -365,10 +384,10 @@ export default function VerificationDashboard({ userEmail, isReadOnlyUser, acces
                                                 </div>
                                             </td>
 
-                                            {/* Tarikh Masuk */}
+                                            {/* Tarikh */}
                                             <td className="px-6 py-4 text-center text-sm text-gray-600">
-                                                {report.submission_date
-                                                    ? new Date(report.submission_date).toLocaleDateString('ms-MY')
+                                                {(showingPaidDate ? report.paid_at : report.submission_date)
+                                                    ? new Date(showingPaidDate ? report.paid_at : report.submission_date).toLocaleDateString('ms-MY')
                                                     : '-'
                                                 }
                                             </td>
@@ -395,7 +414,11 @@ export default function VerificationDashboard({ userEmail, isReadOnlyUser, acces
 
                                             {/* Action */}
                                             <td className="px-6 py-4 text-center">
-                                                {isVerified ? (
+                                                {category === 'sudah_dibayar' ? (
+                                                    <span className="px-3 py-1 text-blue-700 text-sm font-semibold">
+                                                        Dibayar
+                                                    </span>
+                                                ) : isVerified ? (
                                                     <span className="px-3 py-1 text-green-700 text-sm font-semibold">
                                                         ✓ Disemak
                                                     </span>
