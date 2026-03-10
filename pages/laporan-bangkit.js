@@ -695,7 +695,7 @@ export default function LaporanSesiPage() {
     setFiles((prev) => ({ ...prev, [type]: multiple ? Array.from(fileList) : fileList[0] }));
 
   const handleMIAFileChange = (proofType, fileList) => {
-    const file = fileList && fileList.length > 0 ? fileList[0] : null;
+    const file = fileList?.[0] || null;
     setFiles((prev) => ({
       ...prev,
       mia: {
@@ -703,6 +703,7 @@ export default function LaporanSesiPage() {
         [proofType]: file
       }
     }));
+    console.log('Updated MIA proofs:', proofType, file);
   };
 
   const handleKemaskiniChange = (index, value) => {

@@ -655,7 +655,7 @@ const LaporanMajuPage = () => {
   };
 
   const handleMIAFileChange = (proofType, fileList) => {
-    const file = fileList && fileList.length > 0 ? fileList[0] : null;
+    const file = fileList?.[0] || null;
     setFiles((prev) => ({
       ...prev,
       mia: {
@@ -663,6 +663,7 @@ const LaporanMajuPage = () => {
         [proofType]: file
       }
     }));
+    console.log('Updated MIA proofs:', proofType, file);
   };
 
   // Batch upload function

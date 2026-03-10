@@ -64,33 +64,33 @@ const MIAEvidenceForm = ({
                         <h4 className="font-semibold text-gray-700 mb-3">1. Bukti Panggilan Telefon (3 Percubaan)</h4>
                         <FileInput
                             label="Muat Naik Screenshot Log Panggilan"
-                            name="proof_call"
-                            onChange={(e) => onFileChange('proof_call', e.target.files[0])}
+                            name="call"
+                            onChange={(e) => onFileChange('call', e.target.files)}
                             required
                         />
-                        {files.proof_call && <p className="text-xs text-green-600 font-medium">✓ File selected: {files.proof_call.name}</p>}
+                        {files.call && <p className="text-xs text-green-600 font-medium">✓ File selected: {files.call.name}</p>}
                     </div>
 
                     <div className="bg-gray-50 p-4 rounded-md border border-gray-200">
                         <h4 className="font-semibold text-gray-700 mb-3">2. Bukti WhatsApp (3 Percubaan)</h4>
                         <FileInput
                             label="Muat Naik Screenshot Chat WhatsApp"
-                            name="proof_whatsapp"
-                            onChange={(e) => onFileChange('proof_whatsapp', e.target.files[0])}
+                            name="whatsapp"
+                            onChange={(e) => onFileChange('whatsapp', e.target.files)}
                             required
                         />
-                        {files.proof_whatsapp && <p className="text-xs text-green-600 font-medium">✓ File selected: {files.proof_whatsapp.name}</p>}
+                        {files.whatsapp && <p className="text-xs text-green-600 font-medium">✓ File selected: {files.whatsapp.name}</p>}
                     </div>
 
                     <div className="bg-gray-50 p-4 rounded-md border border-gray-200 md:col-span-2">
                         <h4 className="font-semibold text-gray-700 mb-3">3. Bukti Email (3 Percubaan)</h4>
                         <FileInput
                             label="Muat Naik Screenshot 'Sent Items' / Email"
-                            name="proof_email"
-                            onChange={(e) => onFileChange('proof_email', e.target.files[0])}
+                            name="email"
+                            onChange={(e) => onFileChange('email', e.target.files)}
                             required
                         />
-                        {files.proof_email && <p className="text-xs text-green-600 font-medium">✓ File selected: {files.proof_email.name}</p>}
+                        {files.email && <p className="text-xs text-green-600 font-medium">✓ File selected: {files.email.name}</p>}
                     </div>
                 </div>
             </div>
@@ -99,3 +99,4 @@ const MIAEvidenceForm = ({
 };
 
 export default MIAEvidenceForm;
+
