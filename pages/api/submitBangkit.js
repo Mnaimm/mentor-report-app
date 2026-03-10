@@ -276,6 +276,12 @@ export default async function handler(req, res) {
     // ============================================================
     if (reportData?.status === 'MIA') {
       console.log('📝 Creating MIA request record...');
+      console.log('🔍 [DEBUG] Bangkit MIA Request Data:');
+      console.log('  - Reason:', reportData.mia?.alasan?.substring(0, 100) + '...');
+      console.log('  - WhatsApp URL:', reportData.imageUrls?.mia?.whatsapp);
+      console.log('  - Email URL:', reportData.imageUrls?.mia?.email);
+      console.log('  - Call URL:', reportData.imageUrls?.mia?.call);
+
       try {
         const miaPayload = prepareMIARequestPayload({
           mentorEmail: reportData.mentorEmail,
@@ -290,6 +296,12 @@ export default async function handler(req, res) {
           proofEmailUrl: reportData.imageUrls?.mia?.email,
           proofCallUrl: reportData.imageUrls?.mia?.call
         }, 'bangkit');
+
+        console.log('🔍 [DEBUG] Prepared Bangkit MIA payload:');
+        console.log('  - alasan:', miaPayload.alasan?.substring(0, 100) + '...');
+        console.log('  - proof_whatsapp_url:', miaPayload.proof_whatsapp_url);
+        console.log('  - proof_email_url:', miaPayload.proof_email_url);
+        console.log('  - proof_call_url:', miaPayload.proof_call_url);
 
         const { data: miaRequestData, error: miaError } = await supabaseAdmin
           .from('mia_requests')

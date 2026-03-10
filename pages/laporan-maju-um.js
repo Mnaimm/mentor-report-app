@@ -1123,7 +1123,8 @@ const LaporanMajuPage = () => {
           RUMUSAN_DAN_LANGKAH_KEHADAPAN: '',
           MIA_STATUS: 'MIA',
           MIA_REASON: miaReason,
-          MIA_PROOF_URL: imageUrls.mia,
+          MIA_PROOF_URL: '', // Legacy field - not used, individual URLs sent via imageUrls.mia
+          imageUrls: imageUrls, // ✅ MIA proof URLs (whatsapp, email, call)
           // UPWARD MOBILITY - Allow partial data for MIA submissions
           UPWARD_MOBILITY_JSON: JSON.stringify({
             UM_STATUS: formData.UPWARD_MOBILITY.UM_STATUS || '',
@@ -1671,7 +1672,7 @@ const LaporanMajuPage = () => {
                   <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                     <FileInput
                       label={`${MIA_PROOF_TYPES.WHATSAPP.label} *`}
-                      onChange={(e) => handleMIAFileChange('whatsapp', e.target.files)}
+                      onFileChange={(e) => handleMIAFileChange('whatsapp', e.target.files)}
                       required
                       isImageUpload={true}
                     />
@@ -1687,7 +1688,7 @@ const LaporanMajuPage = () => {
                   <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                     <FileInput
                       label={`${MIA_PROOF_TYPES.EMAIL.label} *`}
-                      onChange={(e) => handleMIAFileChange('email', e.target.files)}
+                      onFileChange={(e) => handleMIAFileChange('email', e.target.files)}
                       required
                       isImageUpload={true}
                     />
@@ -1703,7 +1704,7 @@ const LaporanMajuPage = () => {
                   <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                     <FileInput
                       label={`${MIA_PROOF_TYPES.CALL.label} *`}
-                      onChange={(e) => handleMIAFileChange('call', e.target.files)}
+                      onFileChange={(e) => handleMIAFileChange('call', e.target.files)}
                       required
                       isImageUpload={true}
                     />

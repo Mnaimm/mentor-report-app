@@ -2,6 +2,7 @@
 import { google } from 'googleapis';
 import cache from '../../lib/simple-cache';
 import { supabaseAdmin } from '../../lib/supabaseClient';
+import { prepareMIARequestPayload } from '../../lib/mia';
 
 
 /** Extract the row number from "SheetName!A37:T37" */
@@ -66,6 +67,62 @@ export default async function handler(req, res) {
       console.error('⚠️ [CRITICAL] Folder_ID is empty! Document generation will fail.');
       console.error('⚠️ Request body Folder_ID:', reportData.Folder_ID);
     }
+
+    // ============================================================
+    // CREATE MIA REQUEST (if MIA status)
+    // ============================================================
+    let miaRequestId = null;
+    console.log('🔍 [DEBUG] Checking MIA status:', reportData.MIA_STATUS, 'Type:', typeof reportData.MIA_STATUS);
+    console.log('🔍 [DEBUG] Comparison result:', reportData.MIA_STATUS === 'MIA');
+    if (reportData.MIA_STATUS === 'MIA') {
+      try {
+        console.log('📋 Creating MIA request entry...');
+        console.log('🔍 [DEBUG] MIA Request Data:');
+        console.log('  - Reason:', reportData.MIA_REASON?.substring(0, 100) + '...');
+        console.log('  - WhatsApp URL:', reportData.imageUrls?.mia?.whatsapp);
+        console.log('  - Email URL:', reportData.imageUrls?.mia?.email);
+        console.log('  - Call URL:', reportData.imageUrls?.mia?.call);
+
+        const miaPayload = prepareMIARequestPayload({
+          mentorEmail: reportData.EMAIL_MENTOR,
+          mentorName: reportData.NAMA_MENTOR,
+          menteeName: reportData.NAMA_MENTEE,
+          menteeIC: reportData.NAMA_MENTEE, // Use name as fallback
+          menteeCompany: reportData.NAMA_BISNES,
+          menteeBusinessType: reportData.PRODUK_SERVIS,
+          menteeLocation: reportData.LOKASI_BISNES,
+          menteePhone: reportData.NO_TELEFON,
+          sessionNumber: reportData.SESI_NUMBER,
+          batch: reportData.BATCH,
+          miaReason: reportData.MIA_REASON,
+          proofWhatsappUrl: reportData.imageUrls?.mia?.whatsapp,
+          proofEmailUrl: reportData.imageUrls?.mia?.email,
+          proofCallUrl: reportData.imageUrls?.mia?.call
+        }, 'maju');
+
+        console.log('🔍 [DEBUG] Prepared MIA payload:');
+        console.log('  - alasan:', miaPayload.alasan?.substring(0, 100) + '...');
+        console.log('  - proof_whatsapp_url:', miaPayload.proof_whatsapp_url);
+        console.log('  - proof_email_url:', miaPayload.proof_email_url);
+        console.log('  - proof_call_url:', miaPayload.proof_call_url);
+
+        const { data: miaRequestData, error: miaError } = await supabaseAdmin
+          .from('mia_requests')
+          .insert(miaPayload)
+          .select()
+          .single();
+
+        if (miaError) {
+          console.error('⚠️ Failed to create MIA request (non-blocking):', miaError);
+        } else {
+          miaRequestId = miaRequestData.id;
+          console.log(`✅ MIA request created with ID: ${miaRequestId}`);
+        }
+      } catch (error) {
+        console.error('⚠️ MIA request creation failed (non-blocking):', error);
+      }
+    }
+    // ============================================================
 
     // Prepare row data
     const rowData = mapMajuDataToSheetRow(reportData);
@@ -201,6 +258,34 @@ export default async function handler(req, res) {
       console.log(`✅ Entrepreneur resolved: ${entrepreneurId}`);
       // ============================================================
 
+      // ============================================================
+      // RESOLVE MENTOR_ID (required NOT NULL foreign key)
+      // ============================================================
+      const mentorEmail = reportData.EMAIL_MENTOR?.toLowerCase().trim();
+      if (!mentorEmail) {
+        throw new Error('Missing mentor email in payload');
+      }
+
+      console.log('🔍 Resolving mentor using email:', mentorEmail);
+
+      const { data: mentor, error: mentorError } = await supabaseAdmin
+        .from('mentors')
+        .select('id')
+        .eq('email', mentorEmail)
+        .maybeSingle();
+
+      if (mentorError) {
+        throw new Error(`Mentor lookup failed: ${mentorError.message}`);
+      }
+
+      if (!mentor) {
+        throw new Error(`Mentor not found in DB for email: ${mentorEmail}`);
+      }
+
+      const mentorId = mentor.id;
+      console.log(`✅ Mentor resolved: ${mentorId}`);
+      // ============================================================
+
       // Prepare Supabase payload - MUST match 'reports' table schema
       const supabasePayload = {
         // Program & Metadata
@@ -211,6 +296,7 @@ export default async function handler(req, res) {
         sheets_row_number: newRowNumber,
 
         // Mentor Info
+        mentor_id: mentorId,                           // ✅ REQUIRED foreign key
         nama_mentor: reportData.NAMA_MENTOR || null,
         mentor_email: reportData.EMAIL_MENTOR || null,
 
