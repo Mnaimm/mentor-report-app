@@ -789,6 +789,7 @@ export default function LaporanSesiPage() {
         return;
       }
 
+      console.log('MIA proofs:', files.mia);
       if (!validateMIAProofs(files.mia)) {
         setError('Ketiga-tiga bukti (WhatsApp, E-mel, Panggilan) adalah wajib dimuat naik untuk laporan MIA.');
         setIsSubmitting(false);

@@ -771,11 +771,12 @@ const LaporanMajuPage = () => {
     setLoading(false);
     setIsMIA(false);
     setMiaReason('');
-    setFiles(prev => ({
-      ...prev,
+    setFiles({
+      gw360: null,
+      sesi: [],
+      premis: [],
       mia: { whatsapp: null, email: null, call: null }
-    }));
-    setFiles({ gw360: null, sesi: [], premis: [] });
+    });
     setSaveStatus('');
     setAutosaveArmed(false);
 
@@ -898,6 +899,7 @@ const LaporanMajuPage = () => {
         errors.push(reasonValidation.error);
       }
 
+      console.log('MIA proofs:', files.mia);
       if (!validateMIAProofs(files.mia)) {
         errors.push('Ketiga-tiga bukti (WhatsApp, E-mel, Panggilan) adalah wajib dimuat naik untuk laporan MIA.');
       }
