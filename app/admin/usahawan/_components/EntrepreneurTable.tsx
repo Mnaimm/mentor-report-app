@@ -26,12 +26,14 @@ interface EntrepreneurTableProps<TData, TValue> {
     columns: ColumnDef<TData, TValue>[]
     data: TData[]
     loading?: boolean
+    mobileCardComponent?: React.ComponentType<{ entrepreneur: any }>
 }
 
 export function EntrepreneurTable<TData, TValue>({
     columns,
     data,
     loading = false,
+    mobileCardComponent,
 }: EntrepreneurTableProps<TData, TValue>) {
     const [sorting, setSorting] = React.useState<SortingState>([])
 
@@ -64,12 +66,15 @@ export function EntrepreneurTable<TData, TValue>({
         )
     }
 
+    // Use custom mobile card component if provided, otherwise use default
+    const MobileCard = mobileCardComponent || EntrepreneurCard
+
     return (
         <div>
             {/* Mobile View: Cards */}
             <div className="block md:hidden">
                 {data.map((row: any, i) => (
-                    <EntrepreneurCard key={row.id || i} entrepreneur={row as EntrepreneurDirectoryAdmin} />
+                    <MobileCard key={row.id || i} entrepreneur={row as any} />
                 ))}
             </div>
 
