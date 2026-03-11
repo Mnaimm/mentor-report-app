@@ -31,7 +31,7 @@ export default async function handler(req, res) {
 
     const mappingResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.GOOGLE_SHEETS_MAPPING_ID,
-      range: 'mapping!A:K',
+      range: 'mapping!A:L',
     });
     const mappingRows = mappingResponse.data.values;
 
@@ -65,12 +65,13 @@ export default async function handler(req, res) {
       Mentor: row[2] || '',
       Mentor_Email: row[3] || '',
       Usahawan: row[4] || '',
-      Nama_Syarikat: row[5] || '',
-      Alamat: row[6] || '',
-      No_Tel: row[7] || 'N/A',
-      Folder_ID: row[8] || '',
-      Emel: row[9] || '',
-      Jenis_Bisnes: row[10] || '',
+      entrepreneur_id: row[5] || '',
+      Nama_Syarikat: row[6] || '',
+      Alamat: row[7] || '',
+      No_Tel: row[8] || 'N/A',
+      Folder_ID: row[9] || '',
+      Emel: row[10] || '',
+      Jenis_Bisnes: row[11] || '',
     }));
 
     // Logs related to allMenteesFromMapping should be *after* its declaration

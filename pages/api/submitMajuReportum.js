@@ -227,35 +227,58 @@ export default async function handler(req, res) {
       console.log('📊 Starting Supabase dual-write for MAJU report...');
 
       // ============================================================
-      // RESOLVE ENTREPRENEUR_ID (required NOT NULL foreign key)
+      // RESOLVE ENTREPRENEUR_ID (2-tier: ID → email)
       // ============================================================
-      // ✅ Require explicit emel field for MAJU
-      const rawEntrepreneurEmail = reportData.emel;
+      let entrepreneur = null;
 
-      if (!rawEntrepreneurEmail) {
-        throw new Error('Missing emel in MAJU payload. Cannot resolve entrepreneur.');
+      // 🆕 PRIMARY: Try entrepreneur_id if provided
+      const entrepreneurIdFromPayload = reportData.entrepreneur_id;
+      if (entrepreneurIdFromPayload) {
+        const { data: byId, error: idError } = await supabaseAdmin
+          .from('entrepreneurs')
+          .select('id')
+          .eq('id', entrepreneurIdFromPayload)
+          .maybeSingle();
+
+        if (byId) {
+          entrepreneur = byId;
+          console.log('✅ MAJU entrepreneur resolved by ID:', entrepreneurIdFromPayload);
+        } else if (idError) {
+          console.warn('⚠️ MAJU entrepreneur_id lookup failed:', idError.message);
+        } else {
+          console.warn(`⚠️ MAJU entrepreneur_id not found: ${entrepreneurIdFromPayload}`);
+        }
       }
 
-      const normalizedEmail = rawEntrepreneurEmail.toLowerCase().trim();
-
-      console.log('🔍 Resolving MAJU entrepreneur using email:', normalizedEmail);
-
-      const { data: entrepreneur, error: entrepreneurError } = await supabaseAdmin
-        .from('entrepreneurs')
-        .select('id')
-        .eq('email', normalizedEmail)
-        .maybeSingle();
-
-      if (entrepreneurError) {
-        throw new Error(`Entrepreneur lookup failed: ${entrepreneurError.message}`);
-      }
-
+      // Fallback: Email (existing logic)
       if (!entrepreneur) {
-        throw new Error(`Entrepreneur not found in DB for email: ${normalizedEmail}`);
+        const rawEntrepreneurEmail = reportData.emel;
+        if (!rawEntrepreneurEmail) {
+          throw new Error('Missing emel in MAJU payload. Cannot resolve entrepreneur.');
+        }
+
+        const normalizedEmail = rawEntrepreneurEmail.toLowerCase().trim();
+        console.log(`🔍 Resolving MAJU entrepreneur using email: ${normalizedEmail}`);
+
+        const { data: byEmail, error: entrepreneurError } = await supabaseAdmin
+          .from('entrepreneurs')
+          .select('id')
+          .eq('email', normalizedEmail)
+          .maybeSingle();
+
+        if (entrepreneurError) {
+          throw new Error(`Entrepreneur lookup failed: ${entrepreneurError.message}`);
+        }
+        if (!byEmail) {
+          throw new Error(`Entrepreneur not found for email: ${normalizedEmail}`);
+        }
+
+        entrepreneur = byEmail;
+        console.log('✅ MAJU entrepreneur resolved by email:', normalizedEmail);
       }
 
       const entrepreneurId = entrepreneur.id;
-      console.log(`✅ Entrepreneur resolved: ${entrepreneurId}`);
+      console.log(`✅ Final MAJU entrepreneur ID: ${entrepreneurId}`);
       // ============================================================
 
       // ============================================================
@@ -453,37 +476,55 @@ export default async function handler(req, res) {
 
         if (mentorError) throw new Error(`Mentor not found: ${mentorError.message}`);
 
-        // Fetch entrepreneur ID (reuse same email used for reports table)
-        // ✅ Require explicit emel field for MAJU UM
-        const rawEntrepreneurEmail = reportData.emel;
+        // Fetch entrepreneur ID (2-tier: ID → email)
+        let entrepreneurForUM = null;
 
-        if (!rawEntrepreneurEmail) {
-          throw new Error('Missing emel in MAJU payload for UM write.');
+        // Try entrepreneur_id first
+        const entrepreneurIdFromPayload2 = reportData.entrepreneur_id;
+        if (entrepreneurIdFromPayload2) {
+          const { data: byId } = await supabaseAdmin
+            .from('entrepreneurs')
+            .select('id')
+            .eq('id', entrepreneurIdFromPayload2)
+            .maybeSingle();
+
+          if (byId) {
+            entrepreneurForUM = byId;
+            console.log('✅ MAJU UM entrepreneur resolved by ID:', entrepreneurIdFromPayload2);
+          }
         }
 
-        const normalizedEmail = rawEntrepreneurEmail.toLowerCase().trim();
+        // Fallback: Email
+        if (!entrepreneurForUM) {
+          const rawEntrepreneurEmail = reportData.emel;
+          if (!rawEntrepreneurEmail) {
+            throw new Error('Missing emel in MAJU payload for UM write.');
+          }
 
-        const { data: entrepreneur, error: entrepreneurError } = await supabaseAdmin
-          .from('entrepreneurs')
-          .select('id')
-          .eq('email', normalizedEmail)
-          .maybeSingle();
+          const normalizedEmail = rawEntrepreneurEmail.toLowerCase().trim();
 
-        if (entrepreneurError) {
-          throw new Error(`Entrepreneur lookup failed: ${entrepreneurError.message}`);
+          const { data: byEmail, error: entrepreneurError } = await supabaseAdmin
+            .from('entrepreneurs')
+            .select('id')
+            .eq('email', normalizedEmail)
+            .maybeSingle();
+
+          if (entrepreneurError) {
+            throw new Error(`Entrepreneur lookup failed: ${entrepreneurError.message}`);
+          }
+          if (!byEmail) {
+            throw new Error(`Entrepreneur not found for UM: ${normalizedEmail}`);
+          }
+
+          entrepreneurForUM = byEmail;
+          console.log(`✅ MAJU UM entrepreneur resolved by email: ${normalizedEmail}`);
         }
-
-        if (!entrepreneur) {
-          throw new Error(`Entrepreneur not found for UM: ${normalizedEmail}`);
-        }
-
-        console.log(`✅ Entrepreneur resolved for UM: ${entrepreneur.id}`);
 
         // Build schema-whitelisted UM payload (aligned with upward_mobility_reports table)
         const umSupabasePayload = {};
 
         // Required foreign keys
-        umSupabasePayload.entrepreneur_id = entrepreneur.id;
+        umSupabasePayload.entrepreneur_id = entrepreneurForUM.id;
         umSupabasePayload.mentor_id = mentorData.id;
 
         // Program & Session
@@ -792,7 +833,24 @@ function mapMajuDataToSheetRow(data) {
     umData.UM_ASET_BUKAN_TUNAI_SEMASA || '',     // 56 UM_ASET_TUNAI_SEMASA (duplicate slot replaced)
 
     // UM Section 6: Premises Visit Date (1 field)
-    umData.UM_TARIKH_LAWATAN_PREMIS || '',       // 57 UM_TARIKH_LAWATAN_PREMIS
+    umData.UM_TARIKH_LAWATAN_PREMIS || '',       // 57 BF UM_TARIKH_LAWATAN_PREMIS
+
+    // Columns 58-62: MIA Proof Workflow (5 columns)
+    data?.imageUrls?.mia?.whatsapp || '',        // 58 BG MIA_PROOF_WHATSAPP
+    data?.imageUrls?.mia?.email || '',           // 59 BH MIA_PROOF_EMEL
+    data?.imageUrls?.mia?.call || '',            // 60 BI MIA_PROOF_PANGGILAN
+    '',                                          // 61 BJ MIA_REQUEST_ID (reserved)
+    data?.MIA_STATUS === 'MIA' ? 'requested' : '', // 62 BK MIA_STATUS
+
+    // Columns 63-64: Kemaskini Maklumat (Updated Contact Info)
+    data?.KEMASKINI_MAKLUMAT?.alamat_baharu || '',   // 63 BL ALAMAT_BAHARU
+    data?.KEMASKINI_MAKLUMAT?.telefon_baharu || '',  // 64 BM TELEFON_BAHARU
+
+    // Column 65: Additional UM field
+    umData.UM_ULASAN_ASET_TUNAI || '',           // 65 BN UM_ULASAN_ASET_TUNAI
+
+    // Column 66: Entrepreneur ID
+    data.entrepreneur_id || '',                  // 66 BO ENTREPRENEUR_ID
   ];
 }
 

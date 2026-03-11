@@ -19,7 +19,7 @@ function getRowNumberFromUpdatedRange(updatedRange) {
  * Columns BC-CB (54-81): Upward Mobility data (28 columns)
  */
 const mapBangkitDataToSheetRow = (data, miaRequestId = null) => {
-  const row = Array(91).fill(''); // Columns 0-90 (91 total) - extended for MIA enhancements + kemaskini maklumat
+  const row = Array(92).fill(''); // Columns 0-91 (92 total) - extended for MIA enhancements + kemaskini maklumat + entrepreneur_id
 
   // A–J (0-9): Basic session info
   row[0] = new Date().toISOString();                     // A  Timestamp
@@ -157,6 +157,9 @@ const mapBangkitDataToSheetRow = (data, miaRequestId = null) => {
   row[88] = data?.noTelefon || '';                           // CK NO_TELEFON original
   row[89] = data?.kemaskiniMaklumat?.alamat_baharu || '';    // CL ALAMAT_BAHARU
   row[90] = data?.kemaskiniMaklumat?.telefon_baharu || '';   // CM TELEFON_BAHARU
+
+  // CN (91): Entrepreneur ID (UUID from entrepreneurs table)
+  row[91] = data?.entrepreneur_id || '';                     // CN ENTREPRENEUR_ID
 
   return row;
 };
@@ -333,40 +336,67 @@ export default async function handler(req, res) {
     // ============================================================
     console.log('📊 Step 1: Writing to supabaseAdmin (primary source of truth)...');
 
-    // ── Entrepreneur lookup ──────────────────────────────────────
+    // ── Entrepreneur lookup (3-tier: ID → email → name fallback) ──
     let entrepreneur = null;
 
-    // Try email first (most reliable, comes from mapping sheet Emel field)
-    const rawEmail = (reportData.emailUsahawan || '').toLowerCase().trim();
-    if (rawEmail) {
-      const { data: byEmail } = await supabaseAdmin
+    // 🆕 PRIMARY: Try entrepreneur_id if provided
+    const entrepreneurId = reportData.entrepreneur_id;
+    if (entrepreneurId) {
+      const { data: byId, error: idError } = await supabaseAdmin
         .from('entrepreneurs')
         .select('id')
-        .eq('email', rawEmail)
+        .eq('id', entrepreneurId)
         .maybeSingle();
-      if (byEmail) entrepreneur = byEmail;
+
+      if (byId) {
+        entrepreneur = byId;
+        console.log('✅ Entrepreneur resolved by ID:', entrepreneurId);
+      } else if (idError) {
+        console.warn('⚠️ entrepreneur_id lookup failed:', idError.message);
+      } else {
+        console.warn(`⚠️ entrepreneur_id not found: ${entrepreneurId}`);
+      }
     }
 
-    // Fallback: name ILIKE (in case email is missing or mismatched)
+    // Fallback 1: Email (most reliable text identifier)
+    if (!entrepreneur) {
+      const rawEmail = (reportData.emailUsahawan || '').toLowerCase().trim();
+      if (rawEmail) {
+        const { data: byEmail } = await supabaseAdmin
+          .from('entrepreneurs')
+          .select('id')
+          .eq('email', rawEmail)
+          .maybeSingle();
+        if (byEmail) {
+          entrepreneur = byEmail;
+          console.log('✅ Entrepreneur resolved by email:', rawEmail);
+        }
+      }
+    }
+
+    // ⚠️ DEPRECATED Fallback 2: Name-based (temporary safety net)
     if (!entrepreneur) {
       const usahawanName = (reportData.usahawan || '').trim();
-      console.log('⚠️ Email lookup failed, trying name fallback:', usahawanName);
+      console.warn('⚠️ entrepreneur_id missing, falling back to name lookup:', usahawanName);
       if (usahawanName) {
         const { data: byName } = await supabaseAdmin
           .from('entrepreneurs')
           .select('id')
           .ilike('name', usahawanName)
           .maybeSingle();
-        if (byName) entrepreneur = byName;
+        if (byName) {
+          entrepreneur = byName;
+          console.warn('⚠️ Entrepreneur resolved by NAME (deprecated):', usahawanName);
+        }
       }
     }
 
     if (!entrepreneur) {
       throw new Error(
-        `Entrepreneur not found. Email: ${rawEmail || 'none'}, Name: ${reportData.usahawan || 'none'}`
+        `Entrepreneur not found. ID: ${entrepreneurId || 'none'}, Email: ${reportData.emailUsahawan || 'none'}, Name: ${reportData.usahawan || 'none'}`
       );
     }
-    console.log('✅ Entrepreneur resolved:', entrepreneur.id);
+    console.log('✅ Final entrepreneur ID:', entrepreneur.id);
     // ─────────────────────────────────────────────────────────────
 
     console.log(`✅ Entrepreneur resolved: ${entrepreneur.id}`);
@@ -650,37 +680,64 @@ export default async function handler(req, res) {
         if (mentorError) throw new Error(`Mentor lookup failed: ${mentorError.message}`);
         if (!mentorData) throw new Error(`Mentor not found for email: ${normalizedMentorEmail}`);
 
-        // ── Entrepreneur lookup ──────────────────────────────────────
+        // ── Entrepreneur lookup (3-tier: ID → email → name fallback) ──
         let entrepreneur = null;
 
-        // Try email first (most reliable, comes from mapping sheet Emel field)
-        const rawEmail = (reportData.emailUsahawan || '').toLowerCase().trim();
-        if (rawEmail) {
-          const { data: byEmail } = await supabaseAdmin
+        // 🆕 PRIMARY: Try entrepreneur_id if provided
+        const entrepreneurId = reportData.entrepreneur_id;
+        if (entrepreneurId) {
+          const { data: byId, error: idError } = await supabaseAdmin
             .from('entrepreneurs')
             .select('id')
-            .eq('email', rawEmail)
+            .eq('id', entrepreneurId)
             .maybeSingle();
-          if (byEmail) entrepreneur = byEmail;
+
+          if (byId) {
+            entrepreneur = byId;
+            console.log('✅ [REVISION] Entrepreneur resolved by ID:', entrepreneurId);
+          } else if (idError) {
+            console.warn('⚠️ [REVISION] entrepreneur_id lookup failed:', idError.message);
+          } else {
+            console.warn(`⚠️ [REVISION] entrepreneur_id not found: ${entrepreneurId}`);
+          }
         }
 
-        // Fallback: name ILIKE (in case email is missing or mismatched)
+        // Fallback 1: Email (most reliable text identifier)
+        if (!entrepreneur) {
+          const rawEmail = (reportData.emailUsahawan || '').toLowerCase().trim();
+          if (rawEmail) {
+            const { data: byEmail } = await supabaseAdmin
+              .from('entrepreneurs')
+              .select('id')
+              .eq('email', rawEmail)
+              .maybeSingle();
+            if (byEmail) {
+              entrepreneur = byEmail;
+              console.log('✅ [REVISION] Entrepreneur resolved by email:', rawEmail);
+            }
+          }
+        }
+
+        // ⚠️ DEPRECATED Fallback 2: Name-based (temporary safety net)
         if (!entrepreneur) {
           const usahawanName = (reportData.usahawan || '').trim();
-          console.log('⚠️ Email lookup failed, trying name fallback:', usahawanName);
+          console.warn('⚠️ [REVISION] entrepreneur_id missing, falling back to name lookup:', usahawanName);
           if (usahawanName) {
             const { data: byName } = await supabaseAdmin
               .from('entrepreneurs')
               .select('id')
               .ilike('name', usahawanName)
               .maybeSingle();
-            if (byName) entrepreneur = byName;
+            if (byName) {
+              entrepreneur = byName;
+              console.warn('⚠️ [REVISION] Entrepreneur resolved by NAME (deprecated):', usahawanName);
+            }
           }
         }
 
         if (!entrepreneur) {
           throw new Error(
-            `Entrepreneur not found. Email: ${rawEmail || 'none'}, Name: ${reportData.usahawan || 'none'}`
+            `Entrepreneur not found. ID: ${entrepreneurId || 'none'}, Email: ${reportData.emailUsahawan || 'none'}, Name: ${reportData.usahawan || 'none'}`
           );
         }
         console.log('✅ Entrepreneur resolved:', entrepreneur.id);

@@ -1100,6 +1100,7 @@ export default function LaporanSesiPage() {
         status: isMIA ? 'MIA' : 'Selesai',
         sesiLaporan: currentSession,
         usahawan: selectedMentee.Usahawan,
+        entrepreneur_id: selectedMentee.entrepreneur_id || null,
         namaSyarikat: selectedMentee.Nama_Syarikat,
         namaMentor: session?.user?.name || '',
         mentorEmail: session?.user?.email || '',

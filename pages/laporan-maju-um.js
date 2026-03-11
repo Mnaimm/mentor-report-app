@@ -95,6 +95,7 @@ const LaporanMajuPage = () => {
     NAMA_MENTOR: '',
     EMAIL_MENTOR: '',
     NAMA_MENTEE: '',
+    entrepreneur_id: null, // Entrepreneur UUID from mapping for Supabase lookup
     NAMA_BISNES: '',
     LOKASI_BISNES: '',
     PRODUK_SERVIS: '',
@@ -400,9 +401,13 @@ const LaporanMajuPage = () => {
   const handleMenteeSelect = useCallback(async (e) => {
     const selectedMenteeName = e.target.value;
 
+    // Find full mentee object to get entrepreneur_id
+    const selectedMenteeData = filteredMenteesForDropdown.find(m => m.Usahawan === selectedMenteeName);
+
     setFormData(prev => ({
       ...prev,
       NAMA_MENTEE: selectedMenteeName,
+      entrepreneur_id: selectedMenteeData?.entrepreneur_id || null,
       NAMA_BISNES: '',
       LOKASI_BISNES: '',
       PRODUK_SERVIS: '',
@@ -1098,6 +1103,7 @@ const LaporanMajuPage = () => {
           NAMA_MENTOR: formData.NAMA_MENTOR,
           EMAIL_MENTOR: formData.EMAIL_MENTOR,
           NAMA_MENTEE: formData.NAMA_MENTEE,
+          entrepreneur_id: formData.entrepreneur_id || null,
           NAMA_BISNES: formData.NAMA_BISNES,
           SESI_NUMBER: currentSessionNumber,
           BATCH: formData.BATCH || '', // Added Batch
@@ -1161,6 +1167,7 @@ const LaporanMajuPage = () => {
           NAMA_MENTOR: formData.NAMA_MENTOR,
           EMAIL_MENTOR: formData.EMAIL_MENTOR,
           NAMA_MENTEE: formData.NAMA_MENTEE,
+          entrepreneur_id: formData.entrepreneur_id || null,
           NAMA_BISNES: formData.NAMA_BISNES,
           SESI_NUMBER: currentSessionNumber,
           BATCH: formData.BATCH || '', // Added Batch
