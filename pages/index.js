@@ -356,6 +356,11 @@ export default function HomePage() {
             {/* Quick links */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               <ToolCard
+                href="/mentor/usahawan-saya"
+                title="Usahawan Saya"
+                description="Direktori usahawan yang ditugaskan kepada anda."
+              />
+              <ToolCard
                 href="/laporan-bangkit"
                 title="Laporan Sesi iTEKAD Bangkit"
                 description="Isi laporan berterusan untuk usahawan anda di sini."
