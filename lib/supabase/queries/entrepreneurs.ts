@@ -29,7 +29,11 @@ export async function getEntrepreneursDirectory(params: {
         p_offset: offset,
     })
 
-    if (error) throw error
+    if (error) {
+        console.error('❌ Error fetching entrepreneurs directory:', error)
+        throw error
+    }
+
     return data as EntrepreneurDirectoryAdmin[]
 }
 
