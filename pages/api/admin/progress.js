@@ -172,8 +172,8 @@ export default async function handler(req, res) {
     }
 
     const roundStats = Array.from(roundStatsMap.values()).sort((a, b) => {
-      if (a.batch !== b.batch) return a.batch.localeCompare(b.batch);
-      if (a.program !== b.program) return String(a.program).localeCompare(String(b.program));
+      if (a.batch !== b.batch) return (a.batch ?? '').localeCompare(b.batch ?? '');
+      if (a.program !== b.program) return (a.program ?? '').localeCompare(b.program ?? '');
       return a.round - b.round;
     });
 
