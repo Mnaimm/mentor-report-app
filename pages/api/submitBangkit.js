@@ -524,9 +524,10 @@ export default async function handler(req, res) {
 
       console.log('🔗 Bangkit Sheet ID:', spreadsheetId, '- Tab:', bangkitTab);
 
-      // Map data to Sheet row WITH report_id in column P (index 15)
+      // Map data to Sheet row
       rowData = mapBangkitDataToSheetRow(reportData, miaRequestId);
-      rowData[15] = supabaseRecordId; // Column P = report_id
+      // Column P (index 15) must remain Fokus Area 2 - store report_id in reserved column instead
+      rowData[80] = supabaseRecordId; // Column CC (reserved) = report_id
 
       // Append data to Google Sheet with timeout
       const appendRes = await Promise.race([
