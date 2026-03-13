@@ -5,6 +5,16 @@ import { supabaseAdmin } from '../../../lib/supabaseClient';
 
 const normalizeProgram = (program) => (program ? String(program).toLowerCase() : 'all');
 
+// Whitelist of active batches to display
+const ACTIVE_BATCHES = [
+  'Batch 4 MAJU',
+  'Batch 5 Bangkit',
+  'Batch 5 MAJU',
+  'Batch 6 Bangkit',
+  'Batch 6 MAJU',
+  'Batch 7 Bangkit',
+];
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ success: false, error: 'Method Not Allowed' });
@@ -56,6 +66,16 @@ export default async function handler(req, res) {
     if (mentorsError) throw mentorsError;
     if (entrepreneursError) throw entrepreneursError;
 
+    // Filter to only valid and active batches
+    // 1. Exclude batch_rounds where batch_id is null (orphaned rows like Batch 2 Bangkit)
+    // 2. Apply active batch whitelist
+    const roundsActive = (rounds || []).filter(r =>
+      r.batch_id !== null &&
+      ACTIVE_BATCHES.some(name =>
+        r.batch_name?.toLowerCase() === name.toLowerCase()
+      )
+    );
+
     const mentorById = new Map((mentors || []).map((m) => [m.id, m]));
     const mentorIdByEmail = new Map((mentors || []).map((m) => [String(m.email || '').toLowerCase(), m.id]));
     const entrepreneurById = new Map((entrepreneurs || []).map((e) => [e.id, e]));
@@ -63,45 +83,31 @@ export default async function handler(req, res) {
       (entrepreneurs || []).map((e) => [String(e.name || '').toLowerCase(), e.id])
     );
 
+    // Identify orphaned mentor_ids in assignments (for debugging)
+    const orphanedMentorIds = (assignments || [])
+      .filter(a => !mentorById.has(a.mentor_id))
+      .map(a => a.mentor_id);
+    if (orphanedMentorIds.length > 0) {
+      console.log('⚠️ Orphaned mentor_ids in assignments:', [...new Set(orphanedMentorIds)]);
+    }
+
     const today = new Date();
 
     // Filter to active batches if 'all' is selected
+    // A batch is "active" if it has at least one round where end_month <= today (i.e. at least one due round exists)
     let activeBatchNames = null;
     if (batchFilter === 'all') {
-      // Get unique batch_ids from active assignments
-      const assignmentBatchIds = new Set((assignments || []).map(a => a.batch_id));
-
-      // Find the latest batch by finding rounds with the most recent end_month
-      // that have assignments
-      const roundsWithAssignments = (rounds || []).filter(r =>
-        assignmentBatchIds.has(r.batch_id)
+      activeBatchNames = new Set(
+        (roundsActive || [])
+          .filter(r => r.end_month && new Date(r.end_month) <= today)
+          .map(r => r.batch_name)
       );
-
-      if (roundsWithAssignments.length > 0) {
-        // Find the latest end_month among active rounds
-        const latestEndMonth = roundsWithAssignments.reduce((latest, r) => {
-          if (!r.end_month) return latest;
-          const endDate = new Date(r.end_month);
-          return endDate > latest ? endDate : latest;
-        }, new Date(0));
-
-        // Get batch_names that have rounds ending at or near the latest end_month
-        // (within 6 months to catch current active batches)
-        const sixMonthsAgo = new Date(latestEndMonth);
-        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
-        activeBatchNames = new Set(
-          roundsWithAssignments
-            .filter(r => r.end_month && new Date(r.end_month) >= sixMonthsAgo)
-            .map(r => r.batch_name)
-        );
-      }
     }
 
-    const roundsFiltered = (rounds || []).filter((r) => {
+    const roundsFiltered = (roundsActive || []).filter((r) => {
       const programOk = programFilter === 'all' || String(r.program || '').toLowerCase() === programFilter;
 
-      // If batchFilter is 'all', only show the latest active batches
+      // If batchFilter is 'all', show all batches that have at least one due round
       let batchOk = true;
       if (batchFilter === 'all' && activeBatchNames) {
         batchOk = activeBatchNames.has(r.batch_name);
@@ -173,6 +179,14 @@ export default async function handler(req, res) {
     const missingReports = [];
 
     for (const e of expected) {
+      // Skip if mentor not found in mentors table (orphaned assignment)
+      const mentor = mentorById.get(e.mentor_id);
+      if (!mentor) continue;
+
+      // Skip test entrepreneurs (names starting with "TEST")
+      const entrepreneur = entrepreneurById.get(e.entrepreneur_id);
+      if (entrepreneur?.name?.startsWith('TEST')) continue;
+
       const key = `${e.mentor_id}|${e.entrepreneur_id}|${e.round_number}`;
       const submission = submissionMap.get(key) || null;
 
@@ -189,8 +203,9 @@ export default async function handler(req, res) {
 
       const mentorEntry = mentorStatsMap.get(e.mentor_id) || {
         mentor_id: e.mentor_id,
-        mentor_name: mentorById.get(e.mentor_id)?.name || 'Unknown Mentor',
-        mentor_email: mentorById.get(e.mentor_id)?.email || '',
+        mentor_name: mentor.name || 'Unknown Mentor',
+        mentor_email: mentor.email || '',
+        batch_name: e.batch_name,
         rounds: {},
         assigned: 0,
         submitted: 0,
@@ -250,33 +265,65 @@ export default async function handler(req, res) {
 
     const mentorStats = Array.from(mentorStatsMap.values()).sort((a, b) => b.missing - a.missing);
 
-    // Determine the active batch for UI default (most recent batch by end_month)
+    // Group data by batch for UI display
+    const batchesInStats = [...new Set(roundStats.map(r => r.batch))];
+
+    const batchGroups = {};
     let activeBatchName = null;
-    if (roundStats.length > 0) {
-      // Get all unique batches from roundStats
-      const batchesInStats = [...new Set(roundStats.map(r => r.batch))];
+    let latestEndMonth = new Date(0);
 
-      // Find the batch with the most recent end_month
-      const batchEndMonths = batchesInStats.map(batchName => {
-        const batchRounds = roundsFiltered.filter(r => r.batch_name === batchName);
-        const latestEndMonth = batchRounds.reduce((latest, r) => {
-          if (!r.end_month) return latest;
-          const endDate = new Date(r.end_month);
-          return endDate > latest ? endDate : latest;
-        }, new Date(0));
-        return { batchName, latestEndMonth };
-      });
+    for (const batchName of batchesInStats) {
+      // Get round stats for this batch
+      const batchRoundStats = roundStats.filter(r => r.batch === batchName);
 
-      // Sort by latest end_month and pick the first
-      batchEndMonths.sort((a, b) => b.latestEndMonth - a.latestEndMonth);
-      activeBatchName = batchEndMonths[0]?.batchName || null;
+      // Get mentor stats for this batch (mentors who have assignments in this batch)
+      const batchMentorStats = mentorStats.filter(m => m.batch_name === batchName);
+
+      // Get missing reports for this batch
+      const batchMissingReports = missingReports.filter(mr => mr.batch === batchName);
+
+      // Calculate batch totals
+      const expected = batchRoundStats.reduce((sum, r) => sum + r.expected, 0);
+      const submitted = batchRoundStats.reduce((sum, r) => sum + r.submitted, 0);
+      const missing = batchRoundStats.reduce((sum, r) => sum + r.missing, 0);
+
+      // Find the latest end_month for this batch to determine if it's active
+      const batchRounds = roundsFiltered.filter(r => r.batch_name === batchName);
+      const batchLatestEndMonth = batchRounds.reduce((latest, r) => {
+        if (!r.end_month) return latest;
+        const endDate = new Date(r.end_month);
+        return endDate > latest ? endDate : latest;
+      }, new Date(0));
+
+      // Track the overall latest batch
+      if (batchLatestEndMonth > latestEndMonth) {
+        latestEndMonth = batchLatestEndMonth;
+        activeBatchName = batchName;
+      }
+
+      batchGroups[batchName] = {
+        batchName,
+        roundStats: batchRoundStats,
+        mentorStats: batchMentorStats,
+        missingReports: batchMissingReports,
+        totals: { expected, submitted, missing },
+        isActive: batchLatestEndMonth >= new Date(Date.now() - 90 * 24 * 60 * 60 * 1000), // Active if within last 90 days
+      };
     }
+
+    // Calculate overall totals across all batches
+    const expectedTotal = roundStats.reduce((sum, r) => sum + r.expected, 0);
+    const submittedTotal = roundStats.reduce((sum, r) => sum + r.submitted, 0);
+    const missingTotal = roundStats.reduce((sum, r) => sum + r.missing, 0);
 
     return res.status(200).json({
       success: true,
-      roundStats,
-      mentorStats,
-      missingReports,
+      batchGroups,
+      totals: {
+        expected: expectedTotal,
+        submitted: submittedTotal,
+        missing: missingTotal,
+      },
       activeBatch: activeBatchName,
       filters: {
         program: programFilter,

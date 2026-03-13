@@ -66,10 +66,21 @@ export default function AdminProgress({ userEmail, isReadOnlyUser, accessDenied 
   const [round, setRound] = useState('all');
   const [missingRoundFilter, setMissingRoundFilter] = useState('all');
   const [initialLoad, setInitialLoad] = useState(true);
+  const [expandedBatches, setExpandedBatches] = useState(new Set());
 
   if (accessDenied) {
     return <AccessDenied userEmail={userEmail} />;
   }
+
+  const toggleBatch = (batchName) => {
+    const newExpanded = new Set(expandedBatches);
+    if (newExpanded.has(batchName)) {
+      newExpanded.delete(batchName);
+    } else {
+      newExpanded.add(batchName);
+    }
+    setExpandedBatches(newExpanded);
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -89,11 +100,16 @@ export default function AdminProgress({ userEmail, isReadOnlyUser, accessDenied 
       if (!json.success) throw new Error(json.error || 'Failed to fetch progress data');
       setData(json);
 
-      // On initial load, set batch to activeBatch if available
-      if (initialLoad && json.activeBatch) {
-        setBatch(json.activeBatch);
-        setInitialLoad(false);
-      } else if (initialLoad) {
+      // On initial load, expand active batches and set batch filter
+      if (initialLoad) {
+        const activeBatches = Object.keys(json.batchGroups || {}).filter(
+          batchName => json.batchGroups[batchName].isActive
+        );
+        setExpandedBatches(new Set(activeBatches));
+
+        if (json.activeBatch) {
+          setBatch(json.activeBatch);
+        }
         setInitialLoad(false);
       }
     } catch (err) {
@@ -108,28 +124,34 @@ export default function AdminProgress({ userEmail, isReadOnlyUser, accessDenied 
     fetchData();
   }, [program, batch, round]);
 
-  const roundStats = data?.roundStats || [];
-  const mentorStats = data?.mentorStats || [];
-  const missingReports = data?.missingReports || [];
+  const batchGroups = data?.batchGroups || {};
+  const totals = data?.totals || { expected: 0, submitted: 0, missing: 0 };
 
   const batches = useMemo(() => {
-    const set = new Set(roundStats.map((r) => r.batch));
-    return ['all', ...Array.from(set).sort()];
-  }, [roundStats]);
+    return ['all', ...Object.keys(batchGroups).sort()];
+  }, [batchGroups]);
 
   const rounds = useMemo(() => {
-    const set = new Set(roundStats.map((r) => r.round));
-    return ['all', ...Array.from(set).sort((a, b) => a - b)];
-  }, [roundStats]);
+    const allRounds = new Set();
+    Object.values(batchGroups).forEach(group => {
+      group.roundStats.forEach(r => allRounds.add(r.round));
+    });
+    return ['all', ...Array.from(allRounds).sort((a, b) => a - b)];
+  }, [batchGroups]);
 
-  const expectedTotal = roundStats.reduce((sum, r) => sum + r.expected, 0);
-  const submittedTotal = roundStats.reduce((sum, r) => sum + r.submitted, 0);
-  const missingTotal = roundStats.reduce((sum, r) => sum + r.missing, 0);
-  const mentorsBehind = mentorStats.filter((m) => m.missing > 0).length;
+  const expectedTotal = totals.expected;
+  const submittedTotal = totals.submitted;
+  const missingTotal = totals.missing;
+
+  const mentorsBehind = Object.values(batchGroups).reduce((count, group) =>
+    count + group.mentorStats.filter((m) => m.missing > 0).length
+  , 0);
+
+  const allMissingReports = Object.values(batchGroups).flatMap(group => group.missingReports);
 
   const filteredMissingReports = missingRoundFilter === 'all'
-    ? missingReports
-    : missingReports.filter(m => m.round === parseInt(missingRoundFilter));
+    ? allMissingReports
+    : allMissingReports.filter(m => m.round === parseInt(missingRoundFilter));
 
   // Check if report is overdue
   const isOverdue = (dueDate) => {
@@ -275,128 +297,156 @@ export default function AdminProgress({ userEmail, isReadOnlyUser, accessDenied 
               </div>
             </div>
 
-            {/* Round Status */}
-            <div className="bg-white rounded-lg shadow-md mb-6 overflow-hidden border border-gray-200">
-              <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Round Status</h2>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Round</th>
-                      <th className="text-right px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider" style={{ fontVariantNumeric: 'tabular-nums' }}>Expected</th>
-                      <th className="text-right px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider" style={{ fontVariantNumeric: 'tabular-nums' }}>Submitted</th>
-                      <th className="text-right px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider" style={{ fontVariantNumeric: 'tabular-nums' }}>Missing</th>
-                      <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Progress</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 bg-white">
-                    {roundStats.map((r, idx) => {
-                      const pct = r.expected > 0 ? Math.round((r.submitted / r.expected) * 100) : 0;
-                      return (
-                        <tr key={idx} className="hover:bg-gray-50">
-                          <td className="px-6 py-4">
-                            <div className="font-medium text-gray-900">Round {r.round}</div>
-                            <div className="text-xs text-gray-500">{r.batch} • {r.program}</div>
-                          </td>
-                          <td className="px-6 py-4 text-right font-medium text-gray-700" style={{ fontVariantNumeric: 'tabular-nums' }}>{r.expected}</td>
-                          <td className="px-6 py-4 text-right font-medium text-green-600" style={{ fontVariantNumeric: 'tabular-nums' }}>{r.submitted}</td>
-                          <td className="px-6 py-4 text-right">
-                            <span className={`font-bold ${r.missing > 0 ? 'text-red-600' : 'text-gray-400'}`} style={{ fontVariantNumeric: 'tabular-nums' }}>
-                              {r.missing}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <ProgressBar value={r.submitted} total={r.expected} />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                    {roundStats.length === 0 && (
-                      <tr>
-                        <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
-                          No round data available
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            {/* Batch Groups (Collapsible) */}
+            {Object.entries(batchGroups).map(([batchName, group]) => {
+              const isExpanded = expandedBatches.has(batchName);
+              const { roundStats, mentorStats, totals: batchTotals } = group;
 
-            {/* Mentor Heatmap */}
-            <div className="bg-white rounded-lg shadow-md mb-6 overflow-hidden border border-gray-200">
-              <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Mentor Progress Heatmap</h2>
-                <p className="text-xs text-gray-500 mt-1">Sorted by missing count (highest risk first)</p>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Mentor</th>
-                      <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">R1</th>
-                      <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">R2</th>
-                      <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">R3</th>
-                      <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">R4</th>
-                      <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                      <th className="text-right px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider" style={{ fontVariantNumeric: 'tabular-nums' }}>Missing</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 bg-white">
-                    {mentorStats.map((m) => (
-                      <tr key={m.mentor_id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4">
-                          <div className="font-medium text-gray-900">{m.mentor_name}</div>
-                          <div className="text-xs text-gray-500">{m.mentor_email}</div>
-                        </td>
-                        {[1, 2, 3, 4].map((r) => (
-                          <td key={r} className="text-center px-3 py-4">
-                            <StatusBadge status={m.rounds?.[r] || 'not_due'} />
-                          </td>
-                        ))}
-                        <td className="px-6 py-4">
-                          <AccountabilityPill missing={m.missing} />
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <span className={`font-bold text-lg ${m.missing > 0 ? 'text-red-600' : 'text-gray-400'}`} style={{ fontVariantNumeric: 'tabular-nums' }}>
-                            {m.missing}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                    {mentorStats.length === 0 && (
-                      <tr>
-                        <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
-                          No mentor data available
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              <div className="px-6 py-3 bg-gray-50 border-t border-gray-200">
-                <div className="flex items-center gap-6 text-xs text-gray-600">
-                  <div className="flex items-center gap-2">
-                    <StatusBadge status="submitted" />
-                    <span>Submitted</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <StatusBadge status="pending" />
-                    <span>Pending</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <StatusBadge status="missing" />
-                    <span>Missing</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <StatusBadge status="not_due" />
-                    <span>Not Due</span>
-                  </div>
+              return (
+                <div key={batchName} className="bg-white rounded-lg shadow-md mb-6 overflow-hidden border border-gray-200">
+                  {/* Batch Header (Collapsible) */}
+                  <button
+                    onClick={() => toggleBatch(batchName)}
+                    className="w-full px-6 py-4 border-b border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-lg">{isExpanded ? '▼' : '▶'}</span>
+                      <div className="text-left">
+                        <h2 className="text-base font-bold text-gray-900">{batchName}</h2>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {batchTotals.expected} expected • {batchTotals.submitted} submitted • {batchTotals.missing} missing
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {group.isActive && (
+                        <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded">Active</span>
+                      )}
+                    </div>
+                  </button>
+
+                  {/* Batch Content (Expandable) */}
+                  {isExpanded && (
+                    <>
+                      {/* Round Status for this Batch */}
+                      <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Round Status</h3>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead className="bg-gray-50 border-b border-gray-200">
+                            <tr>
+                              <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Round</th>
+                              <th className="text-right px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider" style={{ fontVariantNumeric: 'tabular-nums' }}>Expected</th>
+                              <th className="text-right px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider" style={{ fontVariantNumeric: 'tabular-nums' }}>Submitted</th>
+                              <th className="text-right px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider" style={{ fontVariantNumeric: 'tabular-nums' }}>Missing</th>
+                              <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Progress</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 bg-white">
+                            {roundStats.map((r, idx) => (
+                              <tr key={idx} className="hover:bg-gray-50">
+                                <td className="px-6 py-4">
+                                  <div className="font-medium text-gray-900">Round {r.round}</div>
+                                  <div className="text-xs text-gray-500">{r.program}</div>
+                                </td>
+                                <td className="px-6 py-4 text-right font-medium text-gray-700" style={{ fontVariantNumeric: 'tabular-nums' }}>{r.expected}</td>
+                                <td className="px-6 py-4 text-right font-medium text-green-600" style={{ fontVariantNumeric: 'tabular-nums' }}>{r.submitted}</td>
+                                <td className="px-6 py-4 text-right">
+                                  <span className={`font-bold ${r.missing > 0 ? 'text-red-600' : 'text-gray-400'}`} style={{ fontVariantNumeric: 'tabular-nums' }}>
+                                    {r.missing}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <ProgressBar value={r.submitted} total={r.expected} />
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Mentor Heatmap for this Batch */}
+                      <div className="px-6 py-4 bg-gray-50 border-b border-t border-gray-200">
+                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Mentor Progress Heatmap</h3>
+                        <p className="text-xs text-gray-500 mt-1">Sorted by missing count (highest risk first)</p>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead className="bg-gray-50 border-b border-gray-200">
+                            <tr>
+                              <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Mentor</th>
+                              <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">R1</th>
+                              <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">R2</th>
+                              <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">R3</th>
+                              <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">R4</th>
+                              <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                              <th className="text-right px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider" style={{ fontVariantNumeric: 'tabular-nums' }}>Missing</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 bg-white">
+                            {mentorStats.map((m) => (
+                              <tr key={m.mentor_id} className="hover:bg-gray-50">
+                                <td className="px-6 py-4">
+                                  <div className="font-medium text-gray-900">{m.mentor_name}</div>
+                                  <div className="text-xs text-gray-500">{m.mentor_email}</div>
+                                </td>
+                                {[1, 2, 3, 4].map((r) => (
+                                  <td key={r} className="text-center px-3 py-4">
+                                    <StatusBadge status={m.rounds?.[r] || 'not_due'} />
+                                  </td>
+                                ))}
+                                <td className="px-6 py-4">
+                                  <AccountabilityPill missing={m.missing} />
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                  <span className={`font-bold text-lg ${m.missing > 0 ? 'text-red-600' : 'text-gray-400'}`} style={{ fontVariantNumeric: 'tabular-nums' }}>
+                                    {m.missing}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                            {mentorStats.length === 0 && (
+                              <tr>
+                                <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                                  No mentors in this batch
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="px-6 py-3 bg-gray-50 border-t border-gray-200">
+                        <div className="flex items-center gap-6 text-xs text-gray-600">
+                          <div className="flex items-center gap-2">
+                            <StatusBadge status="submitted" />
+                            <span>Submitted</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <StatusBadge status="pending" />
+                            <span>Pending</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <StatusBadge status="missing" />
+                            <span>Missing</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <StatusBadge status="not_due" />
+                            <span>Not Due</span>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
+              );
+            })}
+
+            {Object.keys(batchGroups).length === 0 && !loading && (
+              <div className="bg-white rounded-lg shadow-md mb-6 p-8 text-center text-gray-500">
+                No batch data available
               </div>
-            </div>
+            )}
 
             {/* Missing Reports */}
             <div id="missing" className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200">
