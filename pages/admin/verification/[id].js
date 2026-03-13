@@ -267,8 +267,8 @@ export default function ReviewReport({ userEmail, isReadOnlyUser, accessDenied }
                                 {report.program === 'Bangkit' && report.session_number == 1 && (
                                     <ComplianceItem
                                         label="GrowthWheel Chart"
-                                        passed={!!report.image_urls?.gw360}
-                                        subtext={report.image_urls?.gw360 ? "Chart attached" : "Required for Session 1"}
+                                        passed={!!report.image_urls?.growthwheel}
+                                        subtext={report.image_urls?.growthwheel ? "Chart attached" : "Required for Session 1"}
                                     />
                                 )}
 
