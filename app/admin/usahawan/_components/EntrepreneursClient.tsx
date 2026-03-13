@@ -343,7 +343,7 @@ export default function EntrepreneursClient({
                                                             <div className="flex items-center gap-2">
                                                                 {entrepreneur.phone && (
                                                                     <button
-                                                                        onClick={(e) => handleAction(e, 'call', entrepreneur.phone)}
+                                                                        onClick={(e) => handleAction(e, 'call', entrepreneur.phone!)}
                                                                         className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                                                                         title="Telefon"
                                                                     >

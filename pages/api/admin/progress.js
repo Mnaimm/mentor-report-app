@@ -63,17 +63,71 @@ export default async function handler(req, res) {
       (entrepreneurs || []).map((e) => [String(e.name || '').toLowerCase(), e.id])
     );
 
+    const today = new Date();
+
+    // Filter to active batches if 'all' is selected
+    let activeBatchNames = null;
+    if (batchFilter === 'all') {
+      // Get unique batch_ids from active assignments
+      const assignmentBatchIds = new Set((assignments || []).map(a => a.batch_id));
+
+      // Find the latest batch by finding rounds with the most recent end_month
+      // that have assignments
+      const roundsWithAssignments = (rounds || []).filter(r =>
+        assignmentBatchIds.has(r.batch_id)
+      );
+
+      if (roundsWithAssignments.length > 0) {
+        // Find the latest end_month among active rounds
+        const latestEndMonth = roundsWithAssignments.reduce((latest, r) => {
+          if (!r.end_month) return latest;
+          const endDate = new Date(r.end_month);
+          return endDate > latest ? endDate : latest;
+        }, new Date(0));
+
+        // Get batch_names that have rounds ending at or near the latest end_month
+        // (within 6 months to catch current active batches)
+        const sixMonthsAgo = new Date(latestEndMonth);
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+        activeBatchNames = new Set(
+          roundsWithAssignments
+            .filter(r => r.end_month && new Date(r.end_month) >= sixMonthsAgo)
+            .map(r => r.batch_name)
+        );
+      }
+    }
+
     const roundsFiltered = (rounds || []).filter((r) => {
       const programOk = programFilter === 'all' || String(r.program || '').toLowerCase() === programFilter;
-      const batchOk = batchFilter === 'all' || r.batch_name === batchFilter;
+
+      // If batchFilter is 'all', only show the latest active batches
+      let batchOk = true;
+      if (batchFilter === 'all' && activeBatchNames) {
+        batchOk = activeBatchNames.has(r.batch_name);
+      } else if (batchFilter !== 'all') {
+        batchOk = r.batch_name === batchFilter;
+      }
+
       const roundOk = !roundFilter || r.round_number === roundFilter;
       return programOk && batchOk && roundOk;
     });
 
     const expected = [];
+    const futureRounds = new Map(); // Track future rounds for each mentor
     for (const a of assignments || []) {
       const roundsForBatch = roundsFiltered.filter((r) => r.batch_id === a.batch_id);
       for (const r of roundsForBatch) {
+        // Fix 1: Skip future rounds (not yet due) from expected reports
+        if (r.end_month && new Date(r.end_month) > today) {
+          // Track future rounds for UI display
+          if (!futureRounds.has(a.mentor_id)) {
+            futureRounds.set(a.mentor_id, new Set());
+          }
+          futureRounds.get(a.mentor_id).add(r.round_number);
+          continue;
+        }
+
         expected.push({
           mentor_id: a.mentor_id,
           entrepreneur_id: a.entrepreneur_id,
@@ -105,7 +159,7 @@ export default async function handler(req, res) {
       const roundNumber = report.session_number ? parseInt(report.session_number, 10) : null;
       if (!mentorId || !entrepreneurId || !roundNumber) continue;
 
-      const key = `${mentorId}|${entrepreneurId}|${program}|${roundNumber}`;
+      const key = `${mentorId}|${entrepreneurId}|${roundNumber}`;
       submissionMap.set(key, {
         id: report.id,
         status: report.status,
@@ -119,8 +173,7 @@ export default async function handler(req, res) {
     const missingReports = [];
 
     for (const e of expected) {
-      const program = String(e.program || '').toLowerCase();
-      const key = `${e.mentor_id}|${e.entrepreneur_id}|${program}|${e.round_number}`;
+      const key = `${e.mentor_id}|${e.entrepreneur_id}|${e.round_number}`;
       const submission = submissionMap.get(key) || null;
 
       const roundKey = `${e.batch_name}|${e.program}|${e.round_number}`;
@@ -149,11 +202,17 @@ export default async function handler(req, res) {
         roundEntry.submitted += 1;
         mentorEntry.submitted += 1;
         const isPending = submission.payment_status === 'pending';
-        mentorEntry.rounds[e.round_number] = isPending ? 'pending' : 'submitted';
+        // Only set if not already set (don't overwrite submitted with anything)
+        if (!mentorEntry.rounds[e.round_number]) {
+          mentorEntry.rounds[e.round_number] = isPending ? 'pending' : 'submitted';
+        }
       } else {
         roundEntry.missing += 1;
         mentorEntry.missing += 1;
-        mentorEntry.rounds[e.round_number] = 'missing';
+        // Only set to missing if not already submitted/pending
+        if (!mentorEntry.rounds[e.round_number]) {
+          mentorEntry.rounds[e.round_number] = 'missing';
+        }
         missingReports.push({
           mentor_id: e.mentor_id,
           mentor_name: mentorEntry.mentor_name,
@@ -177,13 +236,48 @@ export default async function handler(req, res) {
       return a.round - b.round;
     });
 
+    // Mark future rounds as 'not_due' for each mentor
+    for (const [mentorId, futureRoundSet] of futureRounds.entries()) {
+      const mentorEntry = mentorStatsMap.get(mentorId);
+      if (mentorEntry) {
+        for (const roundNum of futureRoundSet) {
+          if (!mentorEntry.rounds[roundNum]) {
+            mentorEntry.rounds[roundNum] = 'not_due';
+          }
+        }
+      }
+    }
+
     const mentorStats = Array.from(mentorStatsMap.values()).sort((a, b) => b.missing - a.missing);
+
+    // Determine the active batch for UI default (most recent batch by end_month)
+    let activeBatchName = null;
+    if (roundStats.length > 0) {
+      // Get all unique batches from roundStats
+      const batchesInStats = [...new Set(roundStats.map(r => r.batch))];
+
+      // Find the batch with the most recent end_month
+      const batchEndMonths = batchesInStats.map(batchName => {
+        const batchRounds = roundsFiltered.filter(r => r.batch_name === batchName);
+        const latestEndMonth = batchRounds.reduce((latest, r) => {
+          if (!r.end_month) return latest;
+          const endDate = new Date(r.end_month);
+          return endDate > latest ? endDate : latest;
+        }, new Date(0));
+        return { batchName, latestEndMonth };
+      });
+
+      // Sort by latest end_month and pick the first
+      batchEndMonths.sort((a, b) => b.latestEndMonth - a.latestEndMonth);
+      activeBatchName = batchEndMonths[0]?.batchName || null;
+    }
 
     return res.status(200).json({
       success: true,
       roundStats,
       mentorStats,
       missingReports,
+      activeBatch: activeBatchName,
       filters: {
         program: programFilter,
         batch: batchFilter,
