@@ -65,7 +65,7 @@ export default async function handler(req, res) {
         entrepreneurs!entrepreneur_id (
           batch
         ),
-        mentors!mentor_email (
+        mentors!mentor_id (
           name,
           email
         )
