@@ -108,6 +108,13 @@ export default function Navbar() {
                     </button>
                     <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 pt-2 z-50 hidden group-hover:block">
                       <Link
+                        href="/admin"
+                        className={`block px-4 py-2 text-sm ${isCurrentPage('/admin') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:bg-blue-50'}`}
+                        onClick={(e) => isCurrentPage('/admin') && e.preventDefault()}
+                      >
+                        Overview
+                      </Link>
+                      <Link
                         href="/admin/dashboard"
                         className={`block px-4 py-2 text-sm ${isCurrentPage('/admin/dashboard') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:bg-blue-50'}`}
                         onClick={(e) => isCurrentPage('/admin/dashboard') && e.preventDefault()}
@@ -148,6 +155,13 @@ export default function Navbar() {
                         onClick={(e) => isCurrentPage('/admin/mia') && e.preventDefault()}
                       >
                         MIA
+                      </Link>
+                      <Link
+                        href="/admin/mentors"
+                        className={`block px-4 py-2 text-sm ${isCurrentPage('/admin/mentors') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:bg-blue-50'}`}
+                        onClick={(e) => isCurrentPage('/admin/mentors') && e.preventDefault()}
+                      >
+                        Mentors
                       </Link>
                       <Link
                         href="/admin/payment-review"
@@ -277,6 +291,19 @@ export default function Navbar() {
                     <p className="text-sm font-medium text-gray-700 mb-2">Admin</p>
                     <div className="space-y-1 pl-4">
                       <Link
+                        href="/admin"
+                        className={`block px-3 py-2 rounded-md text-sm transition-colors ${isCurrentPage('/admin') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
+                        onClick={(e) => {
+                          if (isCurrentPage('/admin')) {
+                            e.preventDefault();
+                          } else {
+                            setMobileMenuOpen(false);
+                          }
+                        }}
+                      >
+                        Overview
+                      </Link>
+                      <Link
                         href="/admin/dashboard"
                         className={`block px-3 py-2 rounded-md text-sm transition-colors ${isCurrentPage('/admin/dashboard') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
                         onClick={(e) => {
@@ -353,6 +380,19 @@ export default function Navbar() {
                         }}
                       >
                         MIA
+                      </Link>
+                      <Link
+                        href="/admin/mentors"
+                        className={`block px-3 py-2 rounded-md text-sm transition-colors ${isCurrentPage('/admin/mentors') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
+                        onClick={(e) => {
+                          if (isCurrentPage('/admin/mentors')) {
+                            e.preventDefault();
+                          } else {
+                            setMobileMenuOpen(false);
+                          }
+                        }}
+                      >
+                        Mentors
                       </Link>
                       <Link
                         href="/admin/payment-review"
