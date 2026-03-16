@@ -9,6 +9,16 @@ const supabase = createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+/**
+ * Normalize batch values for consistent display
+ * Handles legacy data and variations in batch naming
+ */
+function normalizeBatch(raw) {
+    if (!raw) return null;
+    if (raw === '4') return 'Batch 4 Bangkit';
+    return raw.replace(/MAJU/gi, 'Maju').replace(/BANGKIT/gi, 'Bangkit').trim();
+}
+
 export default async function handler(req, res) {
     if (req.method !== 'GET') {
         return res.status(405).json({ success: false, error: 'Method Not Allowed' });
@@ -44,13 +54,21 @@ export default async function handler(req, res) {
         session_number,
         submission_date,
         paid_at,
+        approved_at,
         status,
         payment_status,
         mia_status,
         premis_dilawat,
         base_payment_amount,
         entrepreneur_id,
-        mentor_id
+        mentor_id,
+        entrepreneurs!entrepreneur_id (
+          batch
+        ),
+        mentors!mentor_email (
+          name,
+          email
+        )
       `, { count: 'exact' })
             .order('submission_date', { ascending: false })
             .range(offset, offset + limit - 1);
@@ -73,21 +91,33 @@ export default async function handler(req, res) {
         // Let's check `pages/admin/verification/index.js`:
         // report.mentor_name, report.mentee_name, report.program, report.session_number, report.status
 
-        const formattedData = data.map(r => ({
-            id: r.id,
-            mentor_name: r.nama_mentor || r.mentor_email,
-            // Check both nama_usahawan (older field) and nama_mentee (newer field)
-            mentee_name: r.nama_usahawan || r.nama_mentee || 'Unknown Mentee',
-            program: r.program,
-            session_number: r.session_number,
-            submission_date: r.submission_date,
-            paid_at: r.paid_at,
-            status: r.status,
-            payment_status: r.payment_status,
-            mia_status: r.mia_status,
-            premis_dilawat: r.premis_dilawat,
-            base_payment_amount: r.base_payment_amount
-        }));
+        const formattedData = data.map(r => {
+            // Extract batch from joined entrepreneurs table
+            const rawBatch = r.entrepreneurs?.batch || null;
+            const normalizedBatch = normalizeBatch(rawBatch);
+
+            // Resolve mentor name from mentors table (via mentor_email JOIN)
+            // Fallback hierarchy: mentors.name → stored nama_mentor → mentor_email
+            const mentorName = r.mentors?.name || r.nama_mentor || r.mentor_email;
+
+            return {
+                id: r.id,
+                mentor_name: mentorName,  // Now resolved from mentors table at query time
+                // Check both nama_usahawan (older field) and nama_mentee (newer field)
+                mentee_name: r.nama_usahawan || r.nama_mentee || 'Unknown Mentee',
+                program: r.program,
+                session_number: r.session_number,
+                submission_date: r.submission_date,
+                paid_at: r.paid_at,
+                approved_at: r.approved_at,  // Timestamp when report was approved
+                status: r.status,
+                payment_status: r.payment_status,
+                mia_status: r.mia_status,
+                premis_dilawat: r.premis_dilawat,
+                base_payment_amount: r.base_payment_amount,
+                batch: normalizedBatch  // Add normalized batch field
+            };
+        });
 
         return res.status(200).json({
             success: true,

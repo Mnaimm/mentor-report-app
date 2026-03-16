@@ -43,7 +43,7 @@ export default async function handler(req, res) {
                 payment_batch_id,
                 sheets_row_number
             `)
-            .eq('payment_status', 'approved')
+            .eq('payment_status', 'approved_for_payment')
             .is('payment_batch_id', null)
             .order('approved_at', { ascending: false });
 

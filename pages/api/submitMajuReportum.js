@@ -371,8 +371,30 @@ export default async function handler(req, res) {
         mia_reason: reportData.MIA_REASON || null,
         mia_proof_url: reportData.MIA_PROOF_URL || null,
 
-        // Payment fields (defaults)
-        payment_status: 'pending'
+        // Premises visit tracking
+        premis_dilawat: (() => {
+          const premisImages = reportData.URL_GAMBAR_PREMIS_JSON || [];
+          return Array.isArray(premisImages) && premisImages.length > 0;
+        })(),
+
+        // Payment fields
+        payment_status: 'pending',
+        base_payment_amount: (() => {
+          // Calculate base payment amount based on session and premises visit
+          const sessionNum = reportData.SESI_NUMBER || 1;
+          const premisImages = reportData.URL_GAMBAR_PREMIS_JSON || [];
+          const hasPremisVisit = Array.isArray(premisImages) && premisImages.length > 0;
+
+          // Base rate: Session 1-2 = RM100, Session 3-4 = RM180
+          let baseAmount = (sessionNum >= 3 && sessionNum <= 4) ? 180 : 100;
+
+          // Premises visit bonus: +RM160
+          if (hasPremisVisit) {
+            baseAmount += 160;
+          }
+
+          return baseAmount;
+        })()
       };
 
       console.log('📋 Reports payload preview:', {

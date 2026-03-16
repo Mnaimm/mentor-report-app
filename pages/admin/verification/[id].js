@@ -18,6 +18,10 @@ export default function ReviewReport({ userEmail, isReadOnlyUser, accessDenied }
     const [previewError, setPreviewError] = useState(false);
     const [toast, setToast] = useState(null);
 
+    // Payment amount editing
+    const [editableAmount, setEditableAmount] = useState(null);
+    const [isUpdatingAmount, setIsUpdatingAmount] = useState(false);
+
     // Navigation state
     const [pendingReports, setPendingReports] = useState([]);
     const [currentIndex, setCurrentIndex] = useState(-1);
@@ -50,6 +54,8 @@ export default function ReviewReport({ userEmail, isReadOnlyUser, accessDenied }
             const json = await res.json();
             if (!json.success) throw new Error(json.error);
             setReport(json.data);
+            // Initialize editable amount with current base_payment_amount
+            setEditableAmount(json.data.base_payment_amount || 0);
         } catch (err) {
             console.error(err);
             alert('Error fetching report');
@@ -131,6 +137,56 @@ export default function ReviewReport({ userEmail, isReadOnlyUser, accessDenied }
             });
         } finally {
             setActionLoading(false);
+        }
+    };
+
+    const handleUpdateAmount = async () => {
+        if (editableAmount === null || editableAmount === undefined || editableAmount === '') {
+            setToast({
+                type: 'error',
+                message: 'Sila masukkan jumlah bayaran'
+            });
+            return;
+        }
+
+        const numAmount = parseFloat(editableAmount);
+        if (isNaN(numAmount) || numAmount < 0) {
+            setToast({
+                type: 'error',
+                message: 'Jumlah bayaran tidak sah. Mesti nombor positif.'
+            });
+            return;
+        }
+
+        setIsUpdatingAmount(true);
+        try {
+            const res = await fetch(`/api/admin/reports/${id}/update-amount`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ amount: numAmount })
+            });
+
+            const json = await res.json();
+            if (!json.success) throw new Error(json.error);
+
+            // Update local report state
+            setReport({ ...report, base_payment_amount: numAmount });
+
+            // Show success toast
+            setToast({
+                type: 'success',
+                message: `Jumlah bayaran dikemaskini: RM ${numAmount.toFixed(2)}`
+            });
+
+            // Auto-hide toast after 3 seconds
+            setTimeout(() => setToast(null), 3000);
+        } catch (err) {
+            setToast({
+                type: 'error',
+                message: `Gagal mengemaskini: ${err.message}`
+            });
+        } finally {
+            setIsUpdatingAmount(false);
         }
     };
 
@@ -302,6 +358,38 @@ export default function ReviewReport({ userEmail, isReadOnlyUser, accessDenied }
                                 <li>• Platform: {report.mod_sesi || 'N/A'}</li>
                                 <li>• Payment Status: <span className="font-bold">{report.payment_status || 'Pending'}</span></li>
                             </ul>
+                        </div>
+
+                        {/* 4. Payment Amount Editor */}
+                        <div className="p-4 rounded-lg bg-green-50 border border-green-200">
+                            <h4 className="font-bold text-green-900 text-sm mb-3">Jumlah Bayaran</h4>
+                            <div className="flex items-center gap-2">
+                                <div className="flex-1 relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 font-medium text-sm">
+                                        RM
+                                    </span>
+                                    <input
+                                        type="number"
+                                        value={editableAmount || ''}
+                                        onChange={(e) => setEditableAmount(e.target.value)}
+                                        disabled={isReadOnlyUser || isUpdatingAmount}
+                                        step="10"
+                                        min="0"
+                                        className="w-full pl-10 pr-3 py-2 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm font-semibold text-gray-900 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                        placeholder="0.00"
+                                    />
+                                </div>
+                                <button
+                                    onClick={handleUpdateAmount}
+                                    disabled={isReadOnlyUser || isUpdatingAmount}
+                                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                                >
+                                    {isUpdatingAmount ? '⏳' : '✓'} Kemaskini
+                                </button>
+                            </div>
+                            <p className="text-xs text-green-700 mt-2">
+                                Current: RM {(report.base_payment_amount || 0).toFixed(2)}
+                            </p>
                         </div>
 
                     </div>

@@ -483,8 +483,23 @@ export default async function handler(req, res) {
       // Folder ID for Google Drive integration
       folder_id: reportData?.folder_id || null,
 
-      // Payment fields (defaults)
-      payment_status: 'pending'
+      // Payment fields
+      payment_status: 'pending',
+      base_payment_amount: (() => {
+        // Calculate base payment amount based on session and premises visit
+        const sessionNum = reportData?.sesiLaporan || 1;
+        const premisDilawat = reportData?.premisDilawatChecked || false;
+
+        // Base rate: Session 1-2 = RM100, Session 3-4 = RM180
+        let baseAmount = (sessionNum >= 3 && sessionNum <= 4) ? 180 : 100;
+
+        // Premises visit bonus: +RM160
+        if (premisDilawat) {
+          baseAmount += 160;
+        }
+
+        return baseAmount;
+      })()
     };
 
     // INSERT INTO supabaseAdmin (BLOCKING)

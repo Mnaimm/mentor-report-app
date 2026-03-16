@@ -95,7 +95,7 @@ export default async function handler(req, res) {
             id: report.id,
             mentor_name: report.nama_mentor || report.mentor_email,
             mentor_email: report.mentor_email,
-            mentee_name: report.nama_usahawan,
+            mentee_name: report.nama_usahawan || report.nama_mentee,
             nama_syarikat: report.nama_syarikat,
             program: report.program,
             session_number: report.session_number,
@@ -110,6 +110,7 @@ export default async function handler(req, res) {
             image_urls: report.image_urls, // JSONB object (sesi, gw360, premis, etc.)
             premis_dilawat: report.premis_dilawat, // Boolean
             payment_status: report.payment_status, // String
+            base_payment_amount: report.base_payment_amount, // Editable payment amount
             document_url: finalDocUrl, // Return the synced URL
             sheets_row_number: report.sheets_row_number,
             revision_count: report.revision_count || 0 // Revision tracking

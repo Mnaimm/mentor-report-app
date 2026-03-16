@@ -42,6 +42,28 @@ export default function VerificationDashboard({ userEmail, isReadOnlyUser, acces
         fetchReports();
     }, []);
 
+    const handleUnapprove = async (reportId) => {
+        if (!confirm('Adakah anda pasti untuk membatalkan semakan laporan ini? Laporan akan kembali ke status "Menunggu Semakan".')) {
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/admin/reports/${reportId}/unapprove`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            const json = await res.json();
+            if (!json.success) throw new Error(json.error);
+
+            alert('Semakan laporan berjaya dibatalkan');
+            // Refresh the reports list
+            fetchReports();
+        } catch (err) {
+            alert(`Gagal membatalkan semakan: ${err.message}`);
+        }
+    };
+
     // Helper to categorize report status
     const getReportCategory = (report) => {
         const paymentStatus = report.payment_status || 'pending';
@@ -72,9 +94,9 @@ export default function VerificationDashboard({ userEmail, isReadOnlyUser, acces
             if (statsFilter !== category) return false;
         }
 
-        // Batch filter
+        // Batch filter (using batch field from API)
         if (filterBatch !== 'all') {
-            if (!report.program || !report.program.includes(filterBatch)) return false;
+            if (report.batch !== filterBatch) return false;
         }
 
         // Pusingan (session) filter
@@ -130,8 +152,16 @@ export default function VerificationDashboard({ userEmail, isReadOnlyUser, acces
     // Get unique mentor names
     const uniqueMentors = [...new Set(reports.map(r => r.mentor_name))].sort();
 
-    // Batch options
-    const batchOptions = ['B4-M3', 'B5-M4', 'B6-M5', 'B7-M6', 'BBG MAIPk', 'BBG MULA UKM'];
+    // Batch options (hardcoded normalized values)
+    const batchOptions = [
+        'Batch 4 Bangkit',
+        'Batch 5 Bangkit',
+        'Batch 6 Bangkit',
+        'Batch 7 Bangkit',
+        'Batch 4 Maju',
+        'Batch 5 Maju',
+        'Batch 6 Maju'
+    ];
 
     // Helper to get status dot color
     const getStatusDotColor = (report) => {
@@ -320,6 +350,7 @@ export default function VerificationDashboard({ userEmail, isReadOnlyUser, acces
                                     <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase whitespace-nowrap">Status</th>
                                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Mentor</th>
                                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Mentee</th>
+                                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Batch</th>
                                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Program</th>
                                     <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase">
                                         <button
@@ -333,6 +364,7 @@ export default function VerificationDashboard({ userEmail, isReadOnlyUser, acces
                                             </span>
                                         </button>
                                     </th>
+                                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase">Tarikh Semakan</th>
                                     <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase">Bayaran</th>
                                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Nota</th>
                                     <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase">Action</th>
@@ -376,6 +408,13 @@ export default function VerificationDashboard({ userEmail, isReadOnlyUser, acces
                                                 </div>
                                             </td>
 
+                                            {/* Batch */}
+                                            <td className="px-6 py-4">
+                                                <div className="text-sm text-gray-700">
+                                                    {report.batch || <span className="text-gray-400 italic">-</span>}
+                                                </div>
+                                            </td>
+
                                             {/* Program + Session */}
                                             <td className="px-6 py-4">
                                                 <div className="text-sm text-gray-900 font-medium">{report.program || '-'}</div>
@@ -390,6 +429,17 @@ export default function VerificationDashboard({ userEmail, isReadOnlyUser, acces
                                                     ? new Date(showingPaidDate ? report.paid_at : report.submission_date).toLocaleDateString('ms-MY')
                                                     : '-'
                                                 }
+                                            </td>
+
+                                            {/* Tarikh Semakan */}
+                                            <td className="px-6 py-4 text-center text-sm">
+                                                {report.approved_at ? (
+                                                    <span className="text-green-700 font-medium">
+                                                        {new Date(report.approved_at).toLocaleDateString('ms-MY')}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-gray-400">-</span>
+                                                )}
                                             </td>
 
                                             {/* Bayaran */}
@@ -419,9 +469,20 @@ export default function VerificationDashboard({ userEmail, isReadOnlyUser, acces
                                                         Dibayar
                                                     </span>
                                                 ) : isVerified ? (
-                                                    <span className="px-3 py-1 text-green-700 text-sm font-semibold">
-                                                        ✓ Disemak
-                                                    </span>
+                                                    <div className="flex flex-col gap-2 items-center">
+                                                        <span className="px-3 py-1 text-green-700 text-sm font-semibold">
+                                                            ✓ Disemak
+                                                        </span>
+                                                        {!isReadOnlyUser && (
+                                                            <button
+                                                                onClick={() => handleUnapprove(report.id)}
+                                                                className="px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 text-xs font-medium"
+                                                                title="Batalkan semakan dan kembalikan ke status pending"
+                                                            >
+                                                                Batal Semakan
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 ) : (
                                                     <Link
                                                         href={`/admin/verification/${report.id}`}
@@ -436,7 +497,7 @@ export default function VerificationDashboard({ userEmail, isReadOnlyUser, acces
                                 })}
                                 {paginatedReports.length === 0 && (
                                     <tr>
-                                        <td colSpan={8} className="p-10 text-center text-gray-500">
+                                        <td colSpan={10} className="p-10 text-center text-gray-500">
                                             Tiada laporan dijumpai.
                                         </td>
                                     </tr>
