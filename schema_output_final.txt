@@ -1,0 +1,57 @@
+﻿Fetching schema from https://oogrwqxlwyoswyfqgxxi.supabase.co...
+
+--- Schema Definitions ---
+
+
+Table: mentors
+Properties:
+  - id: string (uuid) [Note:
+This is a Primary Key.<pk/>]
+  - name: string (character varying) 
+  - email: string (character varying) 
+  - phone: string (character varying) 
+  - region: string (public.region_type) 
+  - program: string (public.program_type) 
+  - status: string (character varying) 
+  - created_at: string (timestamp with time zone) 
+  - updated_at: string (timestamp with time zone) 
+Required: id, name, email
+
+Table: mentor_assignments
+Properties:
+  - id: string (uuid) [Note:
+This is a Primary Key.<pk/>]
+  - mentor_id: string (uuid) [Note:
+This is a Foreign Key to `users.id`.<fk table='users' column='id'/>]
+  - entrepreneur_id: string (uuid) [Note:
+This is a Foreign Key to `entrepreneurs.id`.<fk table='entrepreneurs' column='id'/>]
+  - batch_id: string (uuid) [Note:
+This is a Foreign Key to `batches.id`.<fk table='batches' column='id'/>]
+  - status: string (public.assignment_status) 
+  - assigned_at: string (timestamp with time zone) 
+  - completed_at: string (timestamp with time zone) 
+  - transferred_to: string (uuid) [Note:
+This is a Foreign Key to `users.id`.<fk table='users' column='id'/>]
+  - notes: string (text) 
+  - created_at: string (timestamp with time zone) 
+  - updated_at: string (timestamp with time zone) 
+Required: id
+
+Table: batch_rounds
+Properties:
+  - id: string (uuid) [Note:
+This is a Primary Key.<pk/>]
+  - batch_name: string (character varying) 
+  - program: string (character varying) 
+  - round_number: integer (integer) 
+  - round_name: string (character varying) 
+  - period_label: string (character varying) 
+  - start_month: string (date) 
+  - end_month: string (date) 
+  - notes: string (character varying) 
+  - created_at: string (timestamp with time zone) 
+  - batch_id: string (uuid) [Note:
+This is a Foreign Key to `batches.id`.<fk table='batches' column='id'/>]
+Required: id, batch_name, program, round_number, round_name
+
+Time taken: 2.151s

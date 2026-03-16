@@ -10,7 +10,12 @@
       "Bash(cat:*)",
       "Bash(test:*)",
       "Bash(mv:*)",
-      "Bash(git check-ignore:*)"
+      "Bash(git check-ignore:*)",
+      "WebFetch(domain:antigravity.google)",
+      "Bash(node scripts/count-supabase-records.js:*)",
+      "Bash(git add:*)",
+      "Bash(node check-user-role.js:*)",
+      "Bash(node -e:*)"
     ],
     "deny": [],
     "ask": []

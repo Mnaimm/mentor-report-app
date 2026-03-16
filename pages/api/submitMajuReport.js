@@ -1,7 +1,7 @@
 // pages/api/submitMajuReport.js
 import { google } from 'googleapis';
 import cache from '../../lib/simple-cache';
-import { supabase } from '../../lib/supabaseClient';
+import { supabase, supabaseAdmin } from '../../lib/supabaseClient';
 import { prepareMIARequestPayload } from '../../lib/mia';
 
 export default async function handler(req, res) {
@@ -71,7 +71,7 @@ export default async function handler(req, res) {
           proofCallUrl: reportData.imageUrls?.mia?.call
         }, 'maju');
 
-        const { data: miaRequestData, error: miaError } = await supabase
+        const { data: miaRequestData, error: miaError } = await supabaseAdmin
           .from('mia_requests')
           .insert(miaPayload)
           .select()

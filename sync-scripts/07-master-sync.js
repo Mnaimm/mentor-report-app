@@ -4,11 +4,18 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
 
-dotenv.config();
+// Get the directory name in ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load .env.local from the project root
+dotenv.config({ path: path.join(__dirname, '..', '.env.local') });
 
 // Import all sync scripts
 import syncBatches from './01-sync-batches.js';
+import syncMentors from './01b-sync-mentors.js';
 import syncMapping from './02-sync-mapping.js';
 import syncBatch7 from './03-sync-batch-7.js';
 import syncBangkitReports from './04-sync-bangkit-reports.js';
@@ -81,7 +88,7 @@ async function masterSync() {
   console.log('\n');
   console.log('╔════════════════════════════════════════════════════════════════════════╗');
   console.log('║                      MASTER SYNC - DATA MIGRATION                      ║');
-  console.log('║           Google Sheets → Supabase Database (7 Scripts)              ║');
+  console.log('║           Google Sheets → Supabase Database (8 Scripts)              ║');
   console.log('╚════════════════════════════════════════════════════════════════════════╝');
   console.log(`\n🔧 MODE: ${DRY_RUN ? 'DRY RUN (no changes will be made)' : 'LIVE MODE (changes will be written)'}`);
   console.log('📅 Start Time:', new Date().toLocaleString());
@@ -103,6 +110,7 @@ async function masterSync() {
     console.log('   Building batches, mentors, entrepreneurs, assignments\n');
 
     await runScript('01-sync-batches.js', syncBatches);
+    await runScript('01b-sync-mentors.js', syncMentors);
     await runScript('02-sync-mapping.js', syncMapping);
     await runScript('03-sync-batch-7.js', syncBatch7);
 

@@ -1,5 +1,5 @@
 // 04-sync-bangkit-reports.js
-// Syncs bangkit.json (105 rows) to sessions + reports + upward_mobility_reports tables
+// Syncs bangkit.json (105 rows) to reports + upward_mobility_reports tables
 
 import { createClient } from '@supabase/supabase-js';
 import * as fs from 'fs';
@@ -16,7 +16,6 @@ const supabase = createClient(
 const DRY_RUN = process.env.DRY_RUN !== 'false';
 
 const results = {
-  sessions: { success: 0, skipped: 0, failed: 0 },
   reports: { success: 0, skipped: 0, failed: 0 },
   um_reports: { success: 0, skipped: 0, failed: 0 },
   errors: []
@@ -36,6 +35,7 @@ async function getMentorId(email) {
     .from('mentors')
     .select('id')
     .eq('email', key)
+    .limit(1)
     .maybeSingle();
 
   if (error || !data) {
@@ -58,6 +58,7 @@ async function getEntrepreneurId(name) {
     .from('entrepreneurs')
     .select('id')
     .ilike('name', name)
+    .limit(1)
     .maybeSingle();
 
   if (error || !data) {
@@ -164,10 +165,10 @@ function buildUMReport(row, mentorId, entrepreneurId) {
     pekerjaan_sebelum: row.UM_PEKERJAAN_SEBELUM ? parseInt(row.UM_PEKERJAAN_SEBELUM) : null,
     pekerjaan_selepas: row.UM_PEKERJAAN_SELEPAS ? parseInt(row.UM_PEKERJAAN_SELEPAS) : null,
     pekerja_semasa: row.UM_PEKERJA_SEMASA ? parseInt(row.UM_PEKERJA_SEMASA) : null,
-    pembiayaan_sebelum: row.UM_PEMBIAYAAN_SEBELUM || null,
-    pembiayaan_selepas: row.UM_PEMBIAYAAN_SELEPAS || null,
-    ulasan_pekerja: row.UM_ULASAN_PEKERJA || null,
-    ulasan_pekerjaan: row.UM_ULASAN_PEKERJAAN || null
+    // pembiayaan_sebelum: row.UM_PEMBIAYAAN_SEBELUM || null,
+    // pembiayaan_selepas: row.UM_PEMBIAYAAN_SELEPAS || null,
+    // ulasan_pekerja: row.UM_ULASAN_PEKERJA || null,
+    // ulasan_pekerjaan: row.UM_ULASAN_PEKERJAAN || null
   };
 }
 
@@ -175,7 +176,7 @@ async function syncBangkitReports() {
   console.log('\n=== 04-sync-bangkit-reports.js ===');
   console.log(`DRY_RUN: ${DRY_RUN}`);
   console.log('Input: sync-data/bangkit.json (105 rows)');
-  console.log('Output: sessions + reports + upward_mobility_reports tables\n');
+  console.log('Output: reports + upward_mobility_reports tables\n');
 
   const dataPath = path.join(process.cwd(), 'sync-data', 'bangkit.json');
   if (!fs.existsSync(dataPath)) {
@@ -210,83 +211,63 @@ async function syncBangkitReports() {
         throw new Error(`Missing mentor or entrepreneur ID`);
       }
 
-      // Check if session exists
-      const { data: existingSession, error: sessionCheckError } = await supabase
-        .from('sessions')
+      // Check if report already exists
+      const { data: existingReport, error: reportCheckError } = await supabase
+        .from('reports')
         .select('id')
         .eq('mentor_id', mentorId)
         .eq('entrepreneur_id', entrepreneurId)
         .eq('session_number', sessionNumber)
         .eq('program', 'Bangkit')
+        .limit(1)
         .maybeSingle();
 
-      if (sessionCheckError) throw sessionCheckError;
+      if (reportCheckError) throw reportCheckError;
 
-      if (existingSession) {
-        results.sessions.skipped++;
-        results.reports.skipped++;
-        console.log(`   ⏭️  Session already exists`);
-        continue;
-      }
-
-      // === 1. Create session ===
-      let sessionId;
+      // === 1. Create or Update report ===
+      const reportData = {
+        mentor_id: mentorId,
+        entrepreneur_id: entrepreneurId,
+        program: 'Bangkit',
+        session_number: sessionNumber,
+        session_date: sessionDate || null, // Added session_date
+        nama_usahawan: entrepreneurName,
+        nama_syarikat: row['Nama Bisnes'] || null,
+        mentoring_findings: buildMentoringFindings(row),
+        jualan_terkini: buildJualanTerkini(row),
+        gw_skor: buildGWScores(row),
+        refleksi: buildRefleksi(row),
+        rumusan: row.Ringkasan || null,
+        pemerhatian: row.Pemerhatian || null,
+        premis_dilawat: row.Premis_Dilawat === 'true' || row.Premis_Dilawat === true,
+        mia_status: row['Status Sesi'] || 'Selesai',
+        source: 'google_sheets_sync'
+      };
 
       if (!DRY_RUN) {
-        const { data: newSession, error: sessionInsertError } = await supabase
-          .from('sessions')
-          .insert({
-            mentor_id: mentorId,
-            entrepreneur_id: entrepreneurId,
-            program: 'Bangkit',
-            session_date: sessionDate || null,
-            session_number: sessionNumber,
-            mod_sesi: row['Mod Sesi'] || null,
-            status_sesi: row['Status Sesi'] || 'Selesai',
-            source: 'google_sheets_sync'
-          })
-          .select('id')
-          .single();
+        if (existingReport) {
+          // Update existing
+          const { error: reportUpdateError } = await supabase
+            .from('reports')
+            .update(reportData)
+            .eq('id', existingReport.id);
 
-        if (sessionInsertError) throw sessionInsertError;
-        sessionId = newSession.id;
-        results.sessions.success++;
-        console.log(`   ✅ Created session ${sessionNumber}`);
-      } else {
-        sessionId = `dry-session-${rowNum}`;
-        results.sessions.success++;
-        console.log(`   🔍 [DRY] Would create session ${sessionNumber}`);
-      }
+          if (reportUpdateError) throw reportUpdateError;
+          results.reports.success++;
+          console.log(`   ✅ Updated existing report`);
+        } else {
+          // Insert new
+          const { error: reportInsertError } = await supabase
+            .from('reports')
+            .insert(reportData);
 
-      // === 2. Create report ===
-      if (!DRY_RUN && sessionId && !sessionId.startsWith('dry-')) {
-        const { error: reportInsertError } = await supabase
-          .from('reports')
-          .insert({
-            session_id: sessionId,
-            mentor_id: mentorId,
-            entrepreneur_id: entrepreneurId,
-            program: 'Bangkit',
-            session_number: sessionNumber,
-            nama_usahawan: entrepreneurName,
-            nama_syarikat: row['Nama Bisnes'] || null,
-            mentoring_findings: buildMentoringFindings(row),
-            jualan_terkini: buildJualanTerkini(row),
-            gw_skor: buildGWScores(row),
-            refleksi: buildRefleksi(row),
-            rumusan: row.Ringkasan || null,
-            pemerhatian: row.Pemerhatian || null,
-            premis_dilawat: row.Premis_Dilawat === 'true' || row.Premis_Dilawat === true,
-            mia_status: row['Status Sesi'] || 'Selesai',
-            source: 'google_sheets_sync'
-          });
-
-        if (reportInsertError) throw reportInsertError;
-        results.reports.success++;
-        console.log(`   ✅ Created report`);
+          if (reportInsertError) throw reportInsertError;
+          results.reports.success++;
+          console.log(`   ✅ Created report`);
+        }
       } else if (DRY_RUN) {
         results.reports.success++;
-        console.log(`   🔍 [DRY] Would create report`);
+        console.log(`   🔍 [DRY] Would ${existingReport ? 'update' : 'create'} report`);
       }
 
       // === 3. Create UM report if data exists ===
@@ -313,7 +294,7 @@ async function syncBangkitReports() {
       }
 
     } catch (error) {
-      results.sessions.failed++;
+      results.reports.failed++;
       results.errors.push({
         row: rowNum,
         data: row,
@@ -325,11 +306,7 @@ async function syncBangkitReports() {
 
   // === Summary ===
   console.log('\n=== RESULTS ===');
-  console.log('Sessions:');
-  console.log(`  ✅ Created: ${results.sessions.success}`);
-  console.log(`  ⏭️  Skipped: ${results.sessions.skipped}`);
-  console.log(`  ❌ Failed: ${results.sessions.failed}`);
-  console.log('\nReports:');
+  console.log('Reports:');
   console.log(`  ✅ Created: ${results.reports.success}`);
   console.log(`  ⏭️  Skipped: ${results.reports.skipped}`);
   console.log(`  ❌ Failed: ${results.reports.failed}`);

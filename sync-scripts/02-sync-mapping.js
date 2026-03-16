@@ -73,6 +73,7 @@ async function getOrCreateMentor(mentorName, mentorEmail) {
     .from('mentors')
     .select('id')
     .eq('email', mentorEmail.toLowerCase())
+    .limit(1)
     .maybeSingle();
 
   if (checkError) throw checkError;
@@ -128,7 +129,7 @@ async function getOrCreateEntrepreneur(row, program) {
     query = query.eq('email', email.toLowerCase());
   }
 
-  const { data: existing, error: checkError } = await query.maybeSingle();
+  const { data: existing, error: checkError } = await query.limit(1).maybeSingle();
 
   if (checkError) throw checkError;
 
@@ -187,7 +188,8 @@ async function getBatchId(batchName) {
   const { data: batch, error } = await supabase
     .from('batches')
     .select('id')
-    .eq('batch_name', batchName)
+    .ilike('batch_name', batchName)
+    .limit(1)
     .maybeSingle();
 
   if (error) {
@@ -250,6 +252,7 @@ async function syncMapping() {
           .eq('mentor_id', mentorId)
           .eq('entrepreneur_id', entrepreneurId)
           .eq('batch_id', batchId)
+          .limit(1)
           .maybeSingle();
 
         if (assignCheckError) throw assignCheckError;

@@ -1,0 +1,542 @@
+[
+  {
+    "row": 29,
+    "mentee": "WAN NOOREZREEN BINTI WAN AHMAD",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 30,
+    "mentee": "NORSHAZANA BINTI RUSLAN",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 77,
+    "mentee": "MOHD ASRAF MUSTAQIM BIN MOHD NORDIN",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 78,
+    "mentee": "ZAFIRIZAN BINTI JAMALUDDIN",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 79,
+    "mentee": "NUR SHAZWANI BINTI SHAFEI",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 80,
+    "mentee": "CHE SULAILA BINTI MUHAMAD",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 81,
+    "mentee": "NOOR HAYATI BINTI AHMAD",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 82,
+    "mentee": "SHAKINAH BINTI RAZALI",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 83,
+    "mentee": "MUHAMMAD SYAFIQ BIN SYRIFUL NIZAM",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 84,
+    "mentee": "NOR SUHADA BINTI MOHD NASAN",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 85,
+    "mentee": "AWANG JUMAD BIN AWANG BUJANG",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 86,
+    "mentee": "MUHAMMAD AZFAR BIN AHMAD MUNIRAN",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 87,
+    "mentee": "SARIPAH ROKIAH BINTI SYED ISHAK",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 88,
+    "mentee": "AZFAR SYAKIRIN BIN SAZALI",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 89,
+    "mentee": "NUR ASHEERA AZLEEN BINTI MOHAMMAD MIZA",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 90,
+    "mentee": "SITI MARIAM BINTI ZAKARIA",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 91,
+    "mentee": "WAN MUHAMMAD IMRAN BIN WAN ABDUL LATIF",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 92,
+    "mentee": "TENGKU NUR AZIMAH BINTI TENGKU ANUAR",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 93,
+    "mentee": "AHMADUN SIKIN BIN MOHD NOOR",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 94,
+    "mentee": "MOHD RIDDUAN BIN ALI AKMAL",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 95,
+    "mentee": "SITI SYAKIROH BINTI ZAIMI AZLAN",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 96,
+    "mentee": "NORAFIDAH BINTI RAHMAT",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 97,
+    "mentee": "WAN MUHAMMAD IMRAN BIN WAN ABDUL LATIF",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 98,
+    "mentee": "MOHD ZAINUDDIN BIN MOHAMED ALI",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 99,
+    "mentee": "TENGKU NUR AZIMAH BINTI TENGKU ANUAR",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 100,
+    "mentee": "AHMADUN SIKIN BIN MOHD NOOR",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 101,
+    "mentee": "MOHD RIDDUAN BIN ALI AKMAL",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 102,
+    "mentee": "TARMIZI BIN MOHAMAD",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 103,
+    "mentee": "NURUL JANNAH BINTI ABDULLAH",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 125,
+    "mentee": "KARIMAH BT AZIZ",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 166,
+    "mentee": "NUR FARAH NADIA BINTI MEOR RAZMAN",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 167,
+    "mentee": "DEANIALL ASYRRAF BIN ROSLI",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 168,
+    "mentee": "NOOR HAZLIZA BINTI MOHD AZLAN SHAH",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 169,
+    "mentee": "WAN MUHAMMAD SYARIFUDDIN BIN WAN SANUSI\n2ND OWNER: ASMILIZAN BIN AZMI",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 170,
+    "mentee": "MOHD RAHMAT BIN TUGIMAN",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 171,
+    "mentee": "DEANIALL ASYRRAF BIN ROSLI",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 172,
+    "mentee": "MOHAMMAD SHARIL BIN AHMAD SANUSI",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 173,
+    "mentee": "MUHAMMAD SYAHMI HAFIZ BIN SAID MAHMUD",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 174,
+    "mentee": "NOORHIDAYAH BINTI BOHARI",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 175,
+    "mentee": "UMMI FARIHAH BINTI DZULBKHRI",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 176,
+    "mentee": "MOHD NORONG RAHMAN BIN MOHAMAD",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 177,
+    "mentee": "UMMI FARIHAH BINTI DZULBKHRI",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 178,
+    "mentee": "MUHAMMAD A'RFI BIN OSMAN",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 179,
+    "mentee": "KHOIRUL AMAL BIN SAIDIN",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 180,
+    "mentee": "SAIDATUL SYAFINAZ BINTI AL AMIN MALIM",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 181,
+    "mentee": "MOHAMMAD IZZAT IZZUDDIN BIN ABDUL KARIM",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 182,
+    "mentee": "MOHAMAD ASLAM BIN JAMA'AH",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 183,
+    "mentee": "ZULAIKHA AQILAH BINTI ZAHARIS",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 184,
+    "mentee": "MUHAMMAD AFIQ IZWAN BIN RIZAN",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 185,
+    "mentee": "SURIANI BINTI LANARI",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 187,
+    "mentee": "ROZITA BINTI AKMARUN",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 188,
+    "mentee": "NURMILIN BINTI AB RASUL",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 189,
+    "mentee": "ZAFRENA BINTI OMAR",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 190,
+    "mentee": "NOR HALIZAH BINTI ATAN @ ABDULLAH",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 191,
+    "mentee": "NIK MOHAMAD IKMAL BIN NIK MUSTAPHA KAMAL",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 192,
+    "mentee": "DEANIALL ASYRRAF BIN ROSLI",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 193,
+    "mentee": "MAGRET BINTI DARUSIN",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 194,
+    "mentee": "KARTIKA BINTI ABDUL LATIF",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 195,
+    "mentee": "SITTI SAIDAH BINTI OSMAN",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 196,
+    "mentee": "NORHAWATI BINTI JAIMAN @ JASMAN",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 197,
+    "mentee": "MISNI BINTI PITIN",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 198,
+    "mentee": "FATHIMATUL AMANIYAH BINTI ABD HALIM",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 199,
+    "mentee": "JULIANA BINTI BUYONG",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 2,
+    "mentee": "Muhammad Hafizuddin Hamzi Bin Jasmani",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 3,
+    "mentee": "Mohamed Anas Bin Abdul Rashid",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 4,
+    "mentee": "Mohd Harith Fahmi Bin Mohd Subhi",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 5,
+    "mentee": "Muhammad Muslim Bin Musa",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 6,
+    "mentee": "Abd Kamal Bin Abd Rahim",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 7,
+    "mentee": "Nor Mohamad Hadir Bin Hashim",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 8,
+    "mentee": "Nur Hafizah Binti Mahyuddin",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 9,
+    "mentee": "Muhammad Firdaus Bin Mohd Fadzi",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 10,
+    "mentee": "Siti Zulaikha Binti Adnan",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 11,
+    "mentee": "Siti Zulaikha Binti Adnan",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 12,
+    "mentee": "Muhammad As-Shahkirin Bin Mohd Hussin",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 13,
+    "mentee": "Nisha Binti Junus",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 14,
+    "mentee": "Muhammad Faizal Bin Shaari",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 15,
+    "mentee": "Hazazi Bin Hashim",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 16,
+    "mentee": "Fauzana Bte Kasa",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 17,
+    "mentee": "Sharina Binti Shahidan",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 18,
+    "mentee": "Wan Suhir Binti Muhd Zin @ W. Mohd",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 19,
+    "mentee": "Daliah Binti Dahalang",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 20,
+    "mentee": "Lim Boon Chin",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 21,
+    "mentee": "Muhammad Husaini Bin Arifin",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 22,
+    "mentee": "Norine Binti Mohd Noh",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 23,
+    "mentee": "Mohd Najmi Bin Abd Rahim",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 24,
+    "mentee": "Muhammad Firdaus Bin Mohd Fadzi",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 25,
+    "mentee": "Wan Suhir Binti Muhd Zin @ W. Mohd",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 26,
+    "mentee": "Izzul Izz Bin Shahizan",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 27,
+    "mentee": "Abu Hanifah Bin Abu Hassan",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 28,
+    "mentee": "Muhammad Arif Asyraf Bin Zulkifli",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 29,
+    "mentee": "Mohd Ezahin Bin Mohd Yunus",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 30,
+    "mentee": "TEST1",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 31,
+    "mentee": "Muhammad Alif Aizat Bin Mohd Suhaimi",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 32,
+    "mentee": "Mohd Shardi Izwan Bin Abd Manaf",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 33,
+    "mentee": "Mohd Shardi Izwan Bin Abd Manaf",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 34,
+    "mentee": "Hairul Anam Bin Hairuddin",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 35,
+    "mentee": "Nisha Binti Junus",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 36,
+    "mentee": "Muhammad As-Shahkirin Bin Mohd Hussin",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 37,
+    "mentee": "Mohd Arafat Bin Mathan",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 38,
+    "mentee": "Intan Fazlina Binti Yahaya",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 39,
+    "mentee": "Muhammad Mustaqim Bin Abd Kadir",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 40,
+    "mentee": "Wan Hazman Bin Wan Mansor",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 41,
+    "mentee": "Muhammad Harun Bin Mohd Shamma",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 42,
+    "mentee": "Muhammad Taufiq Bin Amir",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 43,
+    "mentee": "Fairuszatonnor Binti Daud",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 44,
+    "mentee": "Norine Binti Mohd Noh",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 46,
+    "mentee": "Muhammad Faizal Bin Shaari",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  },
+  {
+    "row": 48,
+    "mentee": "Mohd Najmi Bin Abd Rahim",
+    "error": "duplicate key value violates unique constraint \"unique_report\""
+  }
+]

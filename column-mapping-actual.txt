@@ -1,0 +1,71 @@
+═══════════════════════════════════════════════════════════
+ACTUAL GOOGLE SHEETS COLUMN MAPPINGS
+═══════════════════════════════════════════════════════════
+
+BANGKIT SHEET (Bangkit tab):
+----------------------------
+Index | Header                | What We Need
+------|----------------------|----------------------------------
+    0 | Timestamp            | ✅ timestamp
+    1 | Emai                 | ✅ mentorEmail (typo in header!)
+    2 | Status Sesi          | ✅ status
+    3 | Sesi Laporan         | ✅ sessionNumber
+    4 | Tarikh Sesi          | ✅ sessionDate  
+    5 | Masa Sesi            | sessionTime
+    6 | Mod Sesi             | sessionMode
+    7 | Nama Usahawan        | ✅ menteeName
+    8 | Nama Bisnes          | ✅ menteeIC (business name)
+    9 | Nama Mentor          | ✅ mentorName
+   53 | DOC_URL              | docUrl
+
+MAJU SHEET (LaporanMajuUM tab):
+-------------------------------
+Index | Header                | What We Need
+------|----------------------|----------------------------------
+    0 | Timestamp            | ✅ timestamp
+    1 | NAMA_MENTOR          | ✅ mentorName
+    2 | EMAIL_MENTOR         | ✅ mentorEmail
+    3 | NAMA_MENTEE          | ✅ menteeName
+    4 | NAMA_BISNES          | ✅ menteeIC (business name)
+    5 | LOKASI_BISNES        | business location
+    6 | PRODUK_SERVIS        | product/service
+    7 | NO_TELEFON           | phone number
+    8 | TARIKH_SESI          | ✅ sessionDate
+    9 | SESI_NUMBER          | ✅ sessionNumber
+   10 | MOD_SESI             | sessionMode
+   11 | LOKASI_F2F           | f2f location
+   12 | MASA_MULA            | start time
+   13 | MASA_TAMAT           | end time
+   26 | Laporan_Maju_Doc_ID  | docUrl (maybe?)
+   27 | MIA_STATUS           | ✅ status (if MIA)
+
+═══════════════════════════════════════════════════════════
+CORRECTED COLUMN MAPPING FOR compare-sheets-supabase.js
+═══════════════════════════════════════════════════════════
+
+BANGKIT (CURRENT - CORRECT):
+    timestamp: row[0]
+    mentorEmail: row[1]
+    status: row[2]
+    sessionNumber: row[3]
+    sessionDate: row[4]
+    sessionTime: row[5]
+    sessionMode: row[6]
+    menteeName: row[7]
+    menteeIC: row[8]
+    mentorName: row[9]
+    docUrl: row[53] or row[row.length - 1]
+
+MAJU (NEEDS TO BE CHANGED TO):
+    timestamp: row[0]
+    mentorEmail: row[2]       ← EMAIL_MENTOR
+    mentorName: row[1]        ← NAMA_MENTOR
+    menteeName: row[3]        ← NAMA_MENTEE
+    menteeIC: row[4]          ← NAMA_BISNES
+    sessionNumber: row[9]     ← SESI_NUMBER
+    sessionDate: row[8]       ← TARIKH_SESI
+    sessionMode: row[10]      ← MOD_SESI
+    status: row[27] or 'Selesai'  ← MIA_STATUS (default to Selesai)
+    docUrl: row[26] or row[row.length - 1]
+
+═══════════════════════════════════════════════════════════

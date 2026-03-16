@@ -1,0 +1,1911 @@
+[
+  {
+    "row": 7,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "PANTAI TIMUR",
+      "Mentor": "NIK ZAKIAH BINTI NIK MOHAMED ZAIN",
+      "Mentor_Email": "coachnikzakiah@gmail.com",
+      "Mentee": "MUHAMMAD JAZLAN BIN KAMSANI",
+      "Nama Syarikat": "JAZLAN MAJU JAYA ENTERPRISE",
+      "Alamat ": "LOT 2790 KG KULIM BERIS KUBUR BESAR 16070 BACHOK KELANTAN",
+      "no Telefon": "010-4055006",
+      "Folder_ID": "1kHjQ0-3kOBs15r61W30OuyCfEOPJYczP",
+      "EMAIL": "jazlankamsani@gmail.com",
+      "JENIS BISNES": "CUCI KARPET",
+      "": "ITEKAD BANGKIT",
+      "✓ Status": "✅ Batch 5 [PANTAI TIMUR] Mentor NIK ZAKIAH"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 8,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "PANTAI TIMUR",
+      "Mentor": "NIK ZAKIAH BINTI NIK MOHAMED ZAIN",
+      "Mentor_Email": "coachnikzakiah@gmail.com",
+      "Mentee": "WAN NOOREZREEN BINTI WAN AHMAD",
+      "Nama Syarikat": "WAN NOOREZREEN BINTI WAN AHMAD",
+      "Alamat ": "KAMPUNG PARIT LIMBAT 16150 KOTA BHARU KELANTAN",
+      "no Telefon": "013-9965400",
+      "Folder_ID": "1kHjQ0-3kOBs15r61W30OuyCfEOPJYczP",
+      "EMAIL": "oneezreen88@gmail.com",
+      "JENIS BISNES": "KEDAI MAKAN",
+      "": "ITEKAD BANGKIT",
+      "✓ Status": "✅ Batch 5 [PANTAI TIMUR] Mentor NIK ZAKIAH"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 10,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "PANTAI TIMUR",
+      "Mentor": "NIK ZAKIAH BINTI NIK MOHAMED ZAIN",
+      "Mentor_Email": "coachnikzakiah@gmail.com",
+      "Mentee": "MUHAMAD RAZMAN AFZAN BIN REJAB",
+      "Nama Syarikat": "RAZMAN RESOURCES TRADING",
+      "Alamat ": "LOT 1621 KAMPUNG NARA, 16800 PASIR PUTEH, KELANTAN",
+      "no Telefon": "013-3834920",
+      "Folder_ID": "1kHjQ0-3kOBs15r61W30OuyCfEOPJYczP",
+      "EMAIL": "razmanafzan@gmail.com",
+      "JENIS BISNES": "KONTRAKTOR BINAAN AM",
+      "": "ITEKAD BANGKIT",
+      "✓ Status": "✅ Batch 5 [PANTAI TIMUR] Mentor NIK ZAKIAH"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 11,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "PANTAI TIMUR",
+      "Mentor": "NIK ZAKIAH BINTI NIK MOHAMED ZAIN",
+      "Mentor_Email": "coachnikzakiah@gmail.com",
+      "Mentee": "SITI ZUBAIDAH BINTI MAMAT",
+      "Nama Syarikat": "SITI ZUBAIDAH BINTI MAMAT",
+      "Alamat ": "KG KUBANG SIPUT LIMBAT KUBANG KERIAN 16150 KOTA BHARU KELANTAN",
+      "no Telefon": "018-9010535",
+      "Folder_ID": "1kHjQ0-3kOBs15r61W30OuyCfEOPJYczP",
+      "EMAIL": "sitizubaidahcikzue90@gmail.com",
+      "JENIS BISNES": "PENGELUAR KEREPEK",
+      "": "ITEKAD BANGKIT",
+      "✓ Status": "✅ Batch 5 [PANTAI TIMUR] Mentor NIK ZAKIAH"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 12,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "PANTAI TIMUR",
+      "Mentor": "NIK ZAKIAH BINTI NIK MOHAMED ZAIN",
+      "Mentor_Email": "coachnikzakiah@gmail.com",
+      "Mentee": "MUHAMMAD FAKHRAN BIN CHE JUSOH @ YUSOFF",
+      "Nama Syarikat": "FCJ MAJU RESOURCES",
+      "Alamat ": "LOT 2395 PANGKAL GONG 16600 PULAI CONDONG KELANTAN",
+      "no Telefon": "011-39960741",
+      "Folder_ID": "1kHjQ0-3kOBs15r61W30OuyCfEOPJYczP",
+      "EMAIL": "fcjmaju@gmail.com",
+      "JENIS BISNES": "CAR WASH",
+      "": "ITEKAD BANGKIT",
+      "✓ Status": "✅ Batch 5 [PANTAI TIMUR] Mentor NIK ZAKIAH"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 15,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "PANTAI TIMUR",
+      "Mentor": "NIK ZAKIAH BINTI NIK MOHAMED ZAIN",
+      "Mentor_Email": "coachnikzakiah@gmail.com",
+      "Mentee": "ROSLIZAWATI BINTI CHE SOH",
+      "Nama Syarikat": "QAISARA BATIK COLLECTION",
+      "Alamat ": "LOT 21 KOMPLEKS BAZAAR BULUH KUBU 15000 KOTA BHARU KELANTAN",
+      "no Telefon": "012-9510325",
+      "Folder_ID": "1kHjQ0-3kOBs15r61W30OuyCfEOPJYczP",
+      "EMAIL": "roslizawatiechesohwatie@gmail.com",
+      "JENIS BISNES": "PAKAIAN",
+      "": "ITEKAD BANGKIT",
+      "✓ Status": "✅ Batch 5 [PANTAI TIMUR] Mentor NIK ZAKIAH"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 18,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "PANTAI TIMUR",
+      "Mentor": "NIK ZAKIAH BINTI NIK MOHAMED ZAIN",
+      "Mentor_Email": "coachnikzakiah@gmail.com",
+      "Mentee": "NUR IZWAH BINTI RUSMADI",
+      "Nama Syarikat": "NUR IZWAH BINTI RUSMADI",
+      "Alamat ": "DEPAN SMK BANDAR CHIKU 03 FELDA CHIKU 03 18300 GUA MUSANG KELANTAN",
+      "no Telefon": "017-9129015",
+      "Folder_ID": "1kHjQ0-3kOBs15r61W30OuyCfEOPJYczP",
+      "EMAIL": "izwahrusmadi859@gmail.com",
+      "JENIS BISNES": "KEDAI MAKAN",
+      "": "ITEKAD BANGKIT",
+      "✓ Status": "✅ Batch 5 [PANTAI TIMUR] Mentor NIK ZAKIAH"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 19,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "PANTAI TIMUR",
+      "Mentor": "NIK ZAKIAH BINTI NIK MOHAMED ZAIN",
+      "Mentor_Email": "coachnikzakiah@gmail.com",
+      "Mentee": "SAKURAWATI BINTI STAPA",
+      "Nama Syarikat": "D SAKURA FASHION",
+      "Alamat ": "NO.3 KEDAI MDPP TO'BALI 16800 PASIR PUTEH KELANTAN",
+      "no Telefon": "013-9675977",
+      "Folder_ID": "1kHjQ0-3kOBs15r61W30OuyCfEOPJYczP",
+      "EMAIL": "nurulasyiqin@gmail.com",
+      "JENIS BISNES": "KEDAI JAHIT BAJU",
+      "": "Waqaf An-Nur",
+      "✓ Status": "✅ Batch 5 [PANTAI TIMUR] Mentor NIK ZAKIAH"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 20,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "PANTAI TIMUR",
+      "Mentor": "NIK ZAKIAH BINTI NIK MOHAMED ZAIN",
+      "Mentor_Email": "coachnikzakiah@gmail.com",
+      "Mentee": "WAN AISHAH SOFIYYAH BINTI NAZIH",
+      "Nama Syarikat": "SOFHIA NAZIH EMPIRE",
+      "Alamat ": "NO 4 LORONG JAYA, JALAN PENGKALAN CHEPA, TANJUNG MAS, 15400 KOTA BHARU, KELANTAN",
+      "no Telefon": "013-9377424",
+      "Folder_ID": "1kHjQ0-3kOBs15r61W30OuyCfEOPJYczP",
+      "EMAIL": "wanaishahsofiyyah@gmail.com",
+      "JENIS BISNES": "COSMETIC",
+      "": "Waqaf An-Nur",
+      "✓ Status": "✅ Batch 5 [PANTAI TIMUR] Mentor NIK ZAKIAH"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 25,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "SABAH",
+      "Mentor": "FARAHWAHIDA BINTI ISHAM",
+      "Mentor_Email": "aurahebat27@gmail.com",
+      "Mentee": "MAGRET BINTI DARUSIN",
+      "Nama Syarikat": "BUTIZA ENTERPRISE",
+      "Alamat ": "W.D.T NO.58, KG TAMBATUON, 89150 KOTA BELUD, SABAH",
+      "no Telefon": "013-5833235",
+      "Folder_ID": "1MW8_Vdrt1bFxXUrb0q8PB43MorhI7Jg6",
+      "EMAIL": "magretdady68@gmail.com",
+      "JENIS BISNES": "Agriculture and agro tourism",
+      "": "iTEKAD BangKIT",
+      "✓ Status": "⚠️ Batch 5 [SABAH] Mentor FARAH"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 27,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "SABAH",
+      "Mentor": "FARAHWAHIDA BINTI ISHAM",
+      "Mentor_Email": "aurahebat27@gmail.com",
+      "Mentee": "NURMILIN BINTI AB RASUL",
+      "Nama Syarikat": "SYAH FRIED CHICKEN",
+      "Alamat ": "NO RH 199 BLOK 10, FELDA SAHABAT 01,ANJUNG TEDUH, 91150 LAHAD DATU,SABAH",
+      "no Telefon": "011-16530211",
+      "Folder_ID": "1MW8_Vdrt1bFxXUrb0q8PB43MorhI7Jg6",
+      "EMAIL": "syafiqahzaina814@gmail.com",
+      "JENIS BISNES": "MAKANAN DAN MINUMAN",
+      "": "BangKIT-TUBF",
+      "✓ Status": "⚠️ Batch 5 [SABAH] Mentor FARAH"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 28,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "SABAH",
+      "Mentor": "FARAHWAHIDA BINTI ISHAM",
+      "Mentor_Email": "aurahebat27@gmail.com",
+      "Mentee": "ROZITA BINTI AKMARUN",
+      "Nama Syarikat": "GERAI MAMA HUSNA",
+      "Alamat ": "NR 150 FELDA SAHABAT 01, BLOK 08 ANJUNG TEDUH, 91150 LAHAD DATU,SAHABAT",
+      "no Telefon": "010-6618326",
+      "Folder_ID": "1MW8_Vdrt1bFxXUrb0q8PB43MorhI7Jg6",
+      "EMAIL": "akmarunrozita@gmail.com",
+      "JENIS BISNES": "MAKANAN DAN MINUMAN",
+      "": "BangKIT-TUBF",
+      "✓ Status": "⚠️ Batch 5 [SABAH] Mentor FARAH"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 29,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "JOHOR",
+      "Mentor": "LIZA ANAK IJAM",
+      "Mentor_Email": "liza.ijam@gmail.com",
+      "Mentee": "AHMAD SAIFUL HADI BIN JOHARI",
+      "Nama Syarikat": "HDR AUTO CARE SERVICE",
+      "Alamat ": "2, JPK 7, JALAN KLUANG, PARIT HAJI KARJO, PARIT RAJA, BATU PAHAT",
+      "no Telefon": "011-26663127",
+      "Folder_ID": "1uhxK2kHtJejxTdCa2beLA81JSPU7nDw5",
+      "EMAIL": "ahmadsaifulhadijohari@gmail.com",
+      "JENIS BISNES": "WORKSHOP",
+      "": "iTEKAD BangKIT",
+      "✓ Status": "✅ Batch 5 [SELATAN] Mentor LIZA IJAM"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 30,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "JOHOR",
+      "Mentor": "LIZA ANAK IJAM",
+      "Mentor_Email": "liza.ijam@gmail.com",
+      "Mentee": "MOHAMMAD LATIF BIN REPAN",
+      "Nama Syarikat": "G THREE LOGISTICS",
+      "Alamat ": "NO. 1020, FELDA BUKIT WAHA, 81907 KOTA TINGGI, JOHOR",
+      "no Telefon": "019-7759498",
+      "Folder_ID": "1uhxK2kHtJejxTdCa2beLA81JSPU7nDw5",
+      "EMAIL": "gthreelogistics@gmail.com",
+      "JENIS BISNES": "PERKHIDMATAN PENGANGKUTAN",
+      "": "iTEKAD BangKIT",
+      "✓ Status": "✅ Batch 5 [SELATAN] Mentor LIZA IJAM"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 31,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "JOHOR",
+      "Mentor": "LIZA ANAK IJAM",
+      "Mentor_Email": "liza.ijam@gmail.com",
+      "Mentee": "SURAYA BINTI PARIAN",
+      "Nama Syarikat": "A&E SUPER ENTERPRISE",
+      "Alamat ": "NO.431, BLOK 18, FELDA SUNGAI MAS, KOTA TINGGI",
+      "no Telefon": "019-3662049",
+      "Folder_ID": "1uhxK2kHtJejxTdCa2beLA81JSPU7nDw5",
+      "EMAIL": "surayaparian10@gmail.com",
+      "JENIS BISNES": "FOOD AND BEVERAGES",
+      "": "BangKIT-TUBF",
+      "✓ Status": "✅ Batch 5 [SELATAN] Mentor LIZA IJAM"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 33,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "JOHOR",
+      "Mentor": "LIZA ANAK IJAM",
+      "Mentor_Email": "liza.ijam@gmail.com",
+      "Mentee": "NORSYAFIQ HAMIZAL BIN HAMZAH",
+      "Nama Syarikat": "APEX AUTOSPRAY ENTERPRISE",
+      "Alamat ": "NO. 97, JALAN PANGLIMA TAMAN KULAIJAYA, 81000 KULAI JOHOR",
+      "no Telefon": "013-7332605",
+      "Folder_ID": "1uhxK2kHtJejxTdCa2beLA81JSPU7nDw5",
+      "EMAIL": "syafiqhamizal1989@gmail.com",
+      "JENIS BISNES": "BENGKEL CAT KERETA",
+      "": "BangKIT-TUBF",
+      "✓ Status": "✅ Batch 5 [SELATAN] Mentor LIZA IJAM"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 34,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "JOHOR",
+      "Mentor": "LIZA ANAK IJAM",
+      "Mentor_Email": "liza.ijam@gmail.com",
+      "Mentee": "MUHAMMAD SYUKRI BIN HANAFI",
+      "Nama Syarikat": "SYUKRI AUTO GARAGE",
+      "Alamat ": "PK 36, KG PT KELANTAN AIR HITAM, 84000 MUAR JOHOR",
+      "no Telefon": "012-999 4745",
+      "Folder_ID": "1uhxK2kHtJejxTdCa2beLA81JSPU7nDw5",
+      "EMAIL": "muhdsyukrihanafi@gmail.com",
+      "JENIS BISNES": "BENGKEL SERVICE KERETA",
+      "": "BangKIT-TUBF",
+      "✓ Status": "✅ Batch 5 [SELATAN] Mentor LIZA IJAM"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 38,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "SENTRAL",
+      "Mentor": "AISYATURRIDHA BINTI ABDULLAH",
+      "Mentor_Email": "aisyadva.tmx@gmail.com",
+      "Mentee": "MUHAMMAD SHAMIR BIN MUHAMMAD JUMAN LUHAT",
+      "Nama Syarikat": "JL LEGASI ENTERPRISE",
+      "Alamat ": "4-2-1 BLOK 4, INTANA RIA 1,SEKSYEN 7, 43650 BANDAR BARU BANGI,SELANGOR",
+      "no Telefon": "013-2647316",
+      "Folder_ID": "16V90lNmusTJcl4Ga1lFk4bop4O5G5n8d",
+      "EMAIL": "muhdshamir95@gmail.com",
+      "JENIS BISNES": "RETAIL OF CLOTHING, WHOLESALE OF CLOTHING",
+      "": "iTEKAD BangKIT",
+      "✓ Status": "✅ Batch 5 [SENTRAL & SELATAN] Mentor AISYA"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 39,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "SENTRAL",
+      "Mentor": "AISYATURRIDHA BINTI ABDULLAH",
+      "Mentor_Email": "aisyadva.tmx@gmail.com",
+      "Mentee": "SITI SAMSIAH BINTI MT GANI",
+      "Nama Syarikat": "LITTLE SAS COLLECTION",
+      "Alamat ": "L-12-03 PPR PINGGIRAN BUKIT JALIL JALAN BUKIT INDAH, 57000 KUALA LUMPUR",
+      "no Telefon": "011-10552180",
+      "Folder_ID": "16V90lNmusTJcl4Ga1lFk4bop4O5G5n8d",
+      "EMAIL": "luqmansam90@gmail.com",
+      "JENIS BISNES": "MENJUAL PAKAIAN KANAK-KANAK DAN DEWASA",
+      "": "iTEKAD BangKIT",
+      "✓ Status": "✅ Batch 5 [SENTRAL & SELATAN] Mentor AISYA"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 45,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "SENTRAL",
+      "Mentor": "MOHAMAD ARSHAD BIN AWANG",
+      "Mentor_Email": "arshad.awang.7092@gmail.com",
+      "Mentee": "MUHAMMAD NAPI BIN MAT NAWI",
+      "Nama Syarikat": "ANAK RANTAU RESOURCES",
+      "Alamat ": "53G JALAN PAHAT H/15 H, SEKSYEN 15 DATARAN OTOMOBIL, 40200 SHAH ALAM, SELANGOR",
+      "no Telefon": "019-2323780",
+      "Folder_ID": "1Y8YOUyRfsLkWxlBI-x9AaOXbuQylhvmn",
+      "EMAIL": "mdpuman@yahoo.com",
+      "JENIS BISNES": "BENGKEL DAN AKSESORI MOTOR",
+      "": "BangKIT-TUBF",
+      "✓ Status": "⚠️ Batch 5 [SENTRAL] Mentor ARSHAD"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 46,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "SENTRAL",
+      "Mentor": "MOHAMAD ARSHAD BIN AWANG",
+      "Mentor_Email": "arshad.awang.7092@gmail.com",
+      "Mentee": "MOHD KHAIRUL AZMAN BIN MOHD NOR",
+      "Nama Syarikat": "MKA AUTO WORKS",
+      "Alamat ": "NO.35, JALAN BULAN U5/170 BANDAR PINGGIRAN SUBANG, 40150 SHAH ALAM, SELANGOR",
+      "no Telefon": "013-6001565",
+      "Folder_ID": "1Y8YOUyRfsLkWxlBI-x9AaOXbuQylhvmn",
+      "EMAIL": "mkaautoworkshq@gmail.com",
+      "JENIS BISNES": "BENGKEL SERVICE KERETA",
+      "": "BangKIT-TUBF",
+      "✓ Status": "⚠️ Batch 5 [SENTRAL] Mentor ARSHAD"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 47,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "SENTRAL",
+      "Mentor": "MOHAMAD ARSHAD BIN AWANG",
+      "Mentor_Email": "arshad.awang.7092@gmail.com",
+      "Mentee": "MOHD SABRI BIN AHMED JAAFAR",
+      "Nama Syarikat": "PERMATA HATI AVENUE RESOURCES",
+      "Alamat ": "NO 2B, JALAN KAMPUNG SUNGAI SIREH TAMBAHAN, 42000 PELABUHAN KLANG, SELANGOR",
+      "no Telefon": "017-297 9866",
+      "Folder_ID": "1Y8YOUyRfsLkWxlBI-x9AaOXbuQylhvmn",
+      "EMAIL": "ms463331@gmail.com",
+      "JENIS BISNES": "PERUSAHAAN PALET KAYU",
+      "": "iTEKAD BangKIT",
+      "✓ Status": "⚠️ Batch 5 [SENTRAL] Mentor ARSHAD"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 59,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "SENTRAL",
+      "Mentor": "SHAHRIZAL BIN ROJALI",
+      "Mentor_Email": "shahrojali1979@gmail.com",
+      "Mentee": "MOHD ZAINUDDIN BIN MOHAMED ALI",
+      "Nama Syarikat": "RESTORAN ROJAK & CENDOL HAJI ALI",
+      "Alamat ": "NO. 2, JALAN JATI 2, TAMAN SAUJANA UTAMA, 47000 SUNGAI BULOH, SELANGOR",
+      "no Telefon": "011-23364662",
+      "Folder_ID": "1YAzd9pEn9QhvsBSXq3XpeVbb6O7W0d-h",
+      "EMAIL": "mohdzainudin1@gmail.com",
+      "JENIS BISNES": "F & B - ROJAK, CENDOL DAN MASAKAN PANAS",
+      "": "iTEKAD BangKIT",
+      "✓ Status": "✅ Batch 5 [SENTRAL] Mentor SHAH"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 60,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "SENTRAL",
+      "Mentor": "SHAHRIZAL BIN ROJALI",
+      "Mentor_Email": "shahrojali1979@gmail.com",
+      "Mentee": "SITI HAIFAA BINTI ISHAK",
+      "Nama Syarikat": "DUSKIE COFFEE BUSINESS",
+      "Alamat ": "NO 2008 JALAN 1A/4 BANDAR BARU SUNGAI BULOH, 47000 SUNGAI BULOH,SELANGOR",
+      "no Telefon": "017-6241400",
+      "Folder_ID": "1YAzd9pEn9QhvsBSXq3XpeVbb6O7W0d-h",
+      "EMAIL": "duskiecoffee@gmail.com",
+      "JENIS BISNES": "FOOD AND BEVERAGES",
+      "": "iTEKAD BangKIT",
+      "✓ Status": "✅ Batch 5 [SENTRAL] Mentor SHAH"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 62,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "UTARA",
+      "Mentor": "MUHAMAD BIN YUSOF",
+      "Mentor_Email": "vakogminds@gmail.com",
+      "Mentee": "TARMIZI BIN MOHAMAD",
+      "Nama Syarikat": "RUSTY SPOOL ENTERPRISE",
+      "Alamat ": "NO 3725 PAYA KELADI TENGAH, 13200 KEPALA BATAS, PULAU PINANG",
+      "no Telefon": "012-4501855",
+      "Folder_ID": "19BVoGJY8vyEraTD9Gc2eWyk51d3yXP50",
+      "EMAIL": "crimebuster79@gmail.com",
+      "JENIS BISNES": "WORKSHOP",
+      "": "iTEKAD BangKIT",
+      "✓ Status": "✅ Batch 5 [UTARA] Mentor FAZLU/MUHAMAD"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 64,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "UTARA",
+      "Mentor": "ZURILAILI BINTI ISHAK",
+      "Mentor_Email": "zurilaili@gmail.com",
+      "Mentee": "WAN MUHAMMAD SYARIFUDDIN BIN WAN SANUSI\n2ND OWNER: ASMILIZAN BIN AZMI",
+      "Nama Syarikat": "DJAN AUTO SERVICE",
+      "Alamat ": "A197GF, JALAN BAIDURI 4, TAMAN BAIDURI, 08000 SUNGAI PETANI, KEDAH",
+      "no Telefon": "018-9498665",
+      "Folder_ID": "156zaJL697Q_P2pJQCnMblUbpTjGlICN8",
+      "EMAIL": "syarifdin97@gmail.com",
+      "JENIS BISNES": "WORKSHOP",
+      "": "iTEKAD BangKIT",
+      "✓ Status": "⚠️ BATCH 5 BANGKIT"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 66,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "UTARA",
+      "Mentor": "ZURILAILI BINTI ISHAK",
+      "Mentor_Email": "zurilaili@gmail.com",
+      "Mentee": "NOOR HAZLIZA BINTI MOHD AZLAN SHAH",
+      "Nama Syarikat": "NHAF VENTURES",
+      "Alamat ": "NO. 47, LORONG PERDA INDAH 13 TAMAN PERDA INDAH, 13300 TASEK GELUGOR, PULAU PINANG",
+      "no Telefon": "016-2979752",
+      "Folder_ID": "156zaJL697Q_P2pJQCnMblUbpTjGlICN8",
+      "EMAIL": "uhkitchenhere@gmail.com",
+      "JENIS BISNES": "F & B",
+      "": "iTEKAD BangKIT",
+      "✓ Status": "⚠️ BATCH 5 BANGKIT"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 69,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "UTARA",
+      "Mentor": "ZURILAILI BINTI ISHAK",
+      "Mentor_Email": "zurilaili@gmail.com",
+      "Mentee": "NUR ANISHA BINTI ADNAN",
+      "Nama Syarikat": "NANGANI ENTERPRISE",
+      "Alamat ": "F583, KAMPUNG PANTAI PRAI, 09400 PADANG SERAI, KEDAH",
+      "no Telefon": "019-9329443",
+      "Folder_ID": "156zaJL697Q_P2pJQCnMblUbpTjGlICN8",
+      "EMAIL": "anishaadnan98@gmail.com",
+      "JENIS BISNES": "F & B",
+      "": "iTEKAD BangKIT",
+      "✓ Status": "⚠️ BATCH 5 BANGKIT"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 70,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "UTARA",
+      "Mentor": "KAMARUZZAMAN BIN KAMALUDEEN",
+      "Mentor_Email": "bizcoachkk@gmail.com",
+      "Mentee": "MOHD RIDZUAN BIN SHAMSUDIN",
+      "Nama Syarikat": "MY PIZZA PLANET ENTERPRISE",
+      "Alamat ": "TAPAK 1, MASJID DAERAH, BARAT DAYA, 11000 BALIK PULAU, PULAU PINANG",
+      "no Telefon": "011-58600228",
+      "Folder_ID": "1Bvy6oJtZieGffjk7jLp3xU0qcXEpSOGN",
+      "EMAIL": "cenderawasihvespa1985@gmail.com",
+      "JENIS BISNES": "PIZZA STATION",
+      "": "iTEKAD BangKIT",
+      "✓ Status": "⚠️ Batch 5 Bangkit"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 71,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "UTARA",
+      "Mentor": "KAMARUZZAMAN BIN KAMALUDEEN",
+      "Mentor_Email": "bizcoachkk@gmail.com",
+      "Mentee": "SHAKIRAH MARDHIAH BINTI MOHAMED JABRULLAH KHAN",
+      "Nama Syarikat": "SARA BOUQERY EMPIRE",
+      "Alamat ": "279-G-2, LORONG TAMPIN, 10150 GEORGETOWN, PULAU PINANG",
+      "no Telefon": "019-4564510",
+      "Folder_ID": "1Bvy6oJtZieGffjk7jLp3xU0qcXEpSOGN",
+      "EMAIL": "shakirahmardhiah95@gmail.com",
+      "JENIS BISNES": "BAKERY",
+      "": "iTEKAD BangKIT",
+      "✓ Status": "⚠️ Batch 5 Bangkit"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 73,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "TENGAH",
+      "Mentor": "MUHAMMAD NAIM BIN MUKHTAR ",
+      "Mentor_Email": "naemmukhtar@gmail.com",
+      "Mentee": "NUR ASHEERA AZLEEN BINTI MOHAMMAD MIZA",
+      "Nama Syarikat": "JAC GLOBAL ENTERPRISE",
+      "Alamat ": "NO 36 JALAN PENANG, MALAYSIA PARK, 36000 TELUK INTAN, PERAK",
+      "no Telefon": "013-9784950",
+      "Folder_ID": "1521-SbJp5er3ab27k_kA64XRFobPP2iD",
+      "EMAIL": "mohdsufhairi88@yahoo.com",
+      "JENIS BISNES": "F & B (CATERING)",
+      "": "iTEKAD BangKIT",
+      "✓ Status": "⚠️ Batch 5 Bangkit"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 74,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "TENGAH",
+      "Mentor": "MUHAMMAD NAIM BIN MUKHTAR ",
+      "Mentor_Email": "naemmukhtar@gmail.com",
+      "Mentee": "SARIPAH ROKIAH BINTI SYED ISHAK",
+      "Nama Syarikat": "SARIPAH COLLECTION",
+      "Alamat ": "NO. 8, KEDAI DUA TINGKAT JALAN BESAR, 34300 BAGAN SERAI, PERAK",
+      "no Telefon": "019-4813027",
+      "Folder_ID": "1521-SbJp5er3ab27k_kA64XRFobPP2iD",
+      "EMAIL": "shiqah1003@gmail.com",
+      "JENIS BISNES": "PAKAIAN",
+      "": "iTEKAD BangKIT",
+      "✓ Status": "⚠️ Batch 5 Bangkit"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 75,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "SENTRAL",
+      "Mentor": "MUHAMMAD NAIM BIN MUKHTAR ",
+      "Mentor_Email": "naemmukhtar@gmail.com",
+      "Mentee": "AZFAR SYAKIRIN BIN SAZALI",
+      "Nama Syarikat": "YUSRAINI ENTERPRISE",
+      "Alamat ": "NO 6G JALAN BAHTERA 2 TAMAN BAHTERA, 35900 HULU BERNAM, SELANGOR",
+      "no Telefon": "011-10152928",
+      "Folder_ID": "1521-SbJp5er3ab27k_kA64XRFobPP2iD",
+      "EMAIL": "yusfarhq@gmail.com",
+      "JENIS BISNES": "KEDAI PRINTING",
+      "": "BangKIT-TUBF",
+      "✓ Status": "⚠️ Batch 5 Bangkit"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 76,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "SELATAN",
+      "Mentor": "AISYATURRIDHA BINTI ABDULLAH",
+      "Mentor_Email": "aisyadva.tmx@gmail.com",
+      "Mentee": "NORHASHIMA BINTI YUSOFF",
+      "Nama Syarikat": "NACUDA ENTERPRISE",
+      "Alamat ": "LOT PT1935, KAMPUNG LEGONG JAYA, KOTA, REMBAU",
+      "no Telefon": "018-3138639",
+      "Folder_ID": "16V90lNmusTJcl4Ga1lFk4bop4O5G5n8d",
+      "EMAIL": "nacuda.enterprise@yahoo.com",
+      "JENIS BISNES": "F&B VENDOR",
+      "": "iTEKAD BangKIT",
+      "✓ Status": "✅ Batch 5 [SENTRAL & SELATAN] Mentor AISYA"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 77,
+    "data": {
+      "Batch": "Batch 5 Bangkit",
+      "Zon": "SELATAN",
+      "Mentor": "AISYATURRIDHA BINTI ABDULLAH",
+      "Mentor_Email": "aisyadva.tmx@gmail.com",
+      "Mentee": "FAZILAH BINTI MD YUSOFF",
+      "Nama Syarikat": "D NALUT ENTERPRISE",
+      "Alamat ": "JALAN SEK, FELDA BUKIT SENGGEH, 77100 JASIN MELAKA",
+      "no Telefon": "010-549 3269",
+      "Folder_ID": "16V90lNmusTJcl4Ga1lFk4bop4O5G5n8d",
+      "EMAIL": "ella47875269@gmail.com",
+      "JENIS BISNES": "F& B",
+      "": "BangKIT TUBF",
+      "✓ Status": "✅ Batch 5 [SENTRAL & SELATAN] Mentor AISYA"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 78,
+    "data": {
+      "Batch": "Batch 4 MAJU",
+      "Zon": "JOHOR",
+      "Mentor": "KAMARUZZAMAN BIN KAMALUDEEN",
+      "Mentor_Email": "bizcoachkk@gmail.com",
+      "Mentee": "Nor Mohamad Hadir Bin Hashim",
+      "Nama Syarikat": "Hadir Works Enterprise",
+      "Alamat ": "No.16, Jalan Merpati 2, Taman Scientex, Pasir Gudang",
+      "no Telefon": "018-7609832",
+      "Folder_ID": "1fh7_NWeml0zduks2huivCFum5r55ItXm",
+      "EMAIL": "hadiragt86@gmail.com",
+      "JENIS BISNES": "Manufacturing",
+      "": "iTEKAD MAJU",
+      "✓ Status": "⚠️ Batch 4 Maju"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 79,
+    "data": {
+      "Batch": "Batch 4 MAJU",
+      "Zon": "JOHOR",
+      "Mentor": "KAMARUZZAMAN BIN KAMALUDEEN",
+      "Mentor_Email": "bizcoachkk@gmail.com",
+      "Mentee": "Siti Zulaikha Binti Adnan",
+      "Nama Syarikat": "Aikha Berkat Enterprise",
+      "Alamat ": "No.10, Jalan Bandar Baru, Pusat Bandar Baru Ayer Hitam",
+      "no Telefon": "012-3628064",
+      "Folder_ID": "1fh7_NWeml0zduks2huivCFum5r55ItXm",
+      "EMAIL": "sitizulaikhabintiadnan91@gmail.com",
+      "JENIS BISNES": "Services",
+      "": "iTEKAD MAJU",
+      "✓ Status": "⚠️ Batch 4 Maju"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 80,
+    "data": {
+      "Batch": "Batch 4 MAJU",
+      "Zon": "JOHOR",
+      "Mentor": "KAMARUZZAMAN BIN KAMALUDEEN",
+      "Mentor_Email": "bizcoachkk@gmail.com",
+      "Mentee": "Abd Kamal Bin Abd Rahim",
+      "Nama Syarikat": "Kamaza Bina Enterprise",
+      "Alamat ": "No.1149, Blok A-7, Felda Adela, Kota Tinggi",
+      "no Telefon": "07-8276789",
+      "Folder_ID": "1fh7_NWeml0zduks2huivCFum5r55ItXm",
+      "EMAIL": "kamazabina7376@gmail.com",
+      "JENIS BISNES": "Services",
+      "": "iTEKAD MAJU",
+      "✓ Status": "⚠️ Batch 4 Maju"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 81,
+    "data": {
+      "Batch": "Batch 4 MAJU",
+      "Zon": "UTARA",
+      "Mentor": "ZURILAILI BINTI ISHAK",
+      "Mentor_Email": "zurilaili@gmail.com",
+      "Mentee": "Muhammad Faizal Bin Shaari",
+      "Nama Syarikat": "Fz Auto Service",
+      "Alamat ": "22 Ground Floor Jalan Bukit Puteri 9/12 Bandar Puteri Jaya, 08000 Sungai Petani, Kedah",
+      "no Telefon": "017-4644749",
+      "Folder_ID": "1X7rqYlWbLn2u_ethKF5vIL6u-1N-wiJH",
+      "EMAIL": "faizaljankau9008@gmail.com",
+      "JENIS BISNES": "Services",
+      "": "iTEKAD MAJU",
+      "✓ Status": "⚠️ BATCH 4 MAJU"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 82,
+    "data": {
+      "Batch": "Batch 4 MAJU",
+      "Zon": "UTARA",
+      "Mentor": "ZURILAILI BINTI ISHAK",
+      "Mentor_Email": "zurilaili@gmail.com",
+      "Mentee": "Mohd Najmi Bin Abd Rahim",
+      "Nama Syarikat": "Nsrk Ikatan Barakah Enterprise",
+      "Alamat ": "F51, Kampung Dingin, Mahang, Karangan, 09700 Kulim Kedah",
+      "no Telefon": "016-4033575",
+      "Folder_ID": "1X7rqYlWbLn2u_ethKF5vIL6u-1N-wiJH",
+      "EMAIL": "mohdnajmirahim5@gmail.com",
+      "JENIS BISNES": "Construction",
+      "": "iTEKAD MAJU",
+      "✓ Status": "⚠️ BATCH 4 MAJU"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 83,
+    "data": {
+      "Batch": "Batch 4 MAJU",
+      "Zon": "UTARA",
+      "Mentor": "ZURILAILI BINTI ISHAK",
+      "Mentor_Email": "zurilaili@gmail.com",
+      "Mentee": "Lim Boon Chin",
+      "Nama Syarikat": "Shw Chin Enterprise",
+      "Alamat ": "No 1, Tingkat Bawah Taman Kasih Kampung Padang Lalang, 06250 Alor Setar, Kedah",
+      "no Telefon": "019-4658955",
+      "Folder_ID": "1X7rqYlWbLn2u_ethKF5vIL6u-1N-wiJH",
+      "EMAIL": "shwchinent@gmail.com",
+      "JENIS BISNES": "Services",
+      "": "iTEKAD MAJU",
+      "✓ Status": "⚠️ BATCH 4 MAJU"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 84,
+    "data": {
+      "Batch": "Batch 4 MAJU",
+      "Zon": "UTARA",
+      "Mentor": "ZURILAILI BINTI ISHAK",
+      "Mentor_Email": "zurilaili@gmail.com",
+      "Mentee": "Muhammad Husaini Bin Arifin",
+      "Nama Syarikat": "Nha Aman Enterprise",
+      "Alamat ": "No. 114, Taman Desa Aman Guar Chempedak, 08800 Gurun, Kedah",
+      "no Telefon": "012-5631410",
+      "Folder_ID": "1X7rqYlWbLn2u_ethKF5vIL6u-1N-wiJH",
+      "EMAIL": "husainiearifin@gmail.com",
+      "JENIS BISNES": "Fashion & Clothing",
+      "": "iTEKAD MAJU",
+      "✓ Status": "⚠️ BATCH 4 MAJU"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 85,
+    "data": {
+      "Batch": "Batch 4 MAJU",
+      "Zon": "UTARA",
+      "Mentor": "ZURILAILI BINTI ISHAK",
+      "Mentor_Email": "zurilaili@gmail.com",
+      "Mentee": "Norine Binti Mohd Noh",
+      "Nama Syarikat": "Noren Teguh Enterprise",
+      "Alamat ": "Batu 13, Kg Kobah, 06700 Pendang, Kedah",
+      "no Telefon": "017-4458929",
+      "Folder_ID": "1X7rqYlWbLn2u_ethKF5vIL6u-1N-wiJH",
+      "EMAIL": "norinedin@gmail.com",
+      "JENIS BISNES": "Food & Beverages",
+      "": "iTEKAD MAJU",
+      "✓ Status": "⚠️ BATCH 4 MAJU"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 89,
+    "data": {
+      "Batch": "Batch 4 MAJU",
+      "Zon": "TENGAH",
+      "Mentor": "MUHAMMAD NAIM BIN MUKHTAR ",
+      "Mentor_Email": "naemmukhtar@gmail.com",
+      "Mentee": "Muhammad Firdaus Bin Mohd Fadzi",
+      "Nama Syarikat": "Nadear Creation Empire",
+      "Alamat ": "Kampung Banggol Sena, Mata Ayer, 02500 Kangar, Perlis",
+      "no Telefon": "012-8005629",
+      "Folder_ID": "1-Jy7gPHTEMTpzMXzf91JU7UrmSnl5Lh0",
+      "EMAIL": "firdaus.fadzi@yahoo.com",
+      "JENIS BISNES": "Beauty & Cosmetics",
+      "": "iTEKAD MAJU",
+      "✓ Status": "⚠️ Batch 4 Maju"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 90,
+    "data": {
+      "Batch": "Batch 4 MAJU",
+      "Zon": "UTARA",
+      "Mentor": "KAMARUZZAMAN BIN KAMALUDEEN",
+      "Mentor_Email": "bizcoachkk@gmail.com",
+      "Mentee": "Mohd Harith Fahmi Bin Mohd Subhi",
+      "Nama Syarikat": "Mhf Venture Service",
+      "Alamat ": "91, Jalan Seri Serdang 3, Taman Seri Serdang, 13200 Kepala Batas, Pulau Pinang",
+      "no Telefon": "013-4621125",
+      "Folder_ID": "1fh7_NWeml0zduks2huivCFum5r55ItXm",
+      "EMAIL": "cuci2penang@gmail.com",
+      "JENIS BISNES": "Services",
+      "": "iTEKAD MAJU",
+      "✓ Status": "⚠️ Batch 4 Maju"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 91,
+    "data": {
+      "Batch": "Batch 4 MAJU",
+      "Zon": "UTARA",
+      "Mentor": "KAMARUZZAMAN BIN KAMALUDEEN",
+      "Mentor_Email": "bizcoachkk@gmail.com",
+      "Mentee": "Muhammad Hafizuddin Hamzi Bin Jasmani",
+      "Nama Syarikat": "Futuree Films 19 Production",
+      "Alamat ": "No 5, Lorong Taman Air Tawar Indah 7, Teluk Air Tawar, 13050 Butterworth, Pulau Pinang",
+      "no Telefon": "017-4882013",
+      "Folder_ID": "1fh7_NWeml0zduks2huivCFum5r55ItXm",
+      "EMAIL": "hafizhamzi12@gmail.com",
+      "JENIS BISNES": "Services",
+      "": "iTEKAD MAJU",
+      "✓ Status": "⚠️ Batch 4 Maju"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 93,
+    "data": {
+      "Batch": "Batch 4 MAJU",
+      "Zon": "UTARA",
+      "Mentor": "KAMARUZZAMAN BIN KAMALUDEEN",
+      "Mentor_Email": "bizcoachkk@gmail.com",
+      "Mentee": "Muhammad Muslim Bin Musa",
+      "Nama Syarikat": "M&F Muslim Enterprise",
+      "Alamat ": "No 5 Dca B Blok H Mukim 12 Sungai Tiram, 11900 Bayan Lepas, Pulau Pinang",
+      "no Telefon": "012-5842742",
+      "Folder_ID": "1fh7_NWeml0zduks2huivCFum5r55ItXm",
+      "EMAIL": "mfmuslimenterprise@gmail.com",
+      "JENIS BISNES": "Services",
+      "": "iTEKAD MAJU",
+      "✓ Status": "⚠️ Batch 4 Maju"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 96,
+    "data": {
+      "Batch": "Batch 4 Bangkit",
+      "Zon": "UTARA",
+      "Mentor": "ZURILAILI BINTI ISHAK",
+      "Mentor_Email": "zurilaili@gmail.com",
+      "Mentee": "DEANIALL ASYRRAF BIN ROSLI",
+      "Nama Syarikat": "CEDOQQ ENTERPRISE",
+      "Alamat ": "NO 2 BAZAR WAKAF RAKYAT MASJID TAMAN INTAN, 08000 SUNGAI PETANI, KEDAH",
+      "no Telefon": "019-5093949",
+      "Folder_ID": "1zMmfC542oxs4JbdBrzFdKuntp3p-qBE8",
+      "EMAIL": "cedoqqlegacy@gmail.com",
+      "JENIS BISNES": "MEMPROSES & MENJUAL DADIH",
+      "": "iTEKAD BangKIT",
+      "✓ Status": "⚠️ DEANIALL ASYRRAF BIN ROSLI"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 99,
+    "data": {
+      "Batch": "Batch 6 Bangkit",
+      "Zon": "KELANTAN",
+      "Mentor": "AFIQ MANAN",
+      "Mentor_Email": "afiqmananbomresources@gmail.com",
+      "Mentee": "NUR ALWANI BINTI CHE ADNAN",
+      "Nama Syarikat": "AZ TRADING & ART DESIGN",
+      "Alamat ": "NO 843, JALAN MASJID BANDAR 16200 TUMPAT KELANTAN",
+      "no Telefon": "011-25648727",
+      "Folder_ID": "1_ZwVGoS7mpwzsW0gl4pkwh9uyCtM9uV4",
+      "EMAIL": "alnzartdesign@gmail.com",
+      "JENIS BISNES": "PRINTING SERVICE",
+      "✓ Status": "⚠️ Batch 6 Bangkit"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 100,
+    "data": {
+      "Batch": "Batch 5 MAJU",
+      "Zon": "KELANTAN",
+      "Mentor": "AFIQ MANAN",
+      "Mentor_Email": "afiqmananbomresources@gmail.com",
+      "Mentee": "Muhammad Alif Aizat Bin Mohd Suhaimi",
+      "Nama Syarikat": "Al Fatihah Marketing",
+      "Alamat ": "Pt 503, 504 Tumpat Tingkat Bawah, Depan Kuil India Jalan Besar 16200 Tumpat Kelantan",
+      "no Telefon": "011-25710309",
+      "Folder_ID": "12q8mFTAoKQAb5zzEGemcmsyjv_GyqFwc",
+      "EMAIL": "alifaizat07@gmail.com",
+      "JENIS BISNES": "Food & Beverages",
+      "✓ Status": "⚠️ Batch 5 MAJU"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 103,
+    "data": {
+      "Batch": "Batch 6 Bangkit",
+      "Zon": "KELANTAN",
+      "Mentor": "AFIQ MANAN",
+      "Mentor_Email": "afiqmananbomresources@gmail.com",
+      "Mentee": "HANZALAH BIN ABD RANI",
+      "Nama Syarikat": "HANZ ELECTRIC & ELECTRONIC",
+      "Alamat ": "KAMPUNG PUSU SIREH LUBUK STOL 17200 RANTAU PANJANG KELANTAN",
+      "no Telefon": "013-2299551",
+      "Folder_ID": "1_ZwVGoS7mpwzsW0gl4pkwh9uyCtM9uV4",
+      "EMAIL": "hanzalahabdrani@gmail.com",
+      "JENIS BISNES": "ELECTRIC DAN ELEKTRONIK",
+      "✓ Status": "❌ Wrong: Batch 6  & Batch 5 MAJU [PANTAI TIMUR] Mentor AFIQ"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 104,
+    "data": {
+      "Batch": "Batch 6 Bangkit",
+      "Zon": "KELANTAN",
+      "Mentor": "AFIQ MANAN",
+      "Mentor_Email": "afiqmananbomresources@gmail.com",
+      "Mentee": "UMI KHALSUM BIN ZULBIRI",
+      "Nama Syarikat": "JOE EXCELLENT ENTERPRISE",
+      "Alamat ": "LOT 4550, JALAN BUKIT BAKAR, KAMPUNG DUSUN BARU 18500 MACHANG KELANTAN",
+      "no Telefon": "011-13215383",
+      "Folder_ID": "1_ZwVGoS7mpwzsW0gl4pkwh9uyCtM9uV4",
+      "EMAIL": "joekachak@gmail.com",
+      "JENIS BISNES": "PERCETAKAN BAJU",
+      "✓ Status": "❌ Wrong: Batch 6  & Batch 5 MAJU [PANTAI TIMUR] Mentor AFIQ"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 106,
+    "data": {
+      "Batch": "Batch 6 Bangkit",
+      "Zon": "KELANTAN",
+      "Mentor": "AFIQ MANAN",
+      "Mentor_Email": "afiqmananbomresources@gmail.com",
+      "Mentee": "CHE SULAILA BINTI MUHAMAD",
+      "Nama Syarikat": "LAILAZIM 097 ENTERPRISE",
+      "Alamat ": "GRILL GUNUNG STONG, RPT KESEDAR JELAWANG, KAMPUNG JELAWANG 18200 DABONG KELANTAN",
+      "no Telefon": "011-27266017",
+      "Folder_ID": "1_ZwVGoS7mpwzsW0gl4pkwh9uyCtM9uV4",
+      "EMAIL": "chesulaila755@gmail.com",
+      "JENIS BISNES": "KEDAI MAKAN",
+      "✓ Status": "❌ Wrong: Batch 6  & Batch 5 MAJU [PANTAI TIMUR] Mentor AFIQ"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 108,
+    "data": {
+      "Batch": "Batch 6 Bangkit",
+      "Zon": "KELANTAN",
+      "Mentor": "AFIQ MANAN",
+      "Mentor_Email": "afiqmananbomresources@gmail.com",
+      "Mentee": "NIK HASNAH BINTI NIK HASSAN",
+      "Nama Syarikat": "NSNH ENTERPRISE",
+      "Alamat ": "LOT 850 KAMPUNG PANGKAL GONG 16600 MACHANG KELANTAN",
+      "no Telefon": "017-6765051 / 0179940833",
+      "Folder_ID": "1_ZwVGoS7mpwzsW0gl4pkwh9uyCtM9uV4",
+      "EMAIL": "nikhasnah2779@gmail.com",
+      "JENIS BISNES": "KEDAI KUIH MUIH (BAHULU)",
+      "✓ Status": "❌ Wrong: Batch 6  & Batch 5 MAJU [PANTAI TIMUR] Mentor AFIQ"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 109,
+    "data": {
+      "Batch": "Batch 5 MAJU",
+      "Zon": "KELANTAN",
+      "Mentor": "AFIQ MANAN",
+      "Mentor_Email": "afiqmananbomresources@gmail.com",
+      "Mentee": "Shahfirul Azuan Bin Hassan",
+      "Nama Syarikat": "Pie You Auto Service",
+      "Alamat ": "No Pt 777 Kg Wakaf Stan Kubang Kerian 16150 Kota Bharu Kelantan",
+      "no Telefon": "017-9300140",
+      "Folder_ID": "12q8mFTAoKQAb5zzEGemcmsyjv_GyqFwc",
+      "EMAIL": "pieyou.autoservice@gmail.com",
+      "JENIS BISNES": "Services",
+      "✓ Status": "⚠️ Batch 5 MAJU"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 110,
+    "data": {
+      "Batch": "Batch 5 MAJU",
+      "Zon": "KELANTAN",
+      "Mentor": "AFIQ MANAN",
+      "Mentor_Email": "afiqmananbomresources@gmail.com",
+      "Mentee": "Mohd Shardi Izwan Bin Abd Manaf",
+      "Nama Syarikat": "Pro Two Rich Auto",
+      "Alamat ": "Lot Pt1906 (Kg Pdg Lati) 16250 Wakaf Bharu Kelantan",
+      "no Telefon": "019-9971882",
+      "Folder_ID": "12q8mFTAoKQAb5zzEGemcmsyjv_GyqFwc",
+      "EMAIL": "protworich84@gmail.com",
+      "JENIS BISNES": "Services",
+      "✓ Status": "⚠️ Batch 5 MAJU"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 112,
+    "data": {
+      "Batch": "Batch 5 MAJU",
+      "Zon": "KELANTAN",
+      "Mentor": "AFIQ MANAN",
+      "Mentor_Email": "afiqmananbomresources@gmail.com",
+      "Mentee": "Muhammad Syafiq Bin Azman",
+      "Nama Syarikat": "Sba Jaya Trading",
+      "Alamat ": "Depan Balai Polis Peringat Kampung Peringat Melor, 16400 Kota Bharu,Kelantan",
+      "no Telefon": "013-9020305",
+      "Folder_ID": "12q8mFTAoKQAb5zzEGemcmsyjv_GyqFwc",
+      "EMAIL": "apikx4880@gmail.com",
+      "JENIS BISNES": "Services",
+      "✓ Status": "⚠️ Batch 5 MAJU"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 115,
+    "data": {
+      "Batch": "Batch 6 Bangkit",
+      "Zon": "KELANTAN",
+      "Mentor": "AFIQ MANAN",
+      "Mentor_Email": "afiqmananbomresources@gmail.com",
+      "Mentee": "SITI MARIAM BINTI ZAKARIA",
+      "Nama Syarikat": "YAM 96 SHOP",
+      "Alamat ": "KAMPUNG JELUTONG TOK BOK LABOK 18500 MACHANG KELANTAN",
+      "no Telefon": "019-9628121",
+      "Folder_ID": "1_ZwVGoS7mpwzsW0gl4pkwh9uyCtM9uV4",
+      "EMAIL": "s.mariam21@yahoo.com",
+      "JENIS BISNES": "JAHITAN",
+      "✓ Status": "❌ Wrong: Batch 6  & Batch 5 MAJU [PANTAI TIMUR] Mentor AFIQ"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 120,
+    "data": {
+      "Batch": "Batch 6 Bangkit",
+      "Zon": "SABAH",
+      "Mentor": "FARAHWAHIDA BINTI ISHAM",
+      "Mentor_Email": "aurahebat27@gmail.com",
+      "Mentee": "JUMINA BINTI JAIMAN",
+      "Nama Syarikat": "IWAK BALE",
+      "Alamat ": "DATARAN NIAGA,ANJUNG TEDUH, FELDA SAHABAT 91150 TUNGKU,LAHAD DATU,SABAH",
+      "no Telefon": "011-33633396",
+      "Folder_ID": "1jw7rbJNUSH5qCt4NFmqnMkYIdcV7HP2p",
+      "EMAIL": "umiekasim93@gmail.com",
+      "JENIS BISNES": "MENJUAL IKAN DAN MEMBORONG HASIL LAUT",
+      "✓ Status": "❌ Wrong: Drive"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 126,
+    "data": {
+      "Batch": "Batch 6 Bangkit",
+      "Zon": "Selatan",
+      "Mentor": "MOHD YUSSNI BIN HASHIM",
+      "Mentor_Email": "aurayussni@gmail.com",
+      "Mentee": "NOOR HAYATI BINTI SUBUH",
+      "Nama Syarikat": "SEDAP TAPAI ENTERPRISE",
+      "Alamat ": "NO 1053-1, BLOK 2 FELDA BUKIT WAHA, 81900, KOTA TINGGI, JOHOR",
+      "no Telefon": "012-7039953",
+      "Folder_ID": "1kf8bn9lpoDcYg_GtZRtpPQb-y3Ynq966",
+      "EMAIL": "artnin86@gmail.com",
+      "JENIS BISNES": "MEMBUAT TAPAI UBI DAN OPAK UBU",
+      "✓ Status": "❌ Wrong: Drive"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 130,
+    "data": {
+      "Batch": "Batch 6 Bangkit",
+      "Zon": "Selatan",
+      "Mentor": "NOVAADILA BT ERIZAL",
+      "Mentor_Email": "novaadila@gmail.com",
+      "Mentee": "SYED SULAIMAN BIN SYED MOHAMMED",
+      "Nama Syarikat": "TBC BRIDGE CAFE BAR",
+      "Alamat ": "712-D, LORONG PERAK 2 TAMAN MEGAH BUKIT BERUANG, 75450 MELAKA",
+      "no Telefon": "011-7038 2387",
+      "Folder_ID": "1Dsz5gccDtED3Bken42CIRmbhDORFCxAe",
+      "EMAIL": "sulaiman2730@gmail.com",
+      "JENIS BISNES": "CAFE F&B",
+      "✓ Status": "❌ Wrong: Drive"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 135,
+    "data": {
+      "Batch": "Batch 6 Bangkit",
+      "Zon": "Sentral",
+      "Mentor": "SHAHRIZAL BIN ROJALI",
+      "Mentor_Email": "shahrojali1979@gmail.com",
+      "Mentee": "MOHD KHAIRUL BIN MAHYUDDIN",
+      "Nama Syarikat": "ABC ABANG GRAB ENTERPRISE",
+      "Alamat ": "104 BLOK 60 JALAN PETOLA 24/8 SEKSYEN 24, 40300 SHAH ALAM,SELANGOR",
+      "no Telefon": "014-9112660",
+      "Folder_ID": "1GWCAljUEnwiFmPhOJUgQSBnwBUb8EUqS",
+      "EMAIL": "khairulmahyuddin@yahoo.com",
+      "JENIS BISNES": "FOOD AND BEVERAGES",
+      "✓ Status": "❌ Wrong: Drive"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 136,
+    "data": {
+      "Batch": "Batch 6 Bangkit",
+      "Zon": "Sentral",
+      "Mentor": "SHAHRIZAL BIN ROJALI",
+      "Mentor_Email": "shahrojali1979@gmail.com",
+      "Mentee": "ABDUL RAZAK BIN ABDUL JALAL",
+      "Nama Syarikat": "AJAK AUTO GARAGE",
+      "Alamat ": "BENGKEL MPS NO 4 RAWANG INTEGRATED SG DUA, 48000 RAWANG SELANGOR",
+      "no Telefon": "013-2964899",
+      "Folder_ID": "1GWCAljUEnwiFmPhOJUgQSBnwBUb8EUqS",
+      "EMAIL": "ajak.auto@gmail.com",
+      "JENIS BISNES": "BENGKEL SERVICE KERETA",
+      "✓ Status": "❌ Wrong: Drive"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 142,
+    "data": {
+      "Batch": "Batch 5 MAJU",
+      "Zon": "Sentral",
+      "Mentor": "MOHD HUSAINY AB MUED",
+      "Mentor_Email": "mdhusainy@gmail.com",
+      "Mentee": "Muhammad Syabil Hafizuddin Bin Yazid",
+      "Nama Syarikat": "Ds 34 Legacy",
+      "Alamat ": "3-5 Prima Bizwalk Business Park,Jalan Tasik Prima 6/2, Taman Tasik Prima, 47150 Puchong,Selangor",
+      "no Telefon": "016-3042769",
+      "Folder_ID": "1iluHToLq3OgXwivjzSww3SWL1nthUAR-",
+      "EMAIL": "ds34legacy@gmail.com",
+      "JENIS BISNES": "Others",
+      "✓ Status": "❌ Wrong: Drive"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 145,
+    "data": {
+      "Batch": "Batch 5 MAJU",
+      "Zon": "Sentral",
+      "Mentor": "MOHAMAD ARSHAD BIN AWANG",
+      "Mentor_Email": "arshad.awang.7092@gmail.com",
+      "Mentee": "Muhammad Harun Bin Mohd Shamma",
+      "Nama Syarikat": "Ha Apparels Enterprise",
+      "Alamat ": "No 18 Jalan 5A/8, Seksyen 5, 43650 Bandar Baru Bangi, Selangor",
+      "no Telefon": "012-3994130",
+      "Folder_ID": "1ef0XcxMJG2k4lMdE4OaL7wyfVdTLCjjH",
+      "EMAIL": "hacompany1112@gmail.com",
+      "JENIS BISNES": "Fashion & Clothing",
+      "✓ Status": "⚠️ Batch 5 Maju"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 147,
+    "data": {
+      "Batch": "Batch 5 MAJU",
+      "Zon": "Sentral",
+      "Mentor": "MOHAMAD ARSHAD BIN AWANG",
+      "Mentor_Email": "arshad.awang.7092@gmail.com",
+      "Mentee": "Mohd Arafat Bin Mathan",
+      "Nama Syarikat": "Hvac Global",
+      "Alamat ": "No 22, Jalan Bm 3/20 Seksyen 3 Bandar Bukit Mahkota, 43000 Kajang, Selangor",
+      "no Telefon": "011-64117043",
+      "Folder_ID": "1ef0XcxMJG2k4lMdE4OaL7wyfVdTLCjjH",
+      "EMAIL": "mohdarafatmathan@gmail.com",
+      "JENIS BISNES": "Services",
+      "✓ Status": "⚠️ Batch 5 Maju"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 148,
+    "data": {
+      "Batch": "Batch 5 MAJU",
+      "Zon": "Sentral",
+      "Mentor": "MOHAMAD ARSHAD BIN AWANG",
+      "Mentor_Email": "arshad.awang.7092@gmail.com",
+      "Mentee": "Muhammad Taufiq Bin Amir",
+      "Nama Syarikat": "Initiate Media Network",
+      "Alamat ": "No 58-02, Jalan Seri Putra 1/4, Bandar Seri Putra, 43000 Kajang, Selangor",
+      "no Telefon": "011-26446180",
+      "Folder_ID": "1ef0XcxMJG2k4lMdE4OaL7wyfVdTLCjjH",
+      "EMAIL": "initiatemedianetwork@gmail.com",
+      "JENIS BISNES": "IT/ Telecommunications",
+      "✓ Status": "⚠️ Batch 5 Maju"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 149,
+    "data": {
+      "Batch": "Batch 6 Bangkit",
+      "Zon": "Sentral",
+      "Mentor": "MUHAMAD BIN YUSOF",
+      "Mentor_Email": "vakogminds@gmail.com",
+      "Mentee": "NOR HIDAYAH BINTI MOHD SOFIAN",
+      "Nama Syarikat": "LAKSAMANA ENTERPRISE",
+      "Alamat ": "NO.1, GERAI PLB FELDA SG. TENGGI, 44010 KUALA KUBU BHARU, SELANGOR",
+      "no Telefon": "017-5292400",
+      "Folder_ID": "1R0phKb7f_DeVZs2MN23eSXmi8pGi5Rir",
+      "EMAIL": "dayah8492@gmail.com",
+      "JENIS BISNES": "MENJUAL BAJA SAWIT DAN MAKANAN HAIWAN TERNAKAN",
+      "✓ Status": "❌ Wrong: Batch 6  & Batch 5 MAJU [SENTRAL] Mentor MUHAMAD"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 150,
+    "data": {
+      "Batch": "Batch 5 MAJU",
+      "Zon": "Sentral",
+      "Mentor": "MUHAMAD BIN YUSOF",
+      "Mentor_Email": "vakogminds@gmail.com",
+      "Mentee": "Nik Irma Rita Binti Nik Shukri",
+      "Nama Syarikat": "Les Gourmands",
+      "Alamat ": "No 26 Jalan Puj 1/18, Taman Puncak Jalil, 43300 Seri Kembangan, Selangor",
+      "no Telefon": "011-15651476",
+      "Folder_ID": "1mmo9fzBwAS1mTbL6KE7nd7ny5K0aSy2_",
+      "EMAIL": "irma.thegourmands@gmail.com",
+      "JENIS BISNES": "Food & Beverages",
+      "✓ Status": "⚠️ Batch 5 Maju"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 153,
+    "data": {
+      "Batch": "Batch 5 MAJU",
+      "Zon": "Sentral",
+      "Mentor": "MOHAMAD ARSHAD BIN AWANG",
+      "Mentor_Email": "arshad.awang.7092@gmail.com",
+      "Mentee": "Muhammad Mustaqim Bin Abd Kadir",
+      "Nama Syarikat": "Qb Cycle Enterprise",
+      "Alamat ": "G-06 Third Avenue Jalan Teknokrat 3 Cyber 4, 63000 Cyberjaya, Selangor",
+      "no Telefon": "012-9934484",
+      "Folder_ID": "1ef0XcxMJG2k4lMdE4OaL7wyfVdTLCjjH",
+      "EMAIL": "qbcycleenterprise@gmail.com",
+      "JENIS BISNES": "Services",
+      "✓ Status": "⚠️ Batch 5 Maju"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 154,
+    "data": {
+      "Batch": "Batch 5 MAJU",
+      "Zon": "Sentral",
+      "Mentor": "MUHAMAD BIN YUSOF",
+      "Mentor_Email": "vakogminds@gmail.com",
+      "Mentee": "Mohammad Norazmi Bin Hadnan",
+      "Nama Syarikat": "Qissyihirah Trading",
+      "Alamat ": "Lot 13B, Tingkat Bawah Bangunan Arked Mara Kajang, 43000 Kajang, Selangor",
+      "no Telefon": "018-2423250",
+      "Folder_ID": "1mmo9fzBwAS1mTbL6KE7nd7ny5K0aSy2_",
+      "EMAIL": "qissyihirah_drshoes@yahoo.com",
+      "JENIS BISNES": "Services",
+      "✓ Status": "⚠️ Batch 5 Maju"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 156,
+    "data": {
+      "Batch": "Batch 5 MAJU",
+      "Zon": "Sentral",
+      "Mentor": "MUHAMAD BIN YUSOF",
+      "Mentor_Email": "vakogminds@gmail.com",
+      "Mentee": "Sharlman A/L Paniselvam",
+      "Nama Syarikat": "Ss Ronya Global Enterprise",
+      "Alamat ": "No 17-1, 1St Floor, Jalan Sungai Burung X32/X Bukit Rimau, 40460 Shah Alam,Selangor",
+      "no Telefon": "014-9690344",
+      "Folder_ID": "1mmo9fzBwAS1mTbL6KE7nd7ny5K0aSy2_",
+      "EMAIL": "ssronyaglobal@gmail.com",
+      "JENIS BISNES": "Services",
+      "✓ Status": "⚠️ Batch 5 Maju"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 157,
+    "data": {
+      "Batch": "Batch 5 MAJU",
+      "Zon": "Sentral",
+      "Mentor": "MUHAMAD BIN YUSOF",
+      "Mentor_Email": "vakogminds@gmail.com",
+      "Mentee": "Nor Hashimah Binti Ismail",
+      "Nama Syarikat": "Tadika Didik Khalifah Bestari",
+      "Alamat ": "No 43-1 Jalan Kebun Nenas 7A/Ks8, Bandar Putera 2, 41200 Klang,Selangor",
+      "no Telefon": "017-2087092",
+      "Folder_ID": "1mmo9fzBwAS1mTbL6KE7nd7ny5K0aSy2_",
+      "EMAIL": "ohdidikids@gmail.com",
+      "JENIS BISNES": "Services",
+      "✓ Status": "⚠️ Batch 5 Maju"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 158,
+    "data": {
+      "Batch": "Batch 5 MAJU",
+      "Zon": "Sentral",
+      "Mentor": "MUHAMAD BIN YUSOF",
+      "Mentor_Email": "vakogminds@gmail.com",
+      "Mentee": "Arina Afiqah  Binti Azman",
+      "Nama Syarikat": "Time Master 'E' Plus",
+      "Alamat ": "No 26, Jalan Cj 3/13/-1, Pusat Bandar Cheras, 43200 Cheras, Selangor",
+      "no Telefon": "019-2090694",
+      "Folder_ID": "1mmo9fzBwAS1mTbL6KE7nd7ny5K0aSy2_",
+      "EMAIL": "tmeplus03@gmail.com",
+      "JENIS BISNES": "Services",
+      "✓ Status": "⚠️ Batch 5 Maju"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 162,
+    "data": {
+      "Batch": "Batch 6 Bangkit",
+      "Zon": "TERENGGANU",
+      "Mentor": "MOHD ZAMRI BIN AMINUDDIN",
+      "Mentor_Email": "zamriaminuddin265@gmail.com",
+      "Mentee": "KARTINI BINTI AZIZ",
+      "Nama Syarikat": "ATANTINIEY ENTERPRISE",
+      "Alamat ": "NO. 59, FELDA NERAM SATU SIMPANG CHENEH, KEMAMAN, 24000 TERENGGANU",
+      "no Telefon": "013-9009730",
+      "Folder_ID": "1slmP4grvmqTWaMqZJg2bI4ZbsJQthjlc",
+      "EMAIL": "atantiniey86@gmail.com",
+      "JENIS BISNES": "KEDAI RUNCIT",
+      "✓ Status": "❌ Wrong: Drive"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 163,
+    "data": {
+      "Batch": "Batch 6 Bangkit",
+      "Zon": "TERENGGANU",
+      "Mentor": "MOHD ZAMRI BIN AMINUDDIN",
+      "Mentor_Email": "zamriaminuddin265@gmail.com",
+      "Mentee": "MOHD HAIZAM BIN JAAPAR",
+      "Nama Syarikat": "FNS MOTORSPORT",
+      "Alamat ": "LOT 114, JALAN FELDA NERAM 1, (BENGKEL KERETA), 24000 KEMAMAN, TERENGGANU",
+      "no Telefon": "019-9258832",
+      "Folder_ID": "1slmP4grvmqTWaMqZJg2bI4ZbsJQthjlc",
+      "EMAIL": "haizam6483@gmail.com",
+      "JENIS BISNES": "MENJUAL ALAT-ALAT GANTI KENDERAAN BERMOTOR DAN MEMBAIKPULIH KENDERAAN",
+      "✓ Status": "❌ Wrong: Drive"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 167,
+    "data": {
+      "Batch": "Batch 5 MAJU",
+      "Zon": "Utara",
+      "Mentor": "MUHAMMAD NAIM BIN MUKHTAR",
+      "Mentor_Email": "naemmukhtar@gmail.com",
+      "Mentee": "Mohd Nurul Akmal Bin Mat Ariff",
+      "Nama Syarikat": "Ezxs Cyberprint Cafe",
+      "Alamat ": "Lot 40 & 44, Varsity Mall, Universiti Utara Malaysia, 06010 Sintok, Kedah",
+      "no Telefon": "013-4820820",
+      "Folder_ID": "11g0lRCKcHSepSSoVYG1eaJjyhPRc9Zmr",
+      "EMAIL": "activo18282@gmail.com",
+      "JENIS BISNES": "Services",
+      "✓ Status": "⚠️ Batch 5 Maju"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 168,
+    "data": {
+      "Batch": "Batch 6 Bangkit",
+      "Zon": "Utara",
+      "Mentor": "MUHAMMAD NAIM BIN MUKHTAR",
+      "Mentor_Email": "naemmukhtar@gmail.com",
+      "Mentee": "KHOIRUL AMAL BIN SAIDIN",
+      "Nama Syarikat": "FM RICH WORK ENTERPRISE",
+      "Alamat ": "NO 1, GERAI KIOSK FAMA KUALA MUDA, JALAN IBRAHIM, 08000 SUNGAI PETANI, KEDAH",
+      "no Telefon": "018-9890819",
+      "Folder_ID": "1b0a6WuvxVuDrx2W9ML8DT_EeJmhuzsFB",
+      "EMAIL": "khoirulamal93@gmail.com",
+      "JENIS BISNES": "FOOD & BEVERAGES",
+      "✓ Status": "❌ Wrong: Batch 6  & Batch 5 MAJU [UTARA] Mentor Naim"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 169,
+    "data": {
+      "Batch": "Batch 6 Bangkit",
+      "Zon": "Utara",
+      "Mentor": "MUHAMMAD NAIM BIN MUKHTAR",
+      "Mentor_Email": "naemmukhtar@gmail.com",
+      "Mentee": "SAIDATUL SYAFINAZ BINTI AL AMIN MALIM",
+      "Nama Syarikat": "HAZELATTE COFFEE STUDIO",
+      "Alamat ": "K04, MEDAN SELERA TAMAN RIA, TAMAN RIA, 08000 SUNGAI PETANI, KEDAH",
+      "no Telefon": "013-5219479",
+      "Folder_ID": "1b0a6WuvxVuDrx2W9ML8DT_EeJmhuzsFB",
+      "EMAIL": "saidatulsyafinaz@gmail.com",
+      "JENIS BISNES": "FOOD & BEVERAGES",
+      "✓ Status": "❌ Wrong: Batch 6  & Batch 5 MAJU [UTARA] Mentor Naim"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 170,
+    "data": {
+      "Batch": "Batch 6 Bangkit",
+      "Zon": "Utara",
+      "Mentor": "MUHAMMAD NAIM BIN MUKHTAR",
+      "Mentor_Email": "naemmukhtar@gmail.com",
+      "Mentee": "MUHAMMAD A'RFI BIN OSMAN",
+      "Nama Syarikat": "MAKTOK NIAGA ENTERPRISE",
+      "Alamat ": "NO 5, BATU 18 GUAR CHEMPEDAK, 08800 GURUN, KEDAH",
+      "no Telefon": "011-37514103",
+      "Folder_ID": "1b0a6WuvxVuDrx2W9ML8DT_EeJmhuzsFB",
+      "EMAIL": "arfi.biz@gmail.com",
+      "JENIS BISNES": "FOOD & BEVERAGES",
+      "✓ Status": "❌ Wrong: Batch 6  & Batch 5 MAJU [UTARA] Mentor Naim"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 171,
+    "data": {
+      "Batch": "Batch 6 Bangkit",
+      "Zon": "Utara",
+      "Mentor": "MUHAMMAD NAIM BIN MUKHTAR",
+      "Mentor_Email": "naemmukhtar@gmail.com",
+      "Mentee": "MOHAMMAD IZZAT IZZUDDIN BIN ABDUL KARIM",
+      "Nama Syarikat": "MII 95 RESOURCES",
+      "Alamat ": "NO. 12 KAMPUNG SUNGAI TENGAS SELAMA, 09810 SERDANG, KEDAH",
+      "no Telefon": "014-9069293",
+      "Folder_ID": "1b0a6WuvxVuDrx2W9ML8DT_EeJmhuzsFB",
+      "EMAIL": "izzat.izzuddin1151@gmail.com",
+      "JENIS BISNES": "FOOD & BEVERAGES",
+      "✓ Status": "❌ Wrong: Batch 6  & Batch 5 MAJU [UTARA] Mentor Naim"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 172,
+    "data": {
+      "Batch": "Batch 5 MAJU",
+      "Zon": "Utara",
+      "Mentor": "MUHAMMAD NAIM BIN MUKHTAR",
+      "Mentor_Email": "naemmukhtar@gmail.com",
+      "Mentee": "Mohd Fadleen Bin Shahabudin",
+      "Nama Syarikat": "Palin Auto Garage",
+      "Alamat ": "No. 1, Tingkat Bawah, Taman Tunku Bendahara, 06550 Alor Setar, Kedah",
+      "no Telefon": "017-5050219",
+      "Folder_ID": "11g0lRCKcHSepSSoVYG1eaJjyhPRc9Zmr",
+      "EMAIL": "palinautogarage@gmail.com",
+      "JENIS BISNES": "Services",
+      "✓ Status": "⚠️ Batch 5 Maju"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 174,
+    "data": {
+      "Batch": "Batch 6 Bangkit",
+      "Zon": "Utara",
+      "Mentor": "AISYATURRIDHA BINTI ABDULLAH",
+      "Mentor_Email": "aisyadva.tmx@gmail.com",
+      "Mentee": "SHAKINAH BINTI RAZALI",
+      "Nama Syarikat": "CIK KINAH ENTERPRISE",
+      "Alamat ": "NO 59 KG BONGOR, 33320 GERIK, PERAK",
+      "no Telefon": "016-9217624",
+      "Folder_ID": "13n1g-AL3D2QrLv-CmQ1spMkUm8zT3cO1",
+      "EMAIL": "sitishakinah606@gmail.com",
+      "JENIS BISNES": "FROZEN FOOD",
+      "✓ Status": "❌ Wrong: Batch 6  & Batch 5 MAJU [UTARA] Mentor AISYA"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 176,
+    "data": {
+      "Batch": "Batch 5 MAJU",
+      "Zon": "Utara",
+      "Mentor": "AISYATURRIDHA BINTI ABDULLAH",
+      "Mentor_Email": "aisyadva.tmx@gmail.com",
+      "Mentee": "Zulkefli Bin Che Dan",
+      "Nama Syarikat": "Joetepeng Garage",
+      "Alamat ": "No 8 Batu 4 Kampung Pasir, 34600 Kamunting, Perak",
+      "no Telefon": "0176029519",
+      "Folder_ID": "1wzYiMmqYhl7j2VCzvSweFBwx5_3ATLsP",
+      "EMAIL": "syazul8687@gmail.com",
+      "JENIS BISNES": "Services",
+      "✓ Status": "⚠️ Batch 5 Maju"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 179,
+    "data": {
+      "Batch": "Batch 6 Bangkit",
+      "Zon": "Utara",
+      "Mentor": "AISYATURRIDHA BINTI ABDULLAH",
+      "Mentor_Email": "aisyadva.tmx@gmail.com",
+      "Mentee": "NOOR HAYATI BINTI AHMAD",
+      "Nama Syarikat": "NOOR HAYATI BINTI AHMAD",
+      "Alamat ": "NO 29 JALAN MERBUK 2 BANDAR BARU SEBERANG PERAK, 36800 KAMPUNG GAJAH, PERAK",
+      "no Telefon": "013-5710409",
+      "Folder_ID": "13n1g-AL3D2QrLv-CmQ1spMkUm8zT3cO1",
+      "EMAIL": "tyrabiatul@gmail.com",
+      "JENIS BISNES": "JAHITAN",
+      "✓ Status": "❌ Wrong: Batch 6  & Batch 5 MAJU [UTARA] Mentor AISYA"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 180,
+    "data": {
+      "Batch": "Batch 6 Bangkit",
+      "Zon": "Utara",
+      "Mentor": "AISYATURRIDHA BINTI ABDULLAH",
+      "Mentor_Email": "aisyadva.tmx@gmail.com",
+      "Mentee": "MUHAMMAD SYAFIQ BIN SYRIFUL NIZAM",
+      "Nama Syarikat": "RIZKI FITRAH ENTERPRISE",
+      "Alamat ": "LOT 178659 JALAN JELAPANG RPT BATU 10 FASA 2, 31200 IPOH, PERAK",
+      "no Telefon": "010-9185441",
+      "Folder_ID": "13n1g-AL3D2QrLv-CmQ1spMkUm8zT3cO1",
+      "EMAIL": "syafiqsyriful69@gmail.com",
+      "JENIS BISNES": "PEMBUATAN PUSARA & BATU NISAN",
+      "✓ Status": "❌ Wrong: Batch 6  & Batch 5 MAJU [UTARA] Mentor AISYA"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 181,
+    "data": {
+      "Batch": "Batch 6 Bangkit",
+      "Zon": "Utara",
+      "Mentor": "ROHANI BINTI ABDUL MAJID",
+      "Mentor_Email": "rohani.abdmajid84@gmail.com",
+      "Mentee": "ROSNIZAM BIN A BAKAR",
+      "Nama Syarikat": "G EFSI WORKSHOP",
+      "Alamat ": "251, BLOK 12, UNIT TEBU FELDA CHUPING, 02500 CHUPING, PERLIS",
+      "no Telefon": "017-5320681",
+      "Folder_ID": "1_TQ6vB2oB3Tog4Uy-MTXlVfsmV7vpE_b",
+      "EMAIL": "zamkedai@gmail.com",
+      "JENIS BISNES": "BENGKEL KERETA",
+      "✓ Status": "❌ Wrong: Drive"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 183,
+    "data": {
+      "Batch": "Batch 5 MAJU",
+      "Zon": "Utara",
+      "Mentor": "KAMARUZZAMAN BIN KAMALUDEEN",
+      "Mentor_Email": "bizcoachkk@gmail.com",
+      "Mentee": "Hazazi Bin Hashim",
+      "Nama Syarikat": "Abb Almeria Enterprise",
+      "Alamat ": "No. 2158, Bakar Kapor, 13100 Penaga, Pulau Pinang",
+      "no Telefon": "019-5601978",
+      "Folder_ID": "1su7aUZ78FH3KXeLm3g22I4Q8gmsld2T7",
+      "EMAIL": "abbalmeria@gmail.com",
+      "JENIS BISNES": "Services",
+      "✓ Status": "⚠️ Batch 5 Maju"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 184,
+    "data": {
+      "Batch": "Batch 5 MAJU",
+      "Zon": "Utara",
+      "Mentor": "KAMARUZZAMAN BIN KAMALUDEEN",
+      "Mentor_Email": "bizcoachkk@gmail.com",
+      "Mentee": "Nur Farahin Binti Muhamad",
+      "Nama Syarikat": "Farahinmuhamad Enterprise",
+      "Alamat ": "No 11, Lorong Menerong Indah 5, Taman Menerong Indah, 13300 Tasek Gelugor, Pulau Pinang",
+      "no Telefon": "014-9851123",
+      "Folder_ID": "1su7aUZ78FH3KXeLm3g22I4Q8gmsld2T7",
+      "EMAIL": "arissa.athilia98@gmail.com",
+      "JENIS BISNES": "Food & Beverages",
+      "✓ Status": "⚠️ Batch 5 Maju"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 185,
+    "data": {
+      "Batch": "Batch 5 MAJU",
+      "Zon": "Utara",
+      "Mentor": "KAMARUZZAMAN BIN KAMALUDEEN",
+      "Mentor_Email": "bizcoachkk@gmail.com",
+      "Mentee": "Izzul Izz Bin Shahizan",
+      "Nama Syarikat": "Izz Multi Resources",
+      "Alamat ": "No 12 A Lorong Mengkuang Indah 6 Taman Mengkuang Indah, 14000 Bukit Mertajam, Pulau Pinang",
+      "no Telefon": "019-5605172",
+      "Folder_ID": "1su7aUZ78FH3KXeLm3g22I4Q8gmsld2T7",
+      "EMAIL": "izzmultiresources@gmail.com",
+      "JENIS BISNES": "Others",
+      "✓ Status": "⚠️ Batch 5 Maju"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 187,
+    "data": {
+      "Batch": "Batch 5 MAJU",
+      "Zon": "Utara",
+      "Mentor": "KAMARUZZAMAN BIN KAMALUDEEN",
+      "Mentor_Email": "bizcoachkk@gmail.com",
+      "Mentee": "Fauzana Bte Kasa",
+      "Nama Syarikat": "Miss My Billionaire Enterprise",
+      "Alamat ": "Mmb Cake Kawasan Pembangunan Dan Pertanian Bersepadu (Iada Seberang Jaya), 13700 Perai, Pulau Pinang",
+      "no Telefon": "011-15262725",
+      "Folder_ID": "1su7aUZ78FH3KXeLm3g22I4Q8gmsld2T7",
+      "EMAIL": "fauzanakasa88@gmail.com",
+      "JENIS BISNES": "Food & Beverages",
+      "✓ Status": "⚠️ Batch 5 Maju"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 188,
+    "data": {
+      "Batch": "Batch 5 MAJU",
+      "Zon": "Utara",
+      "Mentor": "KAMARUZZAMAN BIN KAMALUDEEN",
+      "Mentor_Email": "bizcoachkk@gmail.com",
+      "Mentee": "Sharina Binti Shahidan",
+      "Nama Syarikat": "Mkuang Stay House Enterprise",
+      "Alamat ": "Gerai No 1 Jkk Kuala Mengkuang, 14000 Bukit Mertajam, Pulau Pinang",
+      "no Telefon": "012-5437952",
+      "Folder_ID": "1su7aUZ78FH3KXeLm3g22I4Q8gmsld2T7",
+      "EMAIL": "sharinashahidan.72@gmail.com",
+      "JENIS BISNES": "Food & Beverages",
+      "✓ Status": "⚠️ Batch 5 Maju"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 192,
+    "data": {
+      "Batch": "Batch 5 MAJU",
+      "Zon": "Utara",
+      "Mentor": "KAMARUZZAMAN BIN KAMALUDEEN",
+      "Mentor_Email": "bizcoachkk@gmail.com",
+      "Mentee": "Abu Hanifah Bin Abu Hassan",
+      "Nama Syarikat": "Tg Expert Mobile",
+      "Alamat ": "2375 Permatang Berangan, 13300 Tasek Gelugor, Pulau Pinang",
+      "no Telefon": "014-2559870",
+      "Folder_ID": "1su7aUZ78FH3KXeLm3g22I4Q8gmsld2T7",
+      "EMAIL": "abuhanifah4762@gmail.com",
+      "JENIS BISNES": "IT/ Telecommunication",
+      "✓ Status": "⚠️ Batch 5 Maju"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 193,
+    "data": {
+      "Batch": "Batch 5 MAJU",
+      "Zon": "Utara",
+      "Mentor": "KAMARUZZAMAN BIN KAMALUDEEN",
+      "Mentor_Email": "naemmukhtar@gmail.com",
+      "Mentee": "TEST1",
+      "Nama Syarikat": "Restoran Anjung Utara",
+      "Alamat ": "No 23 Kampung Ganding, Jalan Alor Mengkudu, Mukim Derga, 05400 Alor Setar, Kedah",
+      "no Telefon": "017-4999474",
+      "Folder_ID": "11g0lRCKcHSepSSoVYG1eaJjyhPRc9Zmr",
+      "EMAIL": "test3@example.com",
+      "JENIS BISNES": "SALON MUSLIMAH",
+      "✓ Status": "⚠️ Batch 5 Maju"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 194,
+    "data": {
+      "Batch": "Batch 6 Bangkit",
+      "Zon": "Utara",
+      "Mentor": "KAMARUZZAMAN BIN KAMALUDEEN",
+      "Mentor_Email": "naemmukhtar@gmail.com",
+      "Mentee": "TEST2",
+      "Nama Syarikat": "Palin Auto Garage",
+      "Alamat ": "No. 1, Tingkat Bawah, Taman Tunku Bendahara, 06550 Alor Setar, Kedah",
+      "no Telefon": "017-5050219",
+      "Folder_ID": "1b0a6WuvxVuDrx2W9ML8DT_EeJmhuzsFB",
+      "EMAIL": "test4@example.com",
+      "JENIS BISNES": "IT/ Telecommunication",
+      "✓ Status": "❌ Wrong: Batch 6  & Batch 5 MAJU [UTARA] Mentor Naim"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 196,
+    "data": {
+      "Batch": "Batch 5 MAJU",
+      "Zon": "Utara",
+      "Mentor": "KAMARUZZAMAN BIN KAMALUDEEN",
+      "Mentor_Email": "naemmukhtar@gmail.com",
+      "Mentee": "TEST22",
+      "Nama Syarikat": "Palin Auto Garage",
+      "Alamat ": "No. 1, Tingkat Bawah, Taman Tunku Bendahara, 06550 Alor Setar, Kedah",
+      "no Telefon": "017-5050219",
+      "Folder_ID": "11g0lRCKcHSepSSoVYG1eaJjyhPRc9Zmr",
+      "EMAIL": "test2@example.com",
+      "JENIS BISNES": "IT/ Telecommunication",
+      "✓ Status": "⚠️ Batch 5 Maju"
+    },
+    "error": "duplicate key value violates unique constraint \"one_active_mentor_per_entrepreneur\""
+  },
+  {
+    "row": 209,
+    "data": {
+      "Batch": "Batch 7 Bangkit",
+      "Zon": "UTARA",
+      "Mentor": "MOHD ROSLAN BIN KHALID",
+      "Mentor_Email": "excellent.rich@yahoo.com",
+      "Mentee": "MASTURAYATI BINTI MUSTAFFA",
+      "Nama Syarikat": "MASTURAYATI BINTI MUSTAFFA",
+      "Alamat ": "127DX, KG BENDANG SARAZ, TERAP, SERDANG, 09800 KULIM, KEDAH",
+      "no Telefon": "013-4380527",
+      "Folder_ID": "1p661aKmEGmqa0MO4lnSAlBegalB_s56Q",
+      "EMAIL": "masturayatimustaffa7508@gmail.com",
+      "JENIS BISNES": "FROZEN FOOD",
+      "": "iTEKAD BangKIT",
+      "✓ Status": "❌ Wrong: Batch 7 & Batch 6 MAJU [UTARA] Mentor MOHD ROSLAN BIN KHALID"
+    },
+    "error": "duplicate key value violates unique constraint \"idx_mentor_assignments_unique_active\""
+  },
+  {
+    "row": 225,
+    "data": {
+      "Batch": "Batch 7 Bangkit",
+      "Zon": "UTARA",
+      "Mentor": "MOHD ROSLAN BIN KHALID",
+      "Mentor_Email": "excellent.rich@yahoo.com",
+      "Mentee": "SITI HALIJAH BINTI SAAD",
+      "Nama Syarikat": "FARIZ FURNITURE ENTERPRISE",
+      "Alamat ": "LOT 2788 B, KG BATU SATU, 09300 KUALA KETIL KEDAH",
+      "no Telefon": "012-4422004",
+      "Folder_ID": "1p661aKmEGmqa0MO4lnSAlBegalB_s56Q",
+      "EMAIL": "farizperabot@gmail.com",
+      "JENIS BISNES": "TRADING FURNITURE",
+      "": "BangKIT-TUBF",
+      "✓ Status": "❌ Wrong: Batch 7 & Batch 6 MAJU [UTARA] Mentor MOHD ROSLAN BIN KHALID"
+    },
+    "error": "duplicate key value violates unique constraint \"idx_mentor_assignments_unique_active\""
+  },
+  {
+    "row": 234,
+    "data": {
+      "Batch": "Batch 6 Maju",
+      "Zon": "SENTRAL",
+      "Mentor": "MUHAMAD HARIZ BIN MUHAMAD ADNAN",
+      "Mentor_Email": "hariz.b.adnan@gmail.com",
+      "Mentee": "Norizan Binti Ali",
+      "Nama Syarikat": "Phatboys All Biz",
+      "Alamat ": "No 8 Jalan Bersatu 8, Taman Bersatu, 48000 Rawang Selangor",
+      "no Telefon": "012-2700790",
+      "Folder_ID": "1Bk229L3Gz-Z_qIU94GFch5ZO3gOklqW_",
+      "EMAIL": "phat.store.8@gmail.com",
+      "JENIS BISNES": "Sports",
+      "": "iTEKAD Maju",
+      "✓ Status": "⚠️ Maju"
+    },
+    "error": "duplicate key value violates unique constraint \"idx_mentor_assignments_unique_active\""
+  },
+  {
+    "row": 243,
+    "data": {
+      "Batch": "Batch 6 Maju",
+      "Zon": "UTARA",
+      "Mentor": "MOHD ROSLAN BIN KHALID",
+      "Mentor_Email": "excellent.rich@yahoo.com",
+      "Mentee": "Mohammad Aizat Bin Mohammad Saleh",
+      "Nama Syarikat": "Alisya Food Enterprise",
+      "Alamat ": "No 172 Jalan Tasek Ss1 Bandar Tasek Mutiara, 14120 Simpang Ampat,Pulau Pinang",
+      "no Telefon": "014-5062312",
+      "Folder_ID": "1GCelgsavd2rrrt4FBAUAve5ojAjkY9Rp",
+      "EMAIL": "eyezat5344@gmail.com",
+      "JENIS BISNES": "Food & Beverages",
+      "": "iTEKAD Maju",
+      "✓ Status": "⚠️ Maju"
+    },
+    "error": "duplicate key value violates unique constraint \"idx_mentor_assignments_unique_active\""
+  },
+  {
+    "row": 250,
+    "data": {
+      "Batch": "Batch 6 Maju",
+      "Zon": "UTARA",
+      "Mentor": "MOHD ROSLAN BIN KHALID",
+      "Mentor_Email": "excellent.rich@yahoo.com",
+      "Mentee": "Nor Shahidawati Binti Hussin",
+      "Nama Syarikat": "Nsh Dinida Delight Enterprise",
+      "Alamat ": "No 2375 Lorong Serai Wangi 1/10, Taman Serai Wangi, 09400 Padang Serai, Kedah",
+      "no Telefon": "0111-8651028",
+      "Folder_ID": "1GCelgsavd2rrrt4FBAUAve5ojAjkY9Rp",
+      "EMAIL": "qisyaraqilla07@gmail.com",
+      "JENIS BISNES": "Food & Beverages",
+      "": "iTEKAD Maju",
+      "✓ Status": "⚠️ Maju"
+    },
+    "error": "duplicate key value violates unique constraint \"idx_mentor_assignments_unique_active\""
+  },
+  {
+    "row": 252,
+    "data": {
+      "Batch": "Batch 6 Maju",
+      "Zon": "SENTRAL",
+      "Mentor": "MUHAMAD HARIZ BIN MUHAMAD ADNAN",
+      "Mentor_Email": "hariz.b.adnan@gmail.com",
+      "Mentee": "Mohamad Afiq Aiman Bin Mohd Suhaime",
+      "Nama Syarikat": "Encik Cabinet Enterprise",
+      "Alamat ": "32 & 34-G-B Jalan 7A/3, Bandar Tasik Puteri, 48020 Rawang Selangor",
+      "no Telefon": "013-998 2009",
+      "Folder_ID": "1Bk229L3Gz-Z_qIU94GFch5ZO3gOklqW_",
+      "EMAIL": "encikcabinet145@gmail.com",
+      "JENIS BISNES": "Services",
+      "": "iTEKAD Maju",
+      "✓ Status": "⚠️ Maju"
+    },
+    "error": "duplicate key value violates unique constraint \"idx_mentor_assignments_unique_active\""
+  },
+  {
+    "row": 262,
+    "data": {
+      "Batch": "Batch 6 Maju",
+      "Zon": "UTARA",
+      "Mentor": "MOHD ROSLAN BIN KHALID",
+      "Mentor_Email": "excellent.rich@yahoo.com",
+      "Mentee": "Mohammad Safwan Bin Mohd Arsad",
+      "Nama Syarikat": "Safwan Performance Garage",
+      "Alamat ": "No 337 Jalan Bandar Baru 4 Taman Bandar Baru, 08000 Sungai Petani, Kedah",
+      "no Telefon": "011-10322358",
+      "Folder_ID": "1GCelgsavd2rrrt4FBAUAve5ojAjkY9Rp",
+      "EMAIL": "safwanarsad92@gmail.com",
+      "JENIS BISNES": "Services",
+      "": "iTEKAD Maju",
+      "✓ Status": "⚠️ Maju"
+    },
+    "error": "duplicate key value violates unique constraint \"idx_mentor_assignments_unique_active\""
+  }
+]

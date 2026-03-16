@@ -1,0 +1,3340 @@
+/**
+ * iTEKAD MAJU – Laporan handler (Final Consolidated & Enhanced Version)
+ * This script processes Maju report data from Google Sheet,
+ * generates/appends Google Docs based on templates, and embeds images/tables.
+ */
+
+// === CONFIGURATION ===
+// Your Maju Spreadsheet ID. This is where the form data is submitted and mapping/logs are.
+const SPREADSHEET_ID = '1yjxwqXSO8jtR-nbHA5X4h4YcNzC6jh0zCRsTkYovS7w';
+const SHEET_NAME_LAPORAN_MAJU = 'LaporanMajuUM'; // Changed from 'LaporanMaju'
+const SHEET_NAME_MAPPING = 'mapping'; // Your shared mapping sheet name
+
+// Your Maju Google Docs Template ID.
+const TEMPLATE_DOC_ID = '1gQEeVEqRQqPUwZOsKQXddvIqVEH6t9Snr7B_xvN1VAk'; // New template
+
+// Maximum image widths for embedding (adjust as needed for your document layout)
+const MAX_BODY_WIDTH = 450;
+const MAX_CELL_WIDTH = 220;
+const COLS_PER_ROW = 2; // For images in cells (e.g., 2 images per row)
+
+// === HELPER FUNCTIONS ===
+
+/**
+ * Sanitize filename to prevent path traversal and special characters
+ */
+function sanitizeFileName(fileName) {
+  if (!fileName) return 'unnamed';
+
+  return String(fileName)
+    .replace(/[^a-zA-Z0-9._-]/g, '_')
+    .replace(/^\.+/, '_')
+    .replace(/\.{2,}/g, '_')
+    .substring(0, 255);
+}
+
+// === MAIN WEB APP HANDLERS ===
+
+/**
+ * Handles GET requests (for testing Apps Script deployment).
+ */
+function doGet() {
+  return ContentService.createTextOutput(JSON.stringify({
+      ok: true,
+      ts: new Date().toISOString(),
+      message: "Maju Apps Script is running. Use POST for actions."
+    }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * Handles POST requests from Next.js API for document generation AND image uploads.
+ * Now supports both processRow and uploadImage actions for Maju program.
+ * @param {GoogleAppsScript.Events.DoPost} e The event object from the web app request.
+ */
+function doPost(e) {
+  const executionId = Utilities.getUuid().substring(0, 8); // Unique ID for this execution
+  let logData = {
+    executionId: executionId,
+    timestamp: new Date().toISOString(),
+    step: 'start',
+    success: false,
+    error: null,
+    mentee: '',
+    sesi: '',
+    docId: '',
+    rowNumber: ''
+  };
+
+  try {
+    Logger.log(`[${executionId}] doPost: start`);
+
+    if (!e || !e.postData || !e.postData.contents) {
+      throw new Error('No data received in POST.');
+    }
+
+    const requestPayload = JSON.parse(e.postData.contents);
+    Logger.log(`[${executionId}] Received payload action: ${requestPayload.action}`);
+    Logger.log(`[${executionId}] Full payload: ${JSON.stringify(requestPayload)}`);
+    Logger.log(`[${executionId}] Validation check - action: ${requestPayload.action}, rowNumber: ${requestPayload.rowNumber}, programType: ${requestPayload.programType}`);
+
+    // Handle image upload action
+    if (requestPayload.action === 'uploadImage') {
+      Logger.log(`[${executionId}] Processing image upload`);
+      return handleImageUpload(requestPayload, executionId);
+    }
+
+    // Handle document processing action for 'maju' programType
+    if (requestPayload.action === 'processRow' && requestPayload.rowNumber && requestPayload.programType === 'maju') {
+      const rowNumber = parseInt(requestPayload.rowNumber, 10);
+      if (isNaN(rowNumber) || rowNumber < 2) {
+        throw new Error('Invalid rowNumber received for processing.');
+      }
+      logData.rowNumber = rowNumber;
+
+      Logger.log(`[${executionId}] Processing existing row: ${rowNumber}`);
+      logData.step = 'process_existing_row';
+
+      // Call the main processing function
+      const result = processMajuRow(rowNumber, executionId); // Pass executionId
+
+      logData.success = result.processed || result.skipped;
+      logData.docId = result.docId || '';
+      logData.mentee = result.mentee || '';
+      logData.sesi = result.sesi || '';
+      logData.step = 'completed_processing';
+      logData.details = `Row: ${rowNumber}, Action: ${requestPayload.action}, Program: ${requestPayload.programType}`;
+      Logger.log(`[${executionId}] SUCCESS - Doc ID: ${logData.docId}`);
+      
+      // Try to save log but don't let it break the success response
+      try {
+        saveExecutionLog(logData);
+      } catch (logError) {
+        Logger.log(`[${executionId}] ⚠️ Could not save execution log: ${logError.message}`);
+      }
+
+      return ContentService.createTextOutput(JSON.stringify({
+        success: true,
+        message: 'Document processed successfully.',
+        docId: logData.docId,
+        executionId: executionId,
+        row: rowNumber
+      })).setMimeType(ContentService.MimeType.JSON);
+
+    } else {
+      // If it's not a processRow for 'maju' or an unknown action
+      Logger.log(`[${executionId}] Invalid payload. Action: ${requestPayload.action}, ProgramType: ${requestPayload.programType}, RowNumber: ${requestPayload.rowNumber}`);
+      Logger.log(`[${executionId}] Full received payload: ${JSON.stringify(requestPayload)}`);
+
+      const errorDetails = `Received: action="${requestPayload.action}", rowNumber="${requestPayload.rowNumber}", programType="${requestPayload.programType}"`;
+      logData.error = `Invalid payload. Expected action: processRow with programType: "maju". ${errorDetails}`;
+      throw new Error(logData.error);
+    }
+
+  } catch (err) {
+    Logger.log(`[${executionId}] doPost ERROR: ${err.message}`);
+    Logger.log(`[${executionId}] Error stack: ${err.stack}`);
+
+    logData.success = false;
+    logData.error = err.message;
+    // Keep stack trace to a reasonable length for logs
+    logData.errorStack = err.stack ? String(err.stack).substring(0, 500) : 'No stack trace';
+
+    return ContentService.createTextOutput(JSON.stringify({
+      success: false,
+      message: err.message,
+      executionId: executionId
+    })).setMimeType(ContentService.MimeType.JSON);
+  } finally {
+    // Always try to save the log at the end, but don't let it break anything
+    try {
+      saveExecutionLog(logData);
+    } catch (logError) {
+      Logger.log(`[${logData.executionId}] ⚠️ Final log save failed: ${logError.message}`);
+      console.error(`Execution log save failed for ${logData.executionId}:`, logError);
+    }
+  }
+}
+
+// === IMAGE UPLOAD HANDLER ===
+
+/**
+ * Handles image upload requests for Maju program
+ * @param {Object} data The upload request data
+ * @param {string} executionId Unique execution ID for logging
+ * @returns {ContentService.TextOutput} JSON response
+ */
+function handleImageUpload(data, executionId) {
+  try {
+    Logger.log(`[${executionId}] handleImageUpload: Starting image upload`);
+    
+    const { fileData, fileName, fileType, folderId, menteeName = 'Unknown', sessionNumber = 2, isMIAProof = false } = data;
+    
+    // Validate required fields
+    if (!fileData || !fileName || !folderId) {
+      throw new Error('Missing required fields: fileData, fileName, or folderId');
+    }
+
+    // Validate fileType - only allow images
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (fileType && !allowedTypes.includes(fileType.toLowerCase())) {
+      throw new Error(`Invalid fileType: ${fileType}. Only image files are allowed.`);
+    }
+
+    Logger.log(`[${executionId}] Upload details: ${fileName}, mentee: ${menteeName}, session: ${sessionNumber}, MIA: ${isMIAProof}`);
+    
+    // Create safe file name for Maju program
+    const safeMenteeName = String(menteeName).replace(/[^a-z0-9]/gi, '_');
+    const prefix = isMIAProof ? 'MIA_Proof' : `Maju_Sesi${sessionNumber}`;
+    const safeFileName = sanitizeFileName(fileName);
+    const newFileName = `${safeMenteeName}_${prefix}_${safeFileName}`;
+    
+    Logger.log(`[${executionId}] Generated file name: ${newFileName}`);
+
+    // Convert base64 to blob
+    const blob = Utilities.newBlob(
+      Utilities.base64Decode(fileData),
+      fileType,
+      newFileName
+    );
+
+    Logger.log(`[${executionId}] Blob created, determining target folder...`);
+
+    // Determine target folder: session subfolder or main folder
+    let targetFolderId = folderId; // Default to main folder (fallback)
+
+    if (sessionNumber && sessionNumber >= 1 && sessionNumber <= 4) {
+      // Use session subfolder for regular session images
+      Logger.log(`[${executionId}] Using session subfolder for Sesi ${sessionNumber}`);
+      targetFolderId = ensureSessionSubfolder(folderId, sessionNumber, executionId);
+    } else if (isMIAProof) {
+      // For MIA images, determine which session this belongs to
+      // For now, we'll keep MIA images in the main folder, but you can modify this logic
+      Logger.log(`[${executionId}] MIA image - keeping in main folder for now`);
+      targetFolderId = folderId;
+    }
+
+    Logger.log(`[${executionId}] Target folder determined: ${targetFolderId}`);
+
+    // Upload to the determined folder (either session subfolder or main folder)
+    const folder = DriveApp.getFolderById(targetFolderId);
+    const file = folder.createFile(blob);
+    
+    const fileUrl = file.getUrl();
+    const fileId = file.getId();
+
+    // Get the folder name for logging
+    const uploadedToFolder = DriveApp.getFolderById(targetFolderId);
+    const folderName = uploadedToFolder.getName();
+
+    Logger.log(`[${executionId}] ✅ Image uploaded successfully to "${folderName}": ${fileId}`);
+    
+    return ContentService.createTextOutput(JSON.stringify({
+      success: true,
+      status: 'success',
+      fileName: file.getName(),
+      url: fileUrl,
+      fileId: fileId,
+      message: `Maju image uploaded successfully: ${newFileName}`,
+      executionId: executionId
+    })).setMimeType(ContentService.MimeType.JSON);
+    
+  } catch (error) {
+    Logger.log(`[${executionId}] handleImageUpload ERROR: ${error.message}`);
+    
+    return ContentService.createTextOutput(JSON.stringify({
+      success: false,
+      status: 'error',
+      message: `Maju image upload failed: ${error.message}`,
+      executionId: executionId
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// === MAIN DOCUMENT GENERATION LOGIC ===
+
+/**
+ * Orchestrates the document generation or appending for a Maju report.
+ * @param {number} rowNumber The row number in the Google Sheet to process.
+ * @param {string} executionId Unique ID for logging.
+ * @returns {object} Result object with processing status and docId.
+ */
+function processMajuRow(rowNumber, executionId) {
+  const lock = LockService.getScriptLock();
+
+  if (!lock.tryLock(30000)) {
+    throw new Error('Could not acquire lock - another process is running. Please retry.');
+  }
+
+  try {
+    let result, sheet, headers;
+    
+    try {
+      result = getLaporanMajuSheetAndHeaders();
+      Logger.log(`[${executionId}] getLaporanMajuSheetAndHeaders result: ${JSON.stringify({
+        hasSheet: !!result.sheet,
+        headersLength: result.headers ? result.headers.length : 'null',
+        hasIdx: !!result.idx
+      })}`);
+      sheet = result.sheet;
+      headers = result.headers;
+    } catch (spreadsheetError) {
+      Logger.log(`[${executionId}] ❌ Spreadsheet access failed: ${spreadsheetError.message}`);
+      Logger.log(`[${executionId}] 🔄 Attempting direct document creation without sheet access...`);
+      
+      // Return error for now - we'll fix this step by step
+      throw new Error(`Spreadsheet access failed: ${spreadsheetError.message}`);
+    } 
+    Logger.log(`[${executionId}] After destructuring - sheet: ${sheet}, type: ${typeof sheet}`);
+    Logger.log(`[${executionId}] Result object keys: ${Object.keys(result)}`);
+    
+    // Validate headers
+    if (!headers || headers.length === 0) {
+      throw new Error('Headers are invalid from getLaporanMajuSheetAndHeaders');
+    }
+
+    Logger.log(`[${executionId}] Headers found: ${headers.length} columns`);
+    
+    let values;
+    // Read existing row data (DO NOT APPEND NEW ROW)
+    Logger.log(`[${executionId}] About to call getRange with: rowNumber=${rowNumber} (type: ${typeof rowNumber}), headers.length=${headers.length}`);
+    Logger.log(`[${executionId}] rowNumber is null: ${rowNumber === null}, rowNumber is undefined: ${rowNumber === undefined}`);
+
+    values = sheet.getRange(rowNumber, 1, 1, headers.length).getValues()[0];
+    Logger.log(`[${executionId}] Read row data for row ${rowNumber}: ${values.slice(0, 5)}...`);
+
+    // Reconstruct requestData from the existing row, handling JSON parsing
+    const requestData = {};
+    headers.forEach((header, index) => {
+      const cellValue = values[index];
+      if (header.endsWith('_JSON') && typeof cellValue === 'string' && cellValue.trim() !== '') {
+        try {
+          requestData[header] = JSON.parse(cellValue);
+          Logger.log(`[${executionId}] Successfully parsed JSON for ${header}`);
+        } catch (parseError) {
+          Logger.log(`[${executionId}] Failed to parse ${header} for row ${rowNumber}: ${parseError.message}. Using raw string.`);
+          requestData[header] = cellValue; // Use raw string if parsing fails
+        }
+      } else {
+        requestData[header] = cellValue;
+      }
+    });
+
+    const namaMentee = (requestData.NAMA_MENTEE || '').trim();
+    if (!namaMentee) {
+      throw new Error(`Mentee name is empty in row ${rowNumber}. NAMA_MENTEE was: "${requestData.NAMA_MENTEE}"`);
+    }
+
+    let menteeFolderId = requestData.Mentee_Folder_ID || getMenteeFolderIdFromMapping(namaMentee);
+    if (!menteeFolderId) {
+      throw new Error(`Folder_ID for "${namaMentee}" not found in mapping sheet or data.`);
+    }
+    Logger.log(`[${executionId}] Using mentee folder: ${menteeFolderId}`);
+
+    let laporanMajuDocId;
+    const sessionNumber = normalizeSesiNumber(requestData.SESI_NUMBER);
+    const miaStatus = requestData.MIA_STATUS === 'MIA';
+
+    // --- Core Logic: Create or Append based on existing document ---
+    Logger.log(`[${executionId}] === DOCUMENT PROCESSING LOGIC ===`);
+    Logger.log(`[${executionId}] Mentee: ${namaMentee}`);
+    Logger.log(`[${executionId}] Session Number: ${sessionNumber}`);
+    Logger.log(`[${executionId}] MIA Status: ${miaStatus}`);
+    
+    const existingDocIdForMentee = findExistingDocIdInSheet(sheet, namaMentee, headers);
+    Logger.log(`[${executionId}] Existing Doc ID Found: ${existingDocIdForMentee || 'NONE'}`);
+
+    if (miaStatus) {
+      Logger.log(`[${executionId}] 🎯 Branch: MIA report generation for Sesi ${sessionNumber}`);
+      laporanMajuDocId = processMIADocument(sheet, headers, rowNumber, requestData, sessionNumber, namaMentee, menteeFolderId, existingDocIdForMentee, executionId);
+    } else if (sessionNumber === 1 && !existingDocIdForMentee) {
+      Logger.log(`[${executionId}] 🎯 Branch: Sesi 1 document creation (no existing doc found)`);
+      laporanMajuDocId = createSesi1Document(sheet, headers, rowNumber, requestData, namaMentee, menteeFolderId, executionId);
+    } else if (sessionNumber >= 2) { // Sessions 2-4: ALWAYS create NEW cumulative documents
+      Logger.log(`[${executionId}] 🎯 Branch: Creating NEW cumulative document for Sesi ${sessionNumber}`);
+      Logger.log(`[${executionId}] About to call createCumulativeDocument...`);
+      const namaMentor = requestData.NAMA_MENTOR || 'MENTOR'; // Get mentor name from data
+      laporanMajuDocId = createCumulativeDocument(sheet, headers, rowNumber, requestData, sessionNumber, namaMentee, menteeFolderId, namaMentor, executionId);
+      Logger.log(`[${executionId}] createCumulativeDocument returned: ${laporanMajuDocId || 'NULL/UNDEFINED'}`);
+    } else if (sessionNumber === 1 && existingDocIdForMentee) { // Sesi 1 re-submission only
+      Logger.log(`[${executionId}] 🎯 Branch: Sesi 1 re-submission - updating existing doc: ${existingDocIdForMentee}`);
+      Logger.log(`[${executionId}] About to call createCumulativeDocument for Sesi 1 update...`);
+      const namaMentor = requestData.NAMA_MENTOR || 'MENTOR';
+      laporanMajuDocId = createCumulativeDocument(sheet, headers, rowNumber, requestData, sessionNumber, namaMentee, menteeFolderId, namaMentor, executionId);
+      Logger.log(`[${executionId}] createCumulativeDocument returned: ${laporanMajuDocId || 'NULL/UNDEFINED'}`);
+    } else {
+      // This case should ideally not happen if logic is flawless, or implies an error in flow
+      const errorMsg = `Unexpected document generation scenario for row ${rowNumber}. Sesi: ${sessionNumber}, Existing Doc ID: ${existingDocIdForMentee}, MIA: ${miaStatus}`;
+      Logger.log(`[${executionId}] ❌ ${errorMsg}`);
+      throw new Error(`[${executionId}] ${errorMsg}`);
+    }
+
+    // Update the Laporan_Maju_Doc_ID in the sheet for the current row (if it was created or updated)
+    if (laporanMajuDocId) {
+      try {
+        const docIdColIndex = headers.indexOf('Laporan_Maju_Doc_ID') + 1;
+        sheet.getRange(rowNumber, docIdColIndex).setValue(laporanMajuDocId);
+        Logger.log(`[${executionId}] ✅ Updated row ${rowNumber} with Laporan_Maju_Doc_ID: ${laporanMajuDocId}`);
+      } catch (sheetError) {
+        Logger.log(`[${executionId}] ⚠️ Failed to update sheet with Doc ID, but document was created successfully: ${sheetError.message}`);
+        // Don't let sheet update failure break the entire process
+      }
+    }
+
+    return { processed: true, rowNumber: rowNumber, docId: laporanMajuDocId, mentee: namaMentee, sesi: sessionNumber };
+
+  } catch (error) {
+    Logger.log(`[${executionId}] Error in processMajuRow: ${error.message}`);
+    throw error; // Re-throw to be caught by doPost's error handler
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// === DOCUMENT CREATION/POPULATION FUNCTIONS ===
+
+/**
+ * Creates and populates the Sesi 1 document for a Maju report.
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet The Google Sheet object.
+ * @param {string[]} headers The array of sheet headers.
+ * @param {number} rowNumber The current row number being processed.
+ * @param {object} data The parsed row data from the sheet.
+ * @param {string} namaMentee The mentee's name.
+ * @param {string} menteeFolderId The Drive folder ID for the mentee.
+ * @param {string} executionId Unique ID for logging.
+ * @returns {string} The ID of the created Google Doc.
+ */
+function createSesi1Document(sheet, headers, rowNumber, data, namaMentee, menteeFolderId, executionId) {
+  Logger.log(`[${executionId}] createSesi1Document: starting for ${namaMentee}`);
+
+  // Ensure session subfolder exists and get its ID
+  const sessionSubfolderId = ensureSessionSubfolder(menteeFolderId, 1, executionId);
+  Logger.log(`[${executionId}] Using folder for document placement: ${sessionSubfolderId}`);
+
+  const docName = `${data.NAMA_MENTOR || 'Mentor'}_${namaMentee}_Sesi1-4_LaporanMaju`; // Updated naming convention
+  const newDocFile = DriveApp.getFileById(TEMPLATE_DOC_ID).makeCopy(docName, DriveApp.getFolderById(sessionSubfolderId));
+  const laporanMajuDocId = newDocFile.getId();
+
+  Logger.log(`[${executionId}] ✅ Sesi 1 doc created in subfolder: ${laporanMajuDocId}`);
+
+  const doc = DocumentApp.openById(laporanMajuDocId);
+  populateSesi1Data(doc, data, menteeFolderId, executionId); // Call helper to populate
+
+  return laporanMajuDocId;
+}
+
+/**
+ * Inserts progressive upward mobility tracking table
+ * @param {GoogleAppsScript.Document.Body} body - Document body
+ * @param {Object} progressiveData - Cumulative session data
+ * @param {number} currentSesiNum - Current session number
+ * @param {string} executionId - Execution ID for logging
+ */
+
+/**
+ * Helper to populate Sesi 1 data into a document (can be new or existing).
+ * This function handles filling the initial sections of the document.
+ * @param {GoogleAppsScript.Document.Document} doc The document object.
+ * @param {object} data The parsed row data from the sheet.
+ * @param {string} menteeFolderId The Drive folder ID for the mentee.
+ * @param {string} executionId Unique ID for logging.
+ */
+function populateSesi1Data(doc, data, menteeFolderId, executionId) {
+  const body = doc.getBody();
+  Logger.log(`[${executionId}] populateSesi1Data: populating document body.`);
+
+  // --- Plain Text Placeholders (Matching template as closely as possible) ---
+  // These are for the static main info, assuming they only appear in Sesi 1 template
+  body.replaceText('{{NAMA_MENTOR}}', data.NAMA_MENTOR || '');
+  body.replaceText('{{EMAIL_MENTOR}}', data.EMAIL_MENTOR || '');
+  body.replaceText('{{NAMA_MENTEE}}', data.NAMA_MENTEE || '');
+  body.replaceText('{{NAMA_BISNES}}', data.NAMA_BISNES || '');
+  body.replaceText('{{LOKASI_BISNES}}', data.LOKASI_BISNES || '');
+  body.replaceText('{{PRODUK_SERVIS}}', data.PRODUK_SERVIS || '');
+  body.replaceText('{{NO_TELEFON}}', data.NO_TELEFON || '');
+  
+  // Specific Sesi 1 fields in the MAKLUMAT SESI table
+  // Using EXACT placeholders found in template analysis!
+  Logger.log(`[${executionId}] Replacing MAKLUMAT SESI placeholders with actual data...`);
+  
+  // Replace with exact placeholders from template analysis
+  body.replaceText('{{TARIKH_SESI}}', formatDate(data.TARIKH_SESI)); 
+  body.replaceText('{{MOD_SESI}}', data.MOD_SESI || ''); // Updated to match corrected template!
+  body.replaceText('{{LOKASI_F2F}}', data.LOKASI_F2F || '');
+  body.replaceText('{{MASA_MULA}}', formatTime(data.MASA_MULA));
+  body.replaceText('{{MASA_TAMAT}}', formatTime(data.MASA_TAMAT));
+  
+  // Also try the _1 versions in case template has both formats
+  body.replaceText('{{TARIKH_SESI_1}}', formatDate(data.TARIKH_SESI)); 
+  body.replaceText('{{MOD_SESI_1}}', data.MOD_SESI || '');
+  body.replaceText('{{LOKASI_F2F_1}}', data.LOKASI_F2F || '');
+  body.replaceText('{{MASA_MULA_1}}', formatTime(data.MASA_MULA));
+  body.replaceText('{{MASA_TAMAT_1}}', formatTime(data.MASA_TAMAT));
+  
+  Logger.log(`[${executionId}] MAKLUMAT SESI placeholders replacement completed`);
+
+  // Latarbelakang Usahawan field
+  body.replaceText('{{LATARBELAKANG_USAHAWAN}}', data.LATARBELAKANG_USAHAWAN || '');
+
+  // Rumusan dan Langkah Kehadapan field (for Sesi 1, might be empty initially)
+  body.replaceText('{{RUMUSAN_DAN_LANGKAH_KEHADAPAN}}', data.RUMUSAN_DAN_LANGKAH_KEHADAPAN || '[Akan diisi dalam sesi seterusnya]');
+
+  // Reflection Fields
+  body.replaceText('{{REFLEKSI_MENTOR_PERASAAN}}', data.REFLEKSI_MENTOR_PERASAAN || '');
+  body.replaceText('{{REFLEKSI_MENTOR_KOMITMEN}}', data.REFLEKSI_MENTOR_KOMITMEN || '');
+  body.replaceText('{{REFLEKSI_MENTOR_LAIN}}', data.REFLEKSI_MENTOR_LAIN || '');
+
+  // --- Tables from JSON Data ---
+  // Enhanced table replacement with better placeholder matching and debugging
+  Logger.log(`[${executionId}] === TABLE INSERTION DEBUGGING ===`);
+  
+  // First, log all placeholders in the document
+  const fullDocText = body.getText();
+  const allPlaceholders = fullDocText.match(/\{\{[^}]+\}\}/g) || [];
+  Logger.log(`[${executionId}] All placeholders found in template: ${JSON.stringify(allPlaceholders)}`);
+  
+  // Also search for variations without exact curly braces
+  const potentialPlaceholders = fullDocText.match(/(DATA\s*KEWANGAN|DAPATAN\s*SESI|MENTORING|MAKLUMAT\s*SESI)/gi) || [];
+  Logger.log(`[${executionId}] Potential placeholder text (case-insensitive): ${JSON.stringify(potentialPlaceholders)}`);
+  
+  // Log first 500 characters of document to see structure
+  Logger.log(`[${executionId}] Document preview (first 500 chars): ${fullDocText.substring(0, 500)}`);
+  
+  // Save template analysis to spreadsheet for easy viewing
+  saveTemplateAnalysis(executionId, allPlaceholders, potentialPlaceholders, fullDocText.substring(0, 500));
+  
+  Logger.log(`[${executionId}] Inserting DATA_KEWANGAN_BULANAN table...`);
+  Logger.log(`[${executionId}] DATA_KEWANGAN_BULANAN_JSON: ${JSON.stringify(data.DATA_KEWANGAN_BULANAN_JSON)}`);
+  
+  // Try multiple placeholder formats for financial data with error handling
+  // EXACT MATCH FIRST - we know this exists in the template!
+  let tableInserted = false;
+const financialPlaceholder = '{{DATA_KEWANGAN_BULANAN_TABLE}}';
+  
+  for (const placeholder of [financialPlaceholder]) {
+    try {
+      addDebugLog(executionId, `🔍 ATTEMPTING financial table insertion with placeholder: '${placeholder}'`);
+      
+      // PRE-CHECK: Verify placeholder exists in document before calling insertTableFromJson
+      const documentText = body.getText();
+      const placeholderExists = documentText.includes(placeholder);
+      addDebugLog(executionId, `📋 Document contains '${placeholder}': ${placeholderExists}`);
+      
+      if (placeholderExists) {
+        addDebugLog(executionId, `✅ Placeholder confirmed in document, proceeding with insertion...`);
+        const result = insertTableFromJsonSimple(body, data.DATA_KEWANGAN_BULANAN_JSON, placeholder, executionId, 'DATA KEWANGAN BULANAN');
+        if (result) {
+          tableInserted = true;
+          addDebugLog(executionId, `🎉 Financial table inserted successfully with placeholder: ${placeholder}`);
+          break;
+        } else {
+          addDebugLog(executionId, `⚠️ insertTableFromJson returned null for placeholder: ${placeholder}`);
+        }
+      } else {
+        addDebugLog(executionId, `❌ Placeholder '${placeholder}' not found in document text`);
+      }
+    } catch (insertError) {
+      Logger.log(`[${executionId}] 💥 Error inserting financial table with placeholder '${placeholder}': ${insertError.message}`);
+      Logger.log(`[${executionId}] Error stack: ${insertError.stack}`);
+    }
+  }
+  
+  if (!tableInserted) {
+    Logger.log(`[${executionId}] ⚠️ WARNING: Financial table could not be inserted with any placeholder - trying fallback`);
+    try {
+      // Fallback: append at end with clear heading
+      const fallbackResult = insertTableFromJson(body, data.DATA_KEWANGAN_BULANAN_JSON, 'DATA KEWANGAN BULANAN', null, ['Bulan', 'Jumlah Jualan', 'Kos Jualan', 'Perbelanjaan Tetap', 'Lebihan Tunai', 'Ulasan Mentor'], executionId);
+      if (fallbackResult) {
+        Logger.log(`[${executionId}] ✅ Financial table appended as fallback`);
+      }
+    } catch (fallbackError) {
+      Logger.log(`[${executionId}] ❌ Even fallback failed for financial table: ${fallbackError.message}`);
+    }
+  }
+  
+  Logger.log(`[${executionId}] Inserting MENTORING_FINDINGS table...`);
+  Logger.log(`[${executionId}] MENTORING_FINDINGS_JSON: ${JSON.stringify(data.MENTORING_FINDINGS_JSON)}`);
+  
+  // Try multiple placeholder formats for mentoring findings with error handling  
+  // EXACT MATCH FIRST - we know this exists in the template!
+  tableInserted = false;
+const mentoringPlaceholder = '{{MENTORING_FINDINGS_TABLE}}';
+  
+  for (const placeholder of [mentoringPlaceholder]) {
+    try {
+      addDebugLog(executionId, `🔍 ATTEMPTING mentoring table insertion with placeholder: '${placeholder}'`);
+      
+      // PRE-CHECK: Verify placeholder exists in document before calling insertTableFromJson
+      const documentText = body.getText();
+      const placeholderExists = documentText.includes(placeholder);
+      addDebugLog(executionId, `📋 Document contains '${placeholder}': ${placeholderExists}`);
+      
+      if (placeholderExists) {
+        addDebugLog(executionId, `✅ Placeholder confirmed in document, proceeding with insertion...`);
+        const result = insertTableFromJsonSimple(body, data.MENTORING_FINDINGS_JSON, placeholder, executionId, 'DAPATAN SESI MENTORING');
+        if (result) {
+          tableInserted = true;
+          addDebugLog(executionId, `🎉 Mentoring table inserted successfully with placeholder: ${placeholder}`);
+          break;
+        } else {
+          addDebugLog(executionId, `⚠️ insertTableFromJson returned null for placeholder: ${placeholder}`);
+        }
+      } else {
+        addDebugLog(executionId, `❌ Placeholder '${placeholder}' not found in document text`);
+      }
+    } catch (insertError) {
+      Logger.log(`[${executionId}] 💥 Error inserting mentoring table with placeholder '${placeholder}': ${insertError.message}`);
+      Logger.log(`[${executionId}] Error stack: ${insertError.stack}`);
+    }
+  }
+  
+  if (!tableInserted) {
+    Logger.log(`[${executionId}] ⚠️ WARNING: Mentoring table could not be inserted with any placeholder - trying fallback`);
+    try {
+      // Fallback: append at end with clear heading
+      const fallbackResult = insertTableFromJson(body, data.MENTORING_FINDINGS_JSON, 'DAPATAN SESI MENTORING', null, ['Topik Perbincangan', 'Hasil yang Diharapkan', 'Kemajuan Mentee', 'Cabaran dan Halangan Mentee', 'Pelan Tindakan'], executionId);
+      if (fallbackResult) {
+        Logger.log(`[${executionId}] ✅ Mentoring table appended as fallback`);
+      }
+    } catch (fallbackError) {
+      Logger.log(`[${executionId}] ❌ Even fallback failed for mentoring table: ${fallbackError.message}`);
+    }
+  }
+
+  // === CLEANUP REMAINING PLACEHOLDERS ===
+  Logger.log(`[${executionId}] === CLEANING UP REMAINING PLACEHOLDERS ===`);
+  
+  // Check for any remaining table-related placeholders and try to replace them
+  const finalDocText = body.getText();
+  const remainingPlaceholders = finalDocText.match(/\{\{[^}]+\}\}/g) || [];
+  Logger.log(`[${executionId}] Remaining placeholders after table insertion: ${JSON.stringify(remainingPlaceholders)}`);
+  
+  // Try to replace any obvious table placeholders with a message
+  for (const placeholder of remainingPlaceholders) {
+    const lowerPlaceholder = placeholder.toLowerCase();
+    if (lowerPlaceholder.includes('data') || lowerPlaceholder.includes('kewangan') || 
+        lowerPlaceholder.includes('mentoring') || lowerPlaceholder.includes('dapatan') ||
+        lowerPlaceholder.includes('table') || lowerPlaceholder.includes('maklumat')) {
+      
+      Logger.log(`[${executionId}] Attempting to replace remaining placeholder: ${placeholder}`);
+      
+      // Try direct text replacement
+      const range = body.findText(placeholder);
+      if (range) {
+        const message = lowerPlaceholder.includes('kewangan') ? 
+          'DATA KEWANGAN BULANAN\n(Lihat jadual di bahagian akhir dokumen)' :
+          lowerPlaceholder.includes('mentoring') || lowerPlaceholder.includes('dapatan') ?
+          'DAPATAN SESI MENTORING\n(Lihat jadual di bahagian akhir dokumen)' :
+          'Maklumat telah diproses (lihat bahagian berkaitan dalam dokumen)';
+        
+        range.getElement().asText().replaceText(placeholder, message);
+        Logger.log(`[${executionId}] ✅ Replaced ${placeholder} with reference message`);
+      }
+    }
+  }
+
+  // --- Image Embedding ---
+  // Enhanced session-specific image placeholder handling
+  Logger.log(`[${executionId}] Processing images for Sesi 1...`);
+  
+  // GW360 image (only for Sesi 1)
+  if (data.URL_GAMBAR_GW360) {
+    insertImageAt_(body, '{{URL_GAMBAR_GW360}}', data.URL_GAMBAR_GW360, executionId);
+    Logger.log(`[${executionId}] GW360 image processed`);
+  } else {
+    replaceAll_(body, '{{URL_GAMBAR_GW360}}', '[Tiada gambar GW360 dimuat naik]');
+  }
+  
+  // Premis images (can be from any session)
+  if (data.URL_GAMBAR_PREMIS_JSON) {
+    insertImageAt_(body, '{{URL_GAMBAR_PREMIS_JSON}}', data.URL_GAMBAR_PREMIS_JSON, executionId);
+    Logger.log(`[${executionId}] Premis images processed for Sesi 1`);
+  } else {
+    replaceAll_(body, '{{URL_GAMBAR_PREMIS_JSON}}', '[Tiada gambar premis dimuat naik]');
+  }
+  
+  // Session-specific images for Sesi 1
+  if (data.URL_GAMBAR_SESI_JSON) {
+    insertImageAt_(body, '{{URL_GAMBAR_SESI_1_JSON}}', data.URL_GAMBAR_SESI_JSON, executionId); // Sesi 1 specific
+    Logger.log(`[${executionId}] Sesi 1 images processed`);
+  } else {
+    replaceAll_(body, '{{URL_GAMBAR_SESI_1_JSON}}', '[Tiada gambar sesi dimuat naik]');
+  }
+  
+  // Note: Sesi 2-4 placeholders are handled as text, not placeholders in the template
+  
+  // MIA proof (if applicable)
+  if (data.MIA_PROOF_URL) {
+    insertImageAt_(body, '{{MIA_PROOF_URL}}', data.MIA_PROOF_URL, executionId);
+    Logger.log(`[${executionId}] MIA proof image processed`);
+  } else {
+    replaceAll_(body, '{{MIA_PROOF_URL}}', '[Tiada bukti MIA dimuat naik]');
+  }
+
+  // Handle footer separately as it's a fixed table
+  fillFooterPreparedBy_(body, formatDate(data.TARIKH_SESI), data.NAMA_MENTOR || '', executionId);
+
+  // === UPWARD MOBILITY (Individual placeholders) ===
+  Logger.log(`[${executionId}] Processing upward mobility placeholders for Sesi 1`);
+
+  // Section 1: Current Situation
+  body.replaceText('{{UM_STATUS_PENGLIBATAN}}', data.UM_STATUS_PENGLIBATAN || '');
+  body.replaceText('{{UM_STATUS}}', data.UM_STATUS || '');
+  body.replaceText('{{UM_KRITERIA_IMPROVEMENT}}', data.UM_KRITERIA_IMPROVEMENT || '');
+
+  // Section 2: BIMB Channels
+  body.replaceText('{{UM_AKAUN_BIMB}}', data.UM_AKAUN_BIMB || '');
+  body.replaceText('{{UM_BIMB_BIZ}}', data.UM_BIMB_BIZ || '');
+  body.replaceText('{{UM_AL_AWFAR}}', data.UM_AL_AWFAR || '');
+  body.replaceText('{{UM_MERCHANT_TERMINAL}}', data.UM_MERCHANT_TERMINAL || '');
+  body.replaceText('{{UM_FASILITI_LAIN}}', data.UM_FASILITI_LAIN || '');
+  body.replaceText('{{UM_MESINKIRA}}', data.UM_MESINKIRA || '');
+
+  // Section 3: Financial Metrics
+  body.replaceText('{{UM_PENDAPATAN_SEMASA}}', data.UM_PENDAPATAN_SEMASA || '');
+  body.replaceText('{{UM_ULASAN_PENDAPATAN}}', data.UM_ULASAN_PENDAPATAN || '');
+  body.replaceText('{{UM_PEKERJA_SEMASA}}', data.UM_PEKERJA_SEMASA || '');
+  body.replaceText('{{UM_ULASAN_PEKERJA}}', data.UM_ULASAN_PEKERJA || '');
+  body.replaceText('{{UM_ASET_BUKAN_TUNAI_SEMASA}}', data.UM_ASET_BUKAN_TUNAI_SEMASA || '');
+  body.replaceText('{{UM_ULASAN_ASET_BUKAN_TUNAI}}', data.UM_ULASAN_ASET_BUKAN_TUNAI || '');
+  body.replaceText('{{UM_ASET_TUNAI_SEMASA}}', data.UM_ASET_TUNAI_SEMASA || '');
+  body.replaceText('{{UM_ULASAN_ASET_TUNAI}}', data.UM_ULASAN_ASET_TUNAI || '');
+  body.replaceText('{{UM_SIMPANAN_SEMASA}}', data.UM_SIMPANAN_SEMASA || '');
+  body.replaceText('{{UM_ULASAN_SIMPANAN}}', data.UM_ULASAN_SIMPANAN || '');
+  body.replaceText('{{UM_ZAKAT_SEMASA}}', data.UM_ZAKAT_SEMASA || '');
+  body.replaceText('{{UM_ULASAN_ZAKAT}}', data.UM_ULASAN_ZAKAT || '');
+
+  // Section 4: Digital & Marketing
+  body.replaceText('{{UM_DIGITAL_SEMASA}}', data.UM_DIGITAL_SEMASA || '');
+  body.replaceText('{{UM_ULASAN_DIGITAL}}', data.UM_ULASAN_DIGITAL || '');
+  body.replaceText('{{UM_MARKETING_SEMASA}}', data.UM_MARKETING_SEMASA || '');
+  body.replaceText('{{UM_ULASAN_MARKETING}}', data.UM_ULASAN_MARKETING || '');
+
+  // Metadata
+  body.replaceText('{{UM_TARIKH_LAWATAN_PREMIS}}', data.UM_TARIKH_LAWATAN_PREMIS || '');
+
+  Logger.log(`[${executionId}] All UM placeholders replaced for Sesi 1`);
+
+  doc.saveAndClose();
+  Logger.log(`[${executionId}] populateSesi1Data: finished populating document body.`);
+}
+
+
+/**
+ * Appends data for Sesi 2-4 to an existing Maju document.
+ * This function also updates the common 'MAKLUMAT SESI' table on the first page.
+ * Enhanced with progressive data building from previous sessions.
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet The Google Sheet object.
+ * @param {string[]} headers The array of sheet headers.
+ * @param {number} rowNumber The current row number being processed.
+ * @param {object} data The parsed row data from the sheet.
+ * @param {number} sesiNum The current session number (2, 3, or 4).
+ * @param {string} namaMentee The mentee's name.
+ * @param {string} menteeFolderId The Drive folder ID for the mentee.
+ * @param {string} namaMentor The mentor's name for document naming.
+ * @param {string} executionId Unique ID for logging.
+ * @returns {string} The ID of the newly created cumulative Google Doc.
+ */
+function createCumulativeDocument(sheet, headers, rowNumber, data, sesiNum, namaMentee, menteeFolderId, namaMentor, executionId) {
+  Logger.log(`[${executionId}] 🎯 createCumulativeDocument: starting for Sesi ${sesiNum}, ${namaMentee}`);
+  Logger.log(`[${executionId}] 📋 Creating NEW cumulative document with data from Sessions 1-${sesiNum}`);
+  Logger.log(`[${executionId}] Session data keys: ${Object.keys(data).join(', ')}`);
+
+  try {
+    // Step 1: Create new document from template using DriveApp (instead of DocumentApp)
+    const docName = `${namaMentor}_${namaMentee}_Sesi${sesiNum}_LaporanMaju`;
+    const templateFile = DriveApp.getFileById(TEMPLATE_DOC_ID);
+    const newDocFile = templateFile.makeCopy(docName);
+    const docId = newDocFile.getId();
+    const newDoc = DocumentApp.openById(docId);
+    
+    Logger.log(`[${executionId}] ✅ Created new cumulative document: ${docName}`);
+    Logger.log(`[${executionId}] 📄 New document ID: ${docId}`);
+    
+    // Step 3: Move to session subfolder
+    const file = DriveApp.getFileById(docId);
+    const sessionSubfolderId = ensureSessionSubfolder(menteeFolderId, sesiNum, executionId);
+    Logger.log(`[${executionId}] Moving document to session subfolder: ${sessionSubfolderId}`);
+    const sessionSubfolder = DriveApp.getFolderById(sessionSubfolderId);
+    file.moveTo(sessionSubfolder);
+    Logger.log(`[${executionId}] ✅ Document moved to Sesi ${sesiNum} subfolder successfully`);
+    
+    const body = newDoc.getBody();
+    Logger.log(`[${executionId}] Document body accessed, template length: ${body.getText().length} characters`);
+    
+    // --- Fill Basic Template Placeholders ---
+    Logger.log(`[${executionId}] Filling basic template placeholders...`);
+    body.replaceText('{{NAMA_MENTOR}}', data.NAMA_MENTOR || '');
+    body.replaceText('{{EMAIL_MENTOR}}', data.EMAIL_MENTOR || '');
+    body.replaceText('{{NAMA_MENTEE}}', data.NAMA_MENTEE || '');
+    body.replaceText('{{NAMA_BISNES}}', data.NAMA_BISNES || '');
+    body.replaceText('{{LOKASI_BISNES}}', data.LOKASI_BISNES || '');
+    body.replaceText('{{PRODUK_SERVIS}}', data.PRODUK_SERVIS || '');
+    body.replaceText('{{NO_TELEFON}}', data.NO_TELEFON || '');
+    // LATARBELAKANG_USAHAWAN: Use current session OR fallback to previous sessions (will be set later with progressive data)
+    body.replaceText('{{STATUS_PERNIAGAAN_KESELURUHAN}}', data.STATUS_PERNIAGAAN_KESELURUHAN || '');
+    body.replaceText('{{RUMUSAN_DAN_LANGKAH_KEHADAPAN}}', data.RUMUSAN_DAN_LANGKAH_KEHADAPAN || '');
+    body.replaceText('{{REFLEKSI_MENTOR_PERASAAN}}', data.REFLEKSI_MENTOR_PERASAAN || '');
+    body.replaceText('{{REFLEKSI_MENTOR_KOMITMEN}}', data.REFLEKSI_MENTOR_KOMITMEN || '');
+    body.replaceText('{{REFLEKSI_MENTOR_LAIN}}', data.REFLEKSI_MENTOR_LAIN || '');
+    Logger.log(`[${executionId}] Basic template placeholders filled`);
+  
+  // --- Progressive Data Building: Collect previous sessions data ---
+  Logger.log(`[${executionId}] Building progressive data for Sesi ${sesiNum}...`);
+  const progressiveData = buildProgressiveSessionData(sheet, headers, namaMentee, sesiNum, executionId);
+  Logger.log(`[${executionId}] Progressive data built: ${progressiveData.previousSessions.length} previous sessions found`);
+  
+  // Add current session data to progressive data
+  progressiveData.currentSession = data;
+  progressiveData.allSessions = [...progressiveData.previousSessions, data];
+
+  // --- Fill Sesi 1 Data from Progressive Data ---
+  if (progressiveData.previousSessions.length > 0) {
+    const sesi1Data = progressiveData.previousSessions[0];
+    Logger.log(`[${executionId}] Filling Sesi 1 placeholders from progressive data...`);
+    body.replaceText('{{TARIKH_SESI}}', formatDate(sesi1Data.TARIKH_SESI)); 
+    body.replaceText('{{MOD_SESI}}', sesi1Data.MOD_SESI || '');
+    body.replaceText('{{LOKASI_F2F}}', sesi1Data.LOKASI_F2F || '');
+    body.replaceText('{{MASA_MULA}}', formatTime(sesi1Data.MASA_MULA));
+    body.replaceText('{{MASA_TAMAT}}', formatTime(sesi1Data.MASA_TAMAT));
+    // Also try the _1 versions
+    body.replaceText('{{TARIKH_SESI_1}}', formatDate(sesi1Data.TARIKH_SESI)); 
+    body.replaceText('{{MOD_SESI_1}}', sesi1Data.MOD_SESI || '');
+    body.replaceText('{{LOKASI_F2F_1}}', sesi1Data.LOKASI_F2F || '');
+    body.replaceText('{{MASA_MULA_1}}', formatTime(sesi1Data.MASA_MULA));
+    body.replaceText('{{MASA_TAMAT_1}}', formatTime(sesi1Data.MASA_TAMAT));
+
+    // --- Fill Sesi 1 Image Placeholders ---
+    Logger.log(`[${executionId}] Filling Sesi 1 image placeholders from progressive data...`);
+
+    // GW360 image from Sesi 1
+    if (sesi1Data.URL_GAMBAR_GW360) {
+      insertImageAt_(body, '{{URL_GAMBAR_GW360}}', sesi1Data.URL_GAMBAR_GW360, executionId);
+      Logger.log(`[${executionId}] GW360 image from Sesi 1 inserted`);
+    } else {
+      replaceAll_(body, '{{URL_GAMBAR_GW360}}', '[Tiada gambar GW360 dari Sesi 1]');
+    }
+
+    // Sesi 1 session images
+    if (sesi1Data.URL_GAMBAR_SESI_JSON) {
+      insertImageAt_(body, '{{URL_GAMBAR_SESI_1_JSON}}', sesi1Data.URL_GAMBAR_SESI_JSON, executionId);
+      Logger.log(`[${executionId}] Sesi 1 session images inserted`);
+    } else {
+      replaceAll_(body, '{{URL_GAMBAR_SESI_1_JSON}}', '[Tiada gambar sesi dari Sesi 1]');
+    }
+
+    // Premis images from Sesi 1 (if not provided in current session)
+    if (!data.URL_GAMBAR_PREMIS_JSON && sesi1Data.URL_GAMBAR_PREMIS_JSON) {
+      insertImageAt_(body, '{{URL_GAMBAR_PREMIS_JSON}}', sesi1Data.URL_GAMBAR_PREMIS_JSON, executionId);
+      Logger.log(`[${executionId}] Premis images from Sesi 1 used as fallback`);
+    }
+
+    Logger.log(`[${executionId}] Sesi 1 placeholders filled from progressive data`);
+  } else {
+    // No previous sessions - handle Sesi 1 image placeholders with current session data
+    Logger.log(`[${executionId}] No previous sessions - using current session data for Sesi 1 placeholders`);
+
+    // GW360 image from current session (Sesi 1)
+    if (data.URL_GAMBAR_GW360) {
+      insertImageAt_(body, '{{URL_GAMBAR_GW360}}', data.URL_GAMBAR_GW360, executionId);
+    } else {
+      replaceAll_(body, '{{URL_GAMBAR_GW360}}', '[Tiada gambar GW360 dimuat naik]');
+    }
+
+    // Sesi 1 session images from current session
+    if (data.URL_GAMBAR_SESI_JSON) {
+      insertImageAt_(body, '{{URL_GAMBAR_SESI_1_JSON}}', data.URL_GAMBAR_SESI_JSON, executionId);
+    } else {
+      replaceAll_(body, '{{URL_GAMBAR_SESI_1_JSON}}', '[Tiada gambar sesi dimuat naik]');
+    }
+  }
+
+  // --- Update MAKLUMAT SESI table (on the first page) ---
+  // This part directly updates the cells in the fixed table on the template.
+  const maklumatSesiTable = findTableByRowHeader_(body, 'Nama Mentor', executionId); // Find the main table by its prominent header
+  if (maklumatSesiTable) {
+      Logger.log(`[${executionId}] Found 'MAKLUMAT SESI' table for updating.`);
+      try {
+          // Enhanced MAKLUMAT SESI table update with better cell mapping
+          // Column mapping: 0=Labels, 1=Sesi 1, 2=Sesi 2, 3=Sesi 3, 4=Sesi 4
+          
+          const dateRow = findRowInTable_(maklumatSesiTable, 'Tarikh Sesi', executionId);
+          if (dateRow && dateRow.getNumCells() > sesiNum) { 
+              dateRow.getCell(sesiNum).setText(formatDate(data.TARIKH_SESI));
+              Logger.log(`[${executionId}] Updated Tarikh Sesi for Sesi ${sesiNum}: ${formatDate(data.TARIKH_SESI)}`);
+          } else {
+              Logger.log(`[${executionId}] Could not update 'Tarikh Sesi' for Sesi ${sesiNum}. Row cells: ${dateRow ? dateRow.getNumCells() : 0}`);
+          }
+
+          const lokasiRow = findRowInTable_(maklumatSesiTable, 'Lokasi', executionId);
+          if (lokasiRow && lokasiRow.getNumCells() > sesiNum) {
+              const lokasiText = `${data.MOD_SESI || 'Online'}${data.LOKASI_F2F ? ' - ' + data.LOKASI_F2F : ''}`;
+              lokasiRow.getCell(sesiNum).setText(lokasiText);
+              Logger.log(`[${executionId}] Updated Lokasi for Sesi ${sesiNum}: ${lokasiText}`);
+          } else {
+              Logger.log(`[${executionId}] Could not update 'Lokasi' for Sesi ${sesiNum}. Row cells: ${lokasiRow ? lokasiRow.getNumCells() : 0}`);
+          }
+
+          const masaMulaRow = findRowInTable_(maklumatSesiTable, 'Masa Mula', executionId);
+          if (masaMulaRow && masaMulaRow.getNumCells() > sesiNum) {
+              masaMulaRow.getCell(sesiNum).setText(formatTime(data.MASA_MULA));
+              Logger.log(`[${executionId}] Updated Masa Mula for Sesi ${sesiNum}: ${formatTime(data.MASA_MULA)}`);
+          } else {
+              Logger.log(`[${executionId}] Could not update 'Masa Mula' for Sesi ${sesiNum}. Row cells: ${masaMulaRow ? masaMulaRow.getNumCells() : 0}`);
+          }
+
+          const masaTamatRow = findRowInTable_(maklumatSesiTable, 'Masa Tamat', executionId);
+          if (masaTamatRow && masaTamatRow.getNumCells() > sesiNum) {
+              masaTamatRow.getCell(sesiNum).setText(formatTime(data.MASA_TAMAT));
+              Logger.log(`[${executionId}] Updated Masa Tamat for Sesi ${sesiNum}: ${formatTime(data.MASA_TAMAT)}`);
+          } else {
+              Logger.log(`[${executionId}] Could not update 'Masa Tamat' for Sesi ${sesiNum}. Row cells: ${masaTamatRow ? masaTamatRow.getNumCells() : 0}`);
+          }
+          
+          Logger.log(`[${executionId}] Successfully updated MAKLUMAT SESI table for Sesi ${sesiNum}.`);
+      } catch (e) {
+          Logger.log(`[${executionId}] Error updating MAKLUMAT SESI table: ${e.message}`);
+          Logger.log(`[${executionId}] Stack trace: ${e.stack}`);
+      }
+  } else {
+      Logger.log(`[${executionId}] 'MAKLUMAT SESI' table not found - attempting alternative search methods.`);
+      // Try alternative search methods
+      const altTable = findTableByRowHeader_(body, 'Tarikh Sesi', executionId);
+      if (altTable) {
+          Logger.log(`[${executionId}] Found MAKLUMAT SESI table using alternative search.`);
+          // Repeat the update logic with the alternative table
+          // ... (same logic as above but with altTable)
+      }
+  }
+
+  // --- Append new section for the current session's detailed report ---
+  body.appendPageBreak(); // New session on a new page
+  body.appendParagraph('---').setHeading(DocumentApp.ParagraphHeading.NORMAL);
+  body.appendParagraph(`LAPORAN SESI ${sesiNum} - ${formatDate(data.TARIKH_SESI)}`)
+    .setHeading(DocumentApp.ParagraphHeading.HEADING1)
+    .setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+  body.appendParagraph('---').setHeading(DocumentApp.ParagraphHeading.NORMAL);
+
+  // Progressive LATARBELAKANG_USAHAWAN: Use current session data OR previous session data
+  const latarBelakang = data.LATARBELAKANG_USAHAWAN ||
+    (progressiveData.previousSessions.length > 0 ? progressiveData.previousSessions[0].LATARBELAKANG_USAHAWAN : null) ||
+    '[Tiada latar belakang direkodkan from Sesi 1]';
+  body.replaceText('{{LATARBELAKANG_USAHAWAN}}', latarBelakang);
+  Logger.log(`[${executionId}] LATARBELAKANG_USAHAWAN filled with: ${latarBelakang.substring(0, 50)}...`);
+
+  // Progressive cumulative financial data (always show for cumulative docs)
+  if (progressiveData.cumulativeKewanganData.length > 0) {
+    Logger.log(`[${executionId}] Adding cumulative financial data table`);
+    // Try to replace placeholder first, if not found then append
+    insertTableFromJsonSimple(body, progressiveData.cumulativeKewanganData, '{{DATA_KEWANGAN_BULANAN_TABLE}}', executionId, 'RINGKASAN KEWANGAN KUMULATIF');
+  }
+  
+  // Progressive cumulative mentoring findings with action item tracking (always show for cumulative docs)
+  if (progressiveData.cumulativeMentoringFindings.length > 0) {
+    Logger.log(`[${executionId}] Adding cumulative mentoring findings table`);
+    // Try to replace placeholder first, if not found then append
+    insertTableFromJsonSimple(body, progressiveData.cumulativeMentoringFindings, '{{MENTORING_FINDINGS_TABLE}}', executionId, 'RINGKASAN MENTORING KUMULATIF');
+  }
+
+  // NOTE: STATUS_PERNIAGAAN_KESELURUHAN and RUMUSAN_DAN_LANGKAH_KEHADAPAN are now filled via template placeholders above
+  // REFLEKSI_MENTOR data should also be in template placeholders, not appended
+
+  // === UPWARD MOBILITY (Individual placeholders from current session) ===
+  Logger.log(`[${executionId}] Processing upward mobility placeholders for Sesi ${sesiNum}`);
+
+  // Get current session data (last session in allSessions array)
+  const currentSessionData = progressiveData.allSessions[progressiveData.allSessions.length - 1];
+
+  // Section 1: Current Situation
+  body.replaceText('{{UM_STATUS_PENGLIBATAN}}', currentSessionData.UM_STATUS_PENGLIBATAN || '');
+  body.replaceText('{{UM_STATUS}}', currentSessionData.UM_STATUS || '');
+  body.replaceText('{{UM_KRITERIA_IMPROVEMENT}}', currentSessionData.UM_KRITERIA_IMPROVEMENT || '');
+
+  // Section 2: BIMB Channels
+  body.replaceText('{{UM_AKAUN_BIMB}}', currentSessionData.UM_AKAUN_BIMB || '');
+  body.replaceText('{{UM_BIMB_BIZ}}', currentSessionData.UM_BIMB_BIZ || '');
+  body.replaceText('{{UM_AL_AWFAR}}', currentSessionData.UM_AL_AWFAR || '');
+  body.replaceText('{{UM_MERCHANT_TERMINAL}}', currentSessionData.UM_MERCHANT_TERMINAL || '');
+  body.replaceText('{{UM_FASILITI_LAIN}}', currentSessionData.UM_FASILITI_LAIN || '');
+  body.replaceText('{{UM_MESINKIRA}}', currentSessionData.UM_MESINKIRA || '');
+
+  // Section 3: Financial Metrics
+  body.replaceText('{{UM_PENDAPATAN_SEMASA}}', currentSessionData.UM_PENDAPATAN_SEMASA || '');
+  body.replaceText('{{UM_ULASAN_PENDAPATAN}}', currentSessionData.UM_ULASAN_PENDAPATAN || '');
+  body.replaceText('{{UM_PEKERJA_SEMASA}}', currentSessionData.UM_PEKERJA_SEMASA || '');
+  body.replaceText('{{UM_ULASAN_PEKERJA}}', currentSessionData.UM_ULASAN_PEKERJA || '');
+  body.replaceText('{{UM_ASET_BUKAN_TUNAI_SEMASA}}', currentSessionData.UM_ASET_BUKAN_TUNAI_SEMASA || '');
+  body.replaceText('{{UM_ULASAN_ASET_BUKAN_TUNAI}}', currentSessionData.UM_ULASAN_ASET_BUKAN_TUNAI || '');
+  body.replaceText('{{UM_ASET_TUNAI_SEMASA}}', currentSessionData.UM_ASET_TUNAI_SEMASA || '');
+  body.replaceText('{{UM_ULASAN_ASET_TUNAI}}', currentSessionData.UM_ULASAN_ASET_TUNAI || '');
+  body.replaceText('{{UM_SIMPANAN_SEMASA}}', currentSessionData.UM_SIMPANAN_SEMASA || '');
+  body.replaceText('{{UM_ULASAN_SIMPANAN}}', currentSessionData.UM_ULASAN_SIMPANAN || '');
+  body.replaceText('{{UM_ZAKAT_SEMASA}}', currentSessionData.UM_ZAKAT_SEMASA || '');
+  body.replaceText('{{UM_ULASAN_ZAKAT}}', currentSessionData.UM_ULASAN_ZAKAT || '');
+
+  // Section 4: Digital & Marketing
+  body.replaceText('{{UM_DIGITAL_SEMASA}}', currentSessionData.UM_DIGITAL_SEMASA || '');
+  body.replaceText('{{UM_ULASAN_DIGITAL}}', currentSessionData.UM_ULASAN_DIGITAL || '');
+  body.replaceText('{{UM_MARKETING_SEMASA}}', currentSessionData.UM_MARKETING_SEMASA || '');
+  body.replaceText('{{UM_ULASAN_MARKETING}}', currentSessionData.UM_ULASAN_MARKETING || '');
+
+  // Metadata
+  body.replaceText('{{UM_TARIKH_LAWATAN_PREMIS}}', currentSessionData.UM_TARIKH_LAWATAN_PREMIS || '');
+
+  Logger.log(`[${executionId}] All UM placeholders replaced for Sesi ${sesiNum}`);
+
+  // --- Enhanced Images for current session ---
+  Logger.log(`[${executionId}] Processing images for Sesi ${sesiNum} appending...`);
+  
+  // Update session-specific images using proper placeholders
+  const sessionImagePlaceholder = `{{URL_GAMBAR_SESI_${sesiNum}_JSON}}`;
+  if (data.URL_GAMBAR_SESI_JSON) {
+    insertImageAt_(body, sessionImagePlaceholder, data.URL_GAMBAR_SESI_JSON, executionId);
+    Logger.log(`[${executionId}] Inserted Sesi ${sesiNum} images at placeholder: ${sessionImagePlaceholder}`);
+  } else {
+    replaceAll_(body, sessionImagePlaceholder, `[Tiada gambar sesi dimuat naik untuk Sesi ${sesiNum}]`);
+  }
+  
+  // Update premis images if provided (can be from any session)
+  if (data.URL_GAMBAR_PREMIS_JSON) {
+    insertImageAt_(body, '{{URL_GAMBAR_PREMIS_JSON}}', data.URL_GAMBAR_PREMIS_JSON, executionId);
+    Logger.log(`[${executionId}] Updated premis images from Sesi ${sesiNum}`);
+  } else {
+    // If no premis images in current session, placeholder should have been handled by Sesi 1 fallback above
+    // or replaced with fallback text if no Sesi 1 data either
+    replaceAll_(body, '{{URL_GAMBAR_PREMIS_JSON}}', '[Tiada gambar premis dimuat naik]');
+  }
+  
+  // NOTE: Images are now only placed via template placeholders above, no additional appending needed
+
+    // Update footer with current session's date and mentor name (this might appear on every page)
+    fillFooterPreparedBy_(newDoc.getBody(), formatDate(data.TARIKH_SESI), data.NAMA_MENTOR || '', executionId);
+
+    newDoc.saveAndClose();
+    Logger.log(`[${executionId}] ✅ createCumulativeDocument: SUCCESS - finished for Sesi ${sesiNum}, ${namaMentee}`);
+    Logger.log(`[${executionId}] 📄 New cumulative document created with ID: ${docId}`);
+    return docId;
+    
+  } catch (cumulativeError) {
+    Logger.log(`[${executionId}] ❌ ERROR in createCumulativeDocument: ${cumulativeError.message}`);
+    Logger.log(`[${executionId}] Error stack: ${cumulativeError.stack}`);
+    Logger.log(`[${executionId}] Failed to create cumulative document for Sesi ${sesiNum}, ${namaMentee}`);
+    
+    // Just throw the original error - no broken fallback
+    throw new Error(`Failed to create cumulative Sesi ${sesiNum} document: ${cumulativeError.message}`);
+  }
+}
+
+/**
+ * Processes and appends MIA report data to a (potentially new) document.
+ * Includes logic to find existing doc or create new one for MIA reports.
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet The Google Sheet object.
+ * @param {string[]} headers The array of sheet headers.
+ * @param {number} rowNumber The current row number being processed.
+ * @param {object} data The parsed row data from the sheet.
+ * @param {number} sesiNum The current session number.
+ * @param {string} namaMentee The mentee's name.
+ * @param {string} menteeFolderId The Drive folder ID for the mentee.
+ * @param {string|null} existingDocIdForMentee The ID of an existing main report doc, if any.
+ * @param {string} executionId Unique ID for logging.
+ * @returns {string} The ID of the updated/created Google Doc for the MIA report.
+ */
+function processMIADocument(sheet, headers, rowNumber, data, sesiNum, namaMentee, menteeFolderId, existingDocIdForMentee, executionId) {
+  Logger.log(`[${executionId}] processMIADocument: starting for ${namaMentee}`);
+
+  let laporanMajuDocId = existingDocIdForMentee;
+  let isNewDoc = false;
+
+  if (!laporanMajuDocId) {
+    // If no existing main report doc, create a dedicated MIA reports doc
+    const sessionSubfolderId = ensureSessionSubfolder(menteeFolderId, sesiNum, executionId);
+    Logger.log(`[${executionId}] Creating MIA document in session subfolder: ${sessionSubfolderId}`);
+    const docName = `Laporan Maju - ${namaMentee} (MIA Reports)`;
+    const newDocFile = DriveApp.getFileById(TEMPLATE_DOC_ID).makeCopy(docName, DriveApp.getFolderById(sessionSubfolderId));
+    laporanMajuDocId = newDocFile.getId();
+    isNewDoc = true;
+    Logger.log(`[${executionId}] ✅ Dedicated MIA doc created in Sesi ${sesiNum} subfolder: ${laporanMajuDocId}`);
+  } else {
+    Logger.log(`[${executionId}] Appending MIA report to existing main doc: ${laporanMajuDocId}`);
+  }
+
+  const doc = DocumentApp.openById(laporanMajuDocId);
+  const body = doc.getBody();
+
+  if (!isNewDoc) {
+    body.appendPageBreak(); // Add separator for subsequent MIA reports or after main report
+  }
+  body.appendParagraph('---').setHeading(DocumentApp.ParagraphHeading.NORMAL);
+  body.appendParagraph(`LAPORAN STATUS MIA (SESI ${sesiNum}) - ${formatDate(data.TARIKH_SESI)}`)
+    .setHeading(DocumentApp.ParagraphHeading.HEADING1)
+    .setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+  body.appendParagraph('---').setHeading(DocumentApp.ParagraphHeading.NORMAL);
+
+  body.appendParagraph('MAKLUMAT MIA').setHeading(DocumentApp.ParagraphHeading.HEADING3);
+  body.appendParagraph(`Status: MIA`);
+  body.replaceText('{{NAMA_MENTEE}}', data.NAMA_MENTEE || ''); // Ensure this updates the main info table if MIA report is created directly
+  body.replaceText('{{NAMA_MENTOR}}', data.NAMA_MENTOR || ''); // Ensure this updates the main info table
+  body.appendParagraph(`Alasan/Sebab Usahawan MIA: ${data.MIA_REASON || 'Tiada Alasan Diberikan'}`);
+
+  if (data.MIA_PROOF_URL) {
+    body.appendParagraph('BUKTI MIA').setHeading(DocumentApp.ParagraphHeading.HEADING4);
+    insertImageAt_(body, '{{MIA_PROOF_URL}}', data.MIA_PROOF_URL, executionId); // Use placeholder or append
+  } else {
+    body.appendParagraph('Tiada bukti MIA dimuat naik.');
+  }
+
+  doc.saveAndClose();
+  Logger.log(`[${executionId}] processMIADocument: finished for ${namaMentee}`);
+  return laporanMajuDocId;
+}
+
+
+// === PROGRESSIVE DATA BUILDING ===
+
+/**
+ * Builds progressive session data by collecting all previous sessions for a mentee.
+ * This enables comprehensive reporting that shows the mentoring journey.
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet The Google Sheet object.
+ * @param {string[]} headers The array of sheet headers.
+ * @param {string} namaMentee The mentee's name.
+ * @param {number} currentSesiNum The current session number.
+ * @param {string} executionId Unique ID for logging.
+ * @returns {object} Object containing previous sessions data and accumulated findings.
+ */
+function buildProgressiveSessionData(sheet, headers, namaMentee, currentSesiNum, executionId) {
+  Logger.log(`[${executionId}] buildProgressiveSessionData: collecting data for ${namaMentee} up to Sesi ${currentSesiNum}`);
+  
+  const data = sheet.getDataRange().getValues();
+  const menteeColIndex = headers.indexOf('NAMA_MENTEE');
+  const sesiColIndex = headers.indexOf('SESI_NUMBER');
+  const timestampIndex = headers.indexOf('Timestamp');
+  
+  if (menteeColIndex === -1 || sesiColIndex === -1) {
+    Logger.log(`[${executionId}] Required columns not found for progressive data building`);
+    return { previousSessions: [], cumulativeMentoringFindings: [], cumulativeKewanganData: [] };
+  }
+  
+  const previousSessions = [];
+  const cumulativeMentoringFindings = [];
+  const cumulativeKewanganData = [];
+  
+  // Collect all previous sessions for this mentee (ordered by timestamp)
+  const menteeRows = [];
+  for (let i = 1; i < data.length; i++) { // Skip header row
+    const row = data[i];
+    if (row[menteeColIndex] && String(row[menteeColIndex]).trim() === namaMentee) {
+      const sesiNum = normalizeSesiNumber(row[sesiColIndex]);
+      if (sesiNum <= currentSesiNum && sesiNum > 0) {
+        // Reconstruct row data
+        const rowData = {};
+        headers.forEach((header, index) => {
+          const cellValue = row[index];
+          if (header.endsWith('_JSON') && typeof cellValue === 'string' && cellValue.trim() !== '') {
+            try {
+              rowData[header] = JSON.parse(cellValue);
+            } catch (parseError) {
+              Logger.log(`[${executionId}] Failed to parse JSON for ${header}: ${parseError.message}`);
+              rowData[header] = cellValue;
+            }
+          } else {
+            rowData[header] = cellValue;
+          }
+        });
+        
+        menteeRows.push({
+          sesiNum: sesiNum,
+          timestamp: row[timestampIndex],
+          data: rowData
+        });
+      }
+    }
+  }
+  
+  // Sort by session number
+  menteeRows.sort((a, b) => a.sesiNum - b.sesiNum);
+  
+  // Track unique actions to avoid duplicates
+  const uniqueActions = new Map();
+
+  // Process each previous session
+  menteeRows.forEach(sessionRow => {
+    previousSessions.push(sessionRow.data);
+
+    // Accumulate mentoring findings with deduplication
+    if (sessionRow.data.MENTORING_FINDINGS_JSON) {
+      const findings = Array.isArray(sessionRow.data.MENTORING_FINDINGS_JSON)
+        ? sessionRow.data.MENTORING_FINDINGS_JSON
+        : safeJSONParse(JSON.stringify(sessionRow.data.MENTORING_FINDINGS_JSON));
+
+      findings.forEach(finding => {
+        // Create unique key based on topic and expected result
+        const uniqueKey = `${finding['Topik Perbincangan']||''}_${finding['Hasil yang Diharapkan']||''}`.toLowerCase().trim();
+
+        // Extract Kemajuan and Cabaran from Pelan Tindakan array
+        let kemajuanUpdates = [];
+        let cabaranUpdates = [];
+
+        if (finding['Pelan Tindakan'] && Array.isArray(finding['Pelan Tindakan'])) {
+          finding['Pelan Tindakan'].forEach(plan => {
+            if (plan.Kemajuan && plan.Kemajuan.trim() !== '') {
+              kemajuanUpdates.push(plan.Kemajuan);
+            }
+            if (plan.Cabaran && plan.Cabaran.trim() !== '') {
+              cabaranUpdates.push(plan.Cabaran);
+            }
+          });
+        }
+
+        if (uniqueActions.has(uniqueKey)) {
+          // Update existing action with latest data
+          const existingAction = uniqueActions.get(uniqueKey);
+
+          // Keep the latest updates (overwrite if new ones exist)
+          if (kemajuanUpdates.length > 0) {
+            existingAction.Kemajuan = kemajuanUpdates.join('; ');
+            existingAction.lastUpdatedSession = sessionRow.sesiNum;
+          }
+          if (cabaranUpdates.length > 0) {
+            existingAction.Cabaran = cabaranUpdates.join('; ');
+            existingAction.lastUpdatedSession = sessionRow.sesiNum;
+          }
+
+          // Update other fields that might have changed
+          existingAction['Kemajuan Mentee'] = finding['Kemajuan Mentee'] || existingAction['Kemajuan Mentee'];
+          existingAction['Cabaran dan Halangan Mentee'] = finding['Cabaran dan Halangan Mentee'] || existingAction['Cabaran dan Halangan Mentee'];
+          existingAction['Pelan Tindakan'] = finding['Pelan Tindakan'] || existingAction['Pelan Tindakan'];
+        } else {
+          // Add new action
+          uniqueActions.set(uniqueKey, {
+            ...finding,
+            sesiNumber: sessionRow.sesiNum, // Original session
+            tarikhSesi: sessionRow.data.TARIKH_SESI, // Original date
+            Kemajuan: kemajuanUpdates.length > 0 ? kemajuanUpdates.join('; ') : '',
+            Cabaran: cabaranUpdates.length > 0 ? cabaranUpdates.join('; ') : '',
+            lastUpdatedSession: kemajuanUpdates.length > 0 || cabaranUpdates.length > 0 ? sessionRow.sesiNum : null
+          });
+        }
+      });
+    }
+  });
+
+  // Convert unique actions map back to array
+  cumulativeMentoringFindings.push(...Array.from(uniqueActions.values()));
+
+  // Process financial data for all sessions
+  menteeRows.forEach(sessionRow => {
+    // Accumulate financial data
+    if (sessionRow.data.DATA_KEWANGAN_BULANAN_JSON) {
+      const kewanganData = Array.isArray(sessionRow.data.DATA_KEWANGAN_BULANAN_JSON)
+        ? sessionRow.data.DATA_KEWANGAN_BULANAN_JSON
+        : safeJSONParse(JSON.stringify(sessionRow.data.DATA_KEWANGAN_BULANAN_JSON));
+
+      kewanganData.forEach(data => {
+        cumulativeKewanganData.push({
+          ...data,
+          sesiNumber: sessionRow.sesiNum,
+          tarikhSesi: sessionRow.data.TARIKH_SESI
+        });
+      });
+    }
+  });
+
+  Logger.log(`[${executionId}] Progressive data collected: ${previousSessions.length} sessions`);
+
+  return {
+    previousSessions: previousSessions,
+    cumulativeMentoringFindings: cumulativeMentoringFindings,
+    cumulativeKewanganData: cumulativeKewanganData
+  };
+}
+
+/**
+ * Safe JSON parse helper function for Apps Script
+ */
+function safeJSONParse(str) {
+  try {
+    if (!str || str.trim() === '') {
+      return [];
+    }
+    const parsed = JSON.parse(str);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    Logger.log("Error parsing JSON in Apps Script:", e, "Input string:", str);
+    return [];
+  }
+}
+
+// === HELPER FUNCTIONS (Adapted from Bangkit or new for Maju) ===
+
+/**
+ * Gets column headers for LaporanMaju sheet.
+ */
+function getLaporanMajuColumnHeaders() {
+  return [
+    'Timestamp', 'NAMA_MENTOR', 'EMAIL_MENTOR', 'NAMA_MENTEE', 'NAMA_BISNES',
+    'LOKASI_BISNES', 'PRODUK_SERVIS', 'NO_TELEFON', 'TARIKH_SESI', 'SESI_NUMBER',
+    'MOD_SESI', 'LOKASI_F2F', 'MASA_MULA', 'MASA_TAMAT', 'LATARBELAKANG_USAHAWAN',
+    'DATA_KEWANGAN_BULANAN_JSON', 'MENTORING_FINDINGS_JSON',
+    'REFLEKSI_MENTOR_PERASAAN', 'REFLEKSI_MENTOR_KOMITMEN', 'REFLEKSI_MENTOR_LAIN',
+    // UM Section 1: Current Situation (3 columns)
+    'UM_STATUS_PENGLIBATAN',
+    'UM_STATUS',
+    'UM_KRITERIA_IMPROVEMENT',
+    // UM Section 2: BIMB Channels (6 columns)
+    'UM_AKAUN_BIMB',
+    'UM_BIMB_BIZ',
+    'UM_AL_AWFAR',
+    'UM_MERCHANT_TERMINAL',
+    'UM_FASILITI_LAIN',
+    'UM_MESINKIRA',
+    // UM Section 3: Financial Metrics (12 columns)
+    'UM_PENDAPATAN_SEMASA',
+    'UM_ULASAN_PENDAPATAN',
+    'UM_PEKERJA_SEMASA',
+    'UM_ULASAN_PEKERJA',
+    'UM_ASET_BUKAN_TUNAI_SEMASA',
+    'UM_ULASAN_ASET_BUKAN_TUNAI',
+    'UM_ASET_TUNAI_SEMASA',
+    'UM_ULASAN_ASET_TUNAI',
+    'UM_SIMPANAN_SEMASA',
+    'UM_ULASAN_SIMPANAN',
+    'UM_ZAKAT_SEMASA',
+    'UM_ULASAN_ZAKAT',
+    // UM Section 4: Digital & Marketing (4 columns)
+    'UM_DIGITAL_SEMASA',
+    'UM_ULASAN_DIGITAL',
+    'UM_MARKETING_SEMASA',
+    'UM_ULASAN_MARKETING',
+    // UM Metadata (1 column)
+    'UM_TARIKH_LAWATAN_PREMIS',
+    'STATUS_PERNIAGAAN_KESELURUHAN', 'RUMUSAN_DAN_LANGKAH_KEHADAPAN',
+    'URL_GAMBAR_PREMIS_JSON', 'URL_GAMBAR_SESI_JSON', 'URL_GAMBAR_GW360',
+    'Mentee_Folder_ID', 'Laporan_Maju_Doc_ID',
+    'MIA_STATUS', 'MIA_REASON', 'MIA_PROOF_URL'
+  ];
+}
+
+/**
+ * Opens the Maju spreadsheet and returns the sheet, headers, and column indices.
+ */
+function getLaporanMajuSheetAndHeaders() {
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    let sh = ss.getSheetByName(SHEET_NAME_LAPORAN_MAJU);
+    if (!sh) {
+      sh = ss.insertSheet(SHEET_NAME_LAPORAN_MAJU);
+      sh.getRange(1, 1, 1, getLaporanMajuColumnHeaders().length).setValues([getLaporanMajuColumnHeaders()]);
+    }
+    // Make sure sh is not null here
+    Logger.log(`Sheet found: ${!!sh}, Sheet name: ${sh ? sh.getName() : 'null'}`)
+     const currentHeaders = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+    //const currentHeaders = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+    // Ensure all required headers exist, and add if missing
+    const requiredHeaders = getLaporanMajuColumnHeaders();
+    let headersToInsert = requiredHeaders.filter(h => !currentHeaders.includes(h));
+
+    if (headersToInsert.length > 0) {
+      let lastCol = sh.getLastColumn();
+      sh.insertColumnsAfter(lastCol, headersToInsert.length);
+      headersToInsert.forEach((header, i) => sh.getRange(1, lastCol + 1 + i).setValue(header));
+      Logger.log('Added missing headers to LaporanMaju sheet: ' + headersToInsert.join(', '));
+      // Re-read headers after insertion
+      const updatedHeaders = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+      const idx = {};
+      updatedHeaders.forEach((h, i) => idx[h] = i + 1); // 1-based index
+      return { sheet: sh, headers: updatedHeaders, idx: idx };
+    } else {
+      const idx = {};
+      currentHeaders.forEach((h, i) => idx[h] = i + 1);
+      
+      return { 
+        sheet: sh,  // Make sure this is the actual sheet object
+        headers: currentHeaders, 
+        idx: idx 
+      };
+    }
+  } catch (spreadsheetError) {
+    Logger.log(`ERROR accessing spreadsheet: ${spreadsheetError.message}`);
+    throw spreadsheetError; // Let the error propagate - don't hide it
+  }
+}
+
+/**
+ * Looks up mentee's folder ID from the mapping sheet.
+ */
+function getMenteeFolderIdFromMapping(menteeName) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID); // Assuming mapping is in the same spreadsheet
+  const sh = ss.getSheetByName(SHEET_NAME_MAPPING);
+  if (!sh) throw new Error(`Tab '${SHEET_NAME_MAPPING}' not found in spreadsheet ID ${SPREADSHEET_ID}.`);
+
+  const values = sh.getDataRange().getValues();
+  if (values.length < 2) return null; // Only headers
+
+  const headers = values[0];
+  const menteeIdx = headers.indexOf('Mentee');
+  const folderIdx = headers.indexOf('Folder_ID'); // Ensure case matches your mapping sheet
+
+  if (menteeIdx === -1 || folderIdx === -1) {
+    throw new Error(`Mapping sheet must contain 'Mentee' and 'Folder_ID' columns.`);
+  }
+
+  for (let i = 1; i < values.length; i++) {
+    if ((values[i][menteeIdx] || '').trim() === menteeName) {
+      return (values[i][folderIdx] || '').toString().trim();
+    }
+    // Also check 'Usahawan' if 'Mentee' doesn't match, common typo
+    if (headers.includes('Usahawan') && (values[i][headers.indexOf('Usahawan')] || '').trim() === menteeName) {
+      return (values[i][folderIdx] || '').toString().trim();
+    }
+  }
+  return null;
+}
+
+/**
+ * Finds the existing document ID for a mentee in the sheet.
+ * Prioritizes the most recently updated row for a given mentee if multiple exist.
+ */
+function findExistingDocIdInSheet(sheet, menteeName, headers) {
+  const data = sheet.getDataRange().getValues();
+  const menteeColIndex = headers.indexOf('NAMA_MENTEE');
+  const docColIndex = headers.indexOf('Laporan_Maju_Doc_ID');
+
+  if (menteeColIndex === -1 || docColIndex === -1) {
+    Logger.log('Required columns for finding existing doc not found (NAMA_MENTEE or Laporan_Maju_Doc_ID).');
+    return null;
+  }
+
+  // Iterate from bottom up to find the latest doc ID for the specific mentee
+  for (let i = data.length - 1; i >= 1; i--) { // Start from the last row, skip headers
+    const row = data[i];
+    if (row[menteeColIndex] && String(row[menteeColIndex]).trim() === menteeName && row[docColIndex]) {
+      Logger.log(`Found existing doc ID ${row[docColIndex]} for mentee ${menteeName} in row ${i + 1}`);
+      return row[docColIndex];
+    }
+  }
+  Logger.log(`No existing doc ID found for mentee ${menteeName}.`);
+  return null;
+}
+
+/**
+ * Ensures that a session-specific subfolder exists in the mentee's main folder.
+ * Creates the subfolder if it doesn't exist and returns the subfolder ID.
+ * @param {string} menteeFolderId The main mentee folder ID from the mapping sheet.
+ * @param {number} sesiNum The session number (1, 2, 3, or 4).
+ * @param {string} executionId Unique ID for logging.
+ * @returns {string} The session subfolder ID for document placement.
+ */
+function ensureSessionSubfolder(menteeFolderId, sesiNum, executionId) {
+  try {
+    Logger.log(`[${executionId}] ensureSessionSubfolder: starting for session ${sesiNum}`);
+
+    // Validate inputs
+    if (!menteeFolderId) {
+      throw new Error('menteeFolderId is required');
+    }
+
+    if (!sesiNum || sesiNum < 1 || sesiNum > 4) {
+      throw new Error(`Invalid session number: ${sesiNum}. Must be 1-4.`);
+    }
+
+    // Get the main mentee folder
+    const menteeFolder = DriveApp.getFolderById(menteeFolderId);
+    Logger.log(`[${executionId}] Main folder accessed: ${menteeFolder.getName()}`);
+
+    // Define subfolder name
+    const subfolderName = `Sesi ${sesiNum}`;
+
+    // Check if session subfolder already exists
+    const existingSubfolders = menteeFolder.getFoldersByName(subfolderName);
+
+    if (existingSubfolders.hasNext()) {
+      // Subfolder exists, return its ID
+      const sessionSubfolder = existingSubfolders.next();
+      const sessionSubfolderId = sessionSubfolder.getId();
+      Logger.log(`[${executionId}] ✅ Session subfolder already exists: ${subfolderName} (${sessionSubfolderId})`);
+      return sessionSubfolderId;
+    } else {
+      // Subfolder doesn't exist, create it
+      const sessionSubfolder = menteeFolder.createFolder(subfolderName);
+      const sessionSubfolderId = sessionSubfolder.getId();
+      Logger.log(`[${executionId}] 🆕 Created session subfolder: ${subfolderName} (${sessionSubfolderId})`);
+      return sessionSubfolderId;
+    }
+
+  } catch (error) {
+    Logger.log(`[${executionId}] ❌ Error in ensureSessionSubfolder: ${error.message}`);
+    Logger.log(`[${executionId}] 🔄 Falling back to main mentee folder: ${menteeFolderId}`);
+
+    // Fallback: return the main mentee folder ID
+    return menteeFolderId;
+  }
+}
+
+/**
+ * Test function to verify subfolder creation and document placement.
+ * This function can be run manually from the Google Apps Script editor.
+ * @param {string} testMenteeName Optional test mentee name (defaults to "Test Mentee").
+ */
+function testSubfolderCreation(testMenteeName = "Test Mentee") {
+  const executionId = Utilities.getUuid().substring(0, 8);
+  Logger.log(`[${executionId}] 🧪 Starting subfolder creation test for: ${testMenteeName}`);
+
+  try {
+    // Get mentee folder ID from mapping (you'll need a real mentee name for this to work)
+    const menteeFolderId = getMenteeFolderIdFromMapping(testMenteeName);
+
+    if (!menteeFolderId) {
+      Logger.log(`[${executionId}] ❌ No folder mapping found for ${testMenteeName}. Please use a real mentee name or add to mapping sheet.`);
+      return;
+    }
+
+    Logger.log(`[${executionId}] 📂 Found mentee folder ID: ${menteeFolderId}`);
+
+    // Test creating subfolders for each session
+    const sessions = [1, 2, 3, 4];
+    const subfolderIds = {};
+
+    for (const sesiNum of sessions) {
+      Logger.log(`[${executionId}] 🔄 Testing Sesi ${sesiNum} subfolder creation...`);
+      const subfolderId = ensureSessionSubfolder(menteeFolderId, sesiNum, executionId);
+      subfolderIds[`sesi${sesiNum}`] = subfolderId;
+
+      // Verify subfolder exists
+      try {
+        const folder = DriveApp.getFolderById(subfolderId);
+        Logger.log(`[${executionId}] ✅ Sesi ${sesiNum} subfolder verified: "${folder.getName()}" (${subfolderId})`);
+      } catch (verifyError) {
+        Logger.log(`[${executionId}] ❌ Failed to verify Sesi ${sesiNum} subfolder: ${verifyError.message}`);
+      }
+    }
+
+    // Test creating the same subfolders again (should return existing ones)
+    Logger.log(`[${executionId}] 🔄 Testing duplicate subfolder creation (should return existing)...`);
+    for (const sesiNum of sessions) {
+      const existingSubfolderId = ensureSessionSubfolder(menteeFolderId, sesiNum, executionId);
+      if (existingSubfolderId === subfolderIds[`sesi${sesiNum}`]) {
+        Logger.log(`[${executionId}] ✅ Sesi ${sesiNum} correctly returned existing subfolder ID`);
+      } else {
+        Logger.log(`[${executionId}] ❌ Sesi ${sesiNum} returned different subfolder ID: ${existingSubfolderId} vs ${subfolderIds[`sesi${sesiNum}`]}`);
+      }
+    }
+
+    Logger.log(`[${executionId}] 🎉 Subfolder creation test completed successfully!`);
+    Logger.log(`[${executionId}] 📋 Summary of created subfolders:`);
+    for (const [key, id] of Object.entries(subfolderIds)) {
+      Logger.log(`[${executionId}]   - ${key}: ${id}`);
+    }
+
+  } catch (error) {
+    Logger.log(`[${executionId}] ❌ Test failed: ${error.message}`);
+    Logger.log(`[${executionId}] 📚 Stack trace: ${error.stack}`);
+  }
+}
+
+/**
+ * Test function to verify image upload to session subfolders.
+ * This function can be run manually from the Google Apps Script editor.
+ * @param {string} testMenteeName Optional test mentee name (defaults to "Test Mentee").
+ */
+function testImageUploadToSubfolders(testMenteeName = "Test Mentee") {
+  const executionId = Utilities.getUuid().substring(0, 8);
+  Logger.log(`[${executionId}] 🧪 Starting image upload subfolder test for: ${testMenteeName}`);
+
+  try {
+    // Get mentee folder ID from mapping
+    const menteeFolderId = getMenteeFolderIdFromMapping(testMenteeName);
+
+    if (!menteeFolderId) {
+      Logger.log(`[${executionId}] ❌ No folder mapping found for ${testMenteeName}. Please use a real mentee name.`);
+      return;
+    }
+
+    Logger.log(`[${executionId}] 📂 Found mentee folder ID: ${menteeFolderId}`);
+
+    // Create a test image (small base64 encoded PNG)
+    const testImageData = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+
+    // Test image upload for each session
+    const sessions = [1, 2, 3, 4];
+    for (const sesiNum of sessions) {
+      Logger.log(`[${executionId}] 🔄 Testing image upload for Sesi ${sesiNum}...`);
+
+      const imageUploadData = {
+        action: 'uploadImage',
+        fileData: testImageData,
+        fileName: `test-image-sesi${sesiNum}.png`,
+        fileType: 'image/png',
+        folderId: menteeFolderId,
+        menteeName: testMenteeName,
+        sessionNumber: sesiNum,
+        isMIAProof: false
+      };
+
+      try {
+        const result = handleImageUpload(imageUploadData, executionId);
+        const resultObj = JSON.parse(result.getContent());
+
+        if (resultObj.success) {
+          Logger.log(`[${executionId}] ✅ Sesi ${sesiNum} image upload successful: ${resultObj.fileId}`);
+        } else {
+          Logger.log(`[${executionId}] ❌ Sesi ${sesiNum} image upload failed: ${resultObj.message}`);
+        }
+      } catch (uploadError) {
+        Logger.log(`[${executionId}] ❌ Sesi ${sesiNum} image upload error: ${uploadError.message}`);
+      }
+    }
+
+    // Test MIA image upload
+    Logger.log(`[${executionId}] 🔄 Testing MIA image upload...`);
+    const miaImageData = {
+      action: 'uploadImage',
+      fileData: testImageData,
+      fileName: 'test-mia-proof.png',
+      fileType: 'image/png',
+      folderId: menteeFolderId,
+      menteeName: testMenteeName,
+      sessionNumber: 2, // MIA for session 2
+      isMIAProof: true
+    };
+
+    try {
+      const miaResult = handleImageUpload(miaImageData, executionId);
+      const miaResultObj = JSON.parse(miaResult.getContent());
+
+      if (miaResultObj.success) {
+        Logger.log(`[${executionId}] ✅ MIA image upload successful: ${miaResultObj.fileId}`);
+      } else {
+        Logger.log(`[${executionId}] ❌ MIA image upload failed: ${miaResultObj.message}`);
+      }
+    } catch (miaError) {
+      Logger.log(`[${executionId}] ❌ MIA image upload error: ${miaError.message}`);
+    }
+
+    Logger.log(`[${executionId}] 🎉 Image upload subfolder test completed!`);
+
+  } catch (error) {
+    Logger.log(`[${executionId}] ❌ Test failed: ${error.message}`);
+    Logger.log(`[${executionId}] 📚 Stack trace: ${error.stack}`);
+  }
+}
+
+/**
+ * Normalizes session number from various inputs (e.g., "Sesi #1", 1).
+ */
+function normalizeSesiNumber(raw) {
+  if (typeof raw === 'number') return raw;
+  const m = String(raw || '').match(/#?\s*(\d+)/);
+  return m ? Number(m[1]) : 0;
+}
+
+/**
+ * Converts value to JSON string, or returns '[]' if empty/invalid.
+ */
+function asJsonString(value) {
+  if (value == null || value === '') return '[]';
+  if (typeof value === 'string') {
+    try {
+      JSON.parse(value); // Test if it's already a valid JSON string
+      return value;
+    } catch (_) { /* fall through */ }
+  }
+  return JSON.stringify(value);
+}
+
+// === DOCUMENT POPULATION HELPERS (Replicated from Bangkit & adapted) ===
+
+/**
+ * Inserts a table into the document body/container from JSON data.
+ * Can replace a placeholder or just append.
+ * @param {DocumentApp.Body|DocumentApp.TableCell} container The element to insert the table into.
+ * @param {string|Array<Object>} jsonData The JSON data (string or parsed array).
+ * @param {string} headingText Heading for the table.
+ * @param {string|null} placeholderToRemove If provided, replaces this marker with the table.
+ * @param {Array<string>} [desiredHeadersOrder] Optional array to specify header order and filter.
+ * @param {string} executionId Unique ID for logging.
+ */
+function insertTableFromJson(container, jsonData, headingText, placeholderToRemove = null, desiredHeadersOrder = null, executionId) {
+  try {
+    Logger.log(`[${executionId}] insertTableFromJson called for '${headingText}' with placeholder '${placeholderToRemove}'`);
+    Logger.log(`[${executionId}] JSON data type: ${typeof jsonData}, length: ${jsonData ? jsonData.length : 'N/A'}`);
+    Logger.log(`[${executionId}] JSON data received: ${JSON.stringify(jsonData, null, 2)}`);
+    
+    const json = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
+    if (!Array.isArray(json) || json.length === 0) {
+      Logger.log(`[${executionId}] No data for table: ${headingText}. Array check - isArray: ${Array.isArray(json)}, length: ${json ? json.length : 'N/A'}`);
+      
+      if (placeholderToRemove) {
+        const range = container.findText(placeholderToRemove);
+        if (range) {
+          range.getElement().asText().replaceText(placeholderToRemove, `${headingText}\n\nTiada data untuk dipaparkan.`);
+          Logger.log(`[${executionId}] Replaced placeholder '${placeholderToRemove}' with no-data message`);
+        } else {
+          Logger.log(`[${executionId}] Placeholder '${placeholderToRemove}' not found for no-data replacement`);
+        }
+      } else if (container.appendParagraph) {
+        container.appendParagraph(`[Tiada ${headingText.toLowerCase()} direkodkan]`);
+      }
+      return null;
+    }
+
+    let headers = Object.keys(json[0]);
+    if (desiredHeadersOrder && desiredHeadersOrder.length > 0) {
+      // Filter and reorder headers based on desiredHeadersOrder
+      headers = desiredHeadersOrder.filter(h => headers.includes(h));
+    }
+
+    const tableData = [headers.map(h => h.replace(/_/g, ' ').toUpperCase())]; // Capitalize and replace underscores
+    json.forEach(item => {
+      tableData.push(headers.map(h => {
+        let val = item[h];
+        // Special handling for 'Pelan Tindakan' which is a nested array of objects
+        if (Array.isArray(val) && h === 'Pelan Tindakan') {
+            return val.map(plan =>
+                `${plan.Tindakan || ''} (Jangkaan Siap: ${plan['Jangkaan tarikh siap'] || 'N/A'}) - ${plan.Catatan || ''}`
+            ).join('\n');
+        }
+        // Handle other potential arrays or complex objects
+        if (Array.isArray(val)) {
+          return val.map(v => typeof v === 'object' ? JSON.stringify(v) : String(v)).join(', ');
+        }
+        // Handle objects by converting to readable string
+        if (typeof val === 'object' && val !== null) {
+          return JSON.stringify(val);
+        }
+        return val || '';
+      }));
+    });
+
+    // Enhanced approach: Try multiple placeholder patterns and better detection
+    if (placeholderToRemove) {
+      addDebugLog(executionId, `🔍 Starting search for placeholder: '${placeholderToRemove}'`);
+      
+      // Try exact match first
+      let range = container.findText(placeholderToRemove);
+      addDebugLog(executionId, `📋 Exact match result for '${placeholderToRemove}': ${range ? 'FOUND' : 'NOT FOUND'}`);
+      
+      // If exact match not found, try comprehensive search approaches
+      if (!range) {
+        addDebugLog(executionId, `🔎 Starting comprehensive search for '${placeholderToRemove}'`);
+        
+        // Method 1: Try with regex pattern
+        try {
+          const regexPattern = placeholderToRemove.replace(/[{}]/g, '\\$&');
+          range = container.findText(regexPattern);
+          addDebugLog(executionId, `🔧 Regex pattern '${regexPattern}': ${range ? 'FOUND' : 'NOT FOUND'}`);
+        } catch (regexError) {
+          addDebugLog(executionId, `❌ Regex search failed: ${regexError.message}`);
+        }
+        
+        // Method 2: Manual search through all text elements
+        if (!range) {
+          addDebugLog(executionId, `🔍 Trying manual element search...`);
+          const fullText = container.getText();
+          const placeholderIndex = fullText.indexOf(placeholderToRemove);
+          addDebugLog(executionId, `📍 Manual indexOf search: ${placeholderIndex >= 0 ? `FOUND at position ${placeholderIndex}` : 'NOT FOUND'}`);
+          
+          if (placeholderIndex >= 0) {
+            // If we can find it manually, try findText again with different approaches
+            addDebugLog(executionId, `⚠️ Placeholder exists in text but findText() failed. Trying element-by-element search...`);
+            
+            // Try searching through each element
+            const elements = container.getNumChildren();
+            addDebugLog(executionId, `📊 Document has ${elements} child elements`);
+            
+            for (let i = 0; i < elements && !range; i++) {
+              try {
+                const element = container.getChild(i);
+                const elementType = element.getType();
+                Logger.log(`[${executionId}] 🔍 Element ${i}: type = ${elementType}`);
+                
+                if (elementType === DocumentApp.ElementType.PARAGRAPH) {
+                  const para = element.asParagraph();
+                  const paraText = para.getText();
+                  Logger.log(`[${executionId}] 📋 Paragraph ${i} text (${paraText.length} chars): "${paraText}"`);
+                  
+                  if (paraText.includes(placeholderToRemove)) {
+                    addDebugLog(executionId, `🎯 FOUND placeholder in paragraph ${i}!`);
+                    addDebugLog(executionId, `📍 Exact paragraph text: "${paraText}"`);
+                    addDebugLog(executionId, `🔎 Placeholder position: ${paraText.indexOf(placeholderToRemove)}`);
+                    
+                    // Try direct replacement on the paragraph
+                    try {
+                      para.replaceText(placeholderToRemove, `PLACEHOLDER_REPLACED_${i}`);
+                      addDebugLog(executionId, `✅ Direct replacement successful on paragraph ${i}`);
+                      
+                      // Insert table after this paragraph
+                      const table = container.insertTable(i + 1, tableData);
+                      addDebugLog(executionId, `🎉 Table inserted after paragraph ${i}!`);
+                      
+                      // Add heading before table
+                      const heading = container.insertParagraph(i + 1, headingText);
+                      heading.setHeading(DocumentApp.ParagraphHeading.HEADING2);
+                      addDebugLog(executionId, `📝 Heading '${headingText}' added`);
+                      
+                      return table;
+                      
+                    } catch (replaceError) {
+                      addDebugLog(executionId, `❌ Direct replacement failed: ${replaceError.message}`);
+                    }
+                    
+                    range = para.findText(placeholderToRemove);
+                    if (range) {
+                      Logger.log(`[${executionId}] Successfully found range in paragraph ${i}`);
+                      break;
+                    }
+                  }
+                } else if (elementType === DocumentApp.ElementType.TABLE) {
+                  const table = element.asTable();
+                  const tableText = table.getText();
+                  if (tableText.includes(placeholderToRemove)) {
+                    Logger.log(`[${executionId}] Found placeholder in table ${i}`);
+                    // Try to find it in table cells
+                    const numRows = table.getNumRows();
+                    for (let r = 0; r < numRows && !range; r++) {
+                      const row = table.getRow(r);
+                      const numCells = row.getNumCells();
+                      for (let c = 0; c < numCells && !range; c++) {
+                        const cell = row.getCell(c);
+                        const cellText = cell.getText();
+                        if (cellText.includes(placeholderToRemove)) {
+                          Logger.log(`[${executionId}] Found placeholder in table cell [${r}][${c}]: "${cellText}"`);
+                          range = cell.findText(placeholderToRemove);
+                          if (range) {
+                            Logger.log(`[${executionId}] Successfully found range in table cell [${r}][${c}]`);
+                            break;
+                          }
+                        }
+                      }
+                    }
+                  }
+                } else if (elementType === DocumentApp.ElementType.LIST_ITEM) {
+                  const listItem = element.asListItem();
+                  const listText = listItem.getText();
+                  if (listText.includes(placeholderToRemove)) {
+                    Logger.log(`[${executionId}] Found placeholder in list item ${i}: "${listText}"`);
+                    range = listItem.findText(placeholderToRemove);
+                    if (range) {
+                      Logger.log(`[${executionId}] Successfully found range in list item ${i}`);
+                      break;
+                    }
+                  }
+                }
+              } catch (elementError) {
+                Logger.log(`[${executionId}] Error checking element ${i}: ${elementError.message}`);
+              }
+            }
+          }
+        }
+      }
+      
+      // If not found, try variations of the placeholder
+      if (!range) {
+        const variations = [
+          placeholderToRemove.replace(/[{}]/g, ''), // Remove all braces
+          placeholderToRemove.replace('_TABLE', ''), // Remove _TABLE suffix
+          placeholderToRemove.replace('{{', '').replace('}}', '').replace('_TABLE', ''), // Clean version
+          'DATA KEWANGAN BULANAN', // Try exact heading text
+          'DAPATAN SESI MENTORING' // Try exact heading text for mentoring findings
+        ];
+        
+        for (const variant of variations) {
+          if (!range && variant) {
+            Logger.log(`[${executionId}] Trying variant: '${variant}'`);
+            range = container.findText(variant);
+            if (range) {
+              Logger.log(`[${executionId}] Found placeholder variant: '${variant}'`);
+              placeholderToRemove = variant; // Update the placeholder to replace
+              break;
+            }
+          }
+        }
+      }
+      
+      // Also try regex search for similar patterns
+      if (!range) {
+        const fullText = container.getText();
+        const regexMatches = fullText.match(/\{\{[^}]*KEWANGAN[^}]*\}\}|\{\{[^}]*MENTORING[^}]*\}\}|\{\{[^}]*DATA[^}]*\}\}/gi);
+        Logger.log(`[${executionId}] Found potential table placeholders via regex: ${regexMatches}`);
+        
+        if (regexMatches && regexMatches.length > 0) {
+          // Try to find the first match
+          range = container.findText(regexMatches[0]);
+          if (range) {
+            Logger.log(`[${executionId}] Using regex match as placeholder: '${regexMatches[0]}'`);
+            placeholderToRemove = regexMatches[0]; // Update placeholder for replacement
+          }
+        }
+      }
+      
+      if (range) {
+        Logger.log(`[${executionId}] Found placeholder '${placeholderToRemove}', attempting DIRECT replacement...`);
+        
+        // Get the original text and element
+        const textElement = range.getElement().asText();
+        const originalText = textElement.getText();
+        Logger.log(`[${executionId}] Original text: '${originalText.substring(0, 200)}...'`);
+        
+        // STRATEGY: Replace placeholder with heading + insert table immediately after
+        try {
+          // Step 1: Replace the placeholder text with the heading
+          textElement.replaceText(placeholderToRemove, headingText);
+          Logger.log(`[${executionId}] Placeholder text replaced with heading`);
+          
+          // Step 2: Get the paragraph containing the replaced text
+          const containingParagraph = textElement.getParent();
+          Logger.log(`[${executionId}] Containing element type: ${containingParagraph.getType()}`);
+          
+          let targetParagraph = null;
+          let parentContainer = null;
+          
+          if (containingParagraph.getType() === DocumentApp.ElementType.PARAGRAPH) {
+            targetParagraph = containingParagraph.asParagraph();
+            parentContainer = targetParagraph.getParent();
+            targetParagraph.setHeading(DocumentApp.ParagraphHeading.HEADING3);
+            
+          } else if (containingParagraph.getType() === DocumentApp.ElementType.LIST_ITEM) {
+            const listItem = containingParagraph.asListItem();
+            const list = listItem.getParent();
+            parentContainer = list.getParent();
+            
+            // Create a new paragraph after the list for the heading
+            const listIndex = getElementIndex(list);
+            targetParagraph = parentContainer.insertParagraph(listIndex + 1, headingText);
+            targetParagraph.setHeading(DocumentApp.ParagraphHeading.HEADING3);
+            
+            // Clear the placeholder from the list item since we moved it
+            listItem.replaceText(headingText, ''); 
+            
+          } else if (containingParagraph.getType() === DocumentApp.ElementType.TABLE_CELL) {
+            const tableCell = containingParagraph.asTableCell();
+            const tableRow = tableCell.getParent();
+            const table = tableRow.getParent();
+            parentContainer = table.getParent();
+            
+            // Insert paragraph after the table
+            const tableIndex = getElementIndex(table);
+            targetParagraph = parentContainer.insertParagraph(tableIndex + 1, headingText);
+            targetParagraph.setHeading(DocumentApp.ParagraphHeading.HEADING3);
+            
+            // Clear the placeholder from the table cell
+            tableCell.replaceText(headingText, '');
+          }
+          
+          if (targetParagraph && parentContainer) {
+            // Step 3: Insert the data table immediately after the heading paragraph
+            const paragraphIndex = getElementIndex(targetParagraph);
+            
+            // 🔍 CRITICAL DEBUG: Log everything before table insertion
+            Logger.log(`[${executionId}] 🔍 BEFORE TABLE INSERTION:`);
+            Logger.log(`[${executionId}] - parentContainer type: ${parentContainer.getType()}`);
+            Logger.log(`[${executionId}] - paragraphIndex: ${paragraphIndex}`);
+            Logger.log(`[${executionId}] - tableData length: ${tableData.length}`);
+            Logger.log(`[${executionId}] - tableData[0] keys: ${Object.keys(tableData[0])}`);
+            
+            // 🎯 FIX: Handle paragraphIndex = -1 with robust fallback
+            let insertionIndex = paragraphIndex;
+            if (insertionIndex === -1) {
+              Logger.log(`[${executionId}] ⚠️ getElementIndex returned -1, using fallback strategy`);
+              // Fallback: Find the paragraph by searching for the heading text
+              const allParagraphs = parentContainer.getParagraphs();
+              for (let i = 0; i < allParagraphs.length; i++) {
+                if (allParagraphs[i].getText().includes(headingText)) {
+                  insertionIndex = i;
+                  Logger.log(`[${executionId}] 🎯 Found heading paragraph at fallback index: ${insertionIndex}`);
+                  break;
+                }
+              }
+              // If still -1, append at end of container
+              if (insertionIndex === -1) {
+                insertionIndex = parentContainer.getNumChildren() - 1;
+                Logger.log(`[${executionId}] 🎯 Using final fallback - appending at index: ${insertionIndex}`);
+              }
+            }
+            
+            try {
+              const dataTable = parentContainer.insertTable(insertionIndex + 1, tableData);
+              
+              // 🔍 VERIFY TABLE ACTUALLY CREATED
+              if (dataTable) {
+                const numRows = dataTable.getNumRows();
+                const numCols = dataTable.getRow(0).getNumCells();
+                Logger.log(`[${executionId}] ✅ TABLE CREATED: ${numRows} rows, ${numCols} columns`);
+                
+                dataTable.setBorderWidth(1);
+                dataTable.getRow(0).editAsText().setBold(true);
+                
+                Logger.log(`[${executionId}] ✅ SUCCESS: Table '${headingText}' inserted at corrected position ${insertionIndex + 1} (original paragraphIndex was ${paragraphIndex})`);
+                return dataTable;
+              } else {
+                throw new Error('insertTable returned null/undefined');
+              }
+            } catch (insertError) {
+              Logger.log(`[${executionId}] ❌ TABLE INSERTION FAILED: ${insertError.message}`);
+              throw insertError;
+            }
+          } else {
+            throw new Error('Could not determine target paragraph or parent container');
+          }
+          
+        } catch (directError) {
+          Logger.log(`[${executionId}] Direct replacement failed: ${directError.message}`);
+          Logger.log(`[${executionId}] Error details: ${directError.stack}`);
+          
+          // Enhanced fallback: try to insert near the placeholder location
+          try {
+            Logger.log(`[${executionId}] Attempting enhanced fallback insertion...`);
+            
+            // Find a good insertion point near the placeholder
+            const paragraphs = container.getParagraphs();
+            let insertAfterIndex = -1;
+            
+            for (let i = 0; i < paragraphs.length; i++) {
+              const para = paragraphs[i];
+              if (para.getText().includes(headingText)) {
+                insertAfterIndex = getElementIndex(para);
+                Logger.log(`[${executionId}] Found heading paragraph at index ${insertAfterIndex}`);
+                break;
+              }
+            }
+            
+            if (insertAfterIndex >= 0) {
+              const table = container.insertTable(insertAfterIndex + 1, tableData);
+              table.setBorderWidth(1);
+              table.getRow(0).editAsText().setBold(true);
+              Logger.log(`[${executionId}] ✅ Table '${headingText}' inserted via enhanced fallback at position ${insertAfterIndex + 1}`);
+              return table;
+            } else {
+              throw new Error('Could not find insertion point even in fallback');
+            }
+            
+          } catch (fallbackError) {
+            Logger.log(`[${executionId}] Even enhanced fallback failed: ${fallbackError.message}`);
+            
+            // Last resort: append at end but log it clearly
+            const headingParagraph = container.appendParagraph(headingText);
+            headingParagraph.setHeading(DocumentApp.ParagraphHeading.HEADING3);
+            const table = container.appendTable(tableData);
+            table.setBorderWidth(1);
+            table.getRow(0).editAsText().setBold(true);
+            Logger.log(`[${executionId}] ⚠️ LAST RESORT: Table '${headingText}' appended at document end`);
+            return table;
+          }
+        }
+      } else {
+        Logger.log(`[${executionId}] Placeholder '${placeholderToRemove}' not found in document. Searching entire document...`);
+        
+        // Debug: List all text in the document to see what's actually there
+        const fullText = container.getText();
+        const allPlaceholders = fullText.match(/\{\{[^}]+\}\}/g);
+        Logger.log(`[${executionId}] All placeholders in document: ${allPlaceholders}`);
+        Logger.log(`[${executionId}] Document text length: ${fullText.length}`);
+        Logger.log(`[${executionId}] Appending table instead.`);
+      }
+    }
+
+    // Fallback: append to container
+    if (container.appendParagraph) {
+      const headingParagraph = container.appendParagraph(headingText);
+      headingParagraph.setHeading(DocumentApp.ParagraphHeading.HEADING3);
+    }
+    
+    if (container.appendTable) {
+      const table = container.appendTable(tableData);
+      table.setBorderWidth(1);
+      table.getRow(0).editAsText().setBold(true);
+      Logger.log(`[${executionId}] Table '${headingText}' appended to container.`);
+      return table;
+    }
+
+    Logger.log(`[${executionId}] Could not insert table '${headingText}' - no suitable insertion method found.`);
+    return null;
+
+  } catch (e) {
+    Logger.log(`[${executionId}] insertTableFromJson error for '${headingText}': ${e.message}`);
+    Logger.log(`[${executionId}] Error stack: ${e.stack}`);
+    if (placeholderToRemove) container.replaceText(placeholderToRemove, `Error loading ${headingText.toLowerCase()} data: ${e.message}`);
+    else if (container.appendParagraph) container.appendParagraph(`Error loading ${headingText.toLowerCase()} data: ${e.message}`);
+    return null;
+  }
+}
+
+/**
+ * Inserts images at a specified marker in the document.
+ * Adapts to place images in cells or directly in the body.
+ * @param {DocumentApp.Body|DocumentApp.TableCell} container The element to insert the images into.
+ * @param {string|null} marker The placeholder text (e.g., '{{IMAGE_PLACEHOLDER}}'). If null, appends directly.
+ * @param {string|Array<string>} urls Comma-separated string of URLs or an array of URLs.
+ * @param {string} executionId Unique ID for logging.
+ */
+function insertImageAt_(container, marker, urls, executionId) {
+  Logger.log(`[${executionId}] Attempting to insert image at marker: ${marker} with URL(s): ${JSON.stringify(urls)}`);
+  
+  let urlList = [];
+  if (typeof urls === 'string') {
+      try { // Try parsing as JSON array first (if frontend stringifies arrays)
+          const parsed = JSON.parse(urls);
+          if (Array.isArray(parsed)) {
+              urlList = parsed.map(s => String(s).trim()).filter(Boolean);
+          } else { // Fallback to comma-separated string if not an array but parsable
+              urlList = String(urls).split(',').map(s => s.trim()).filter(Boolean);
+          }
+      } catch (e) { // If not JSON or comma-separated, treat as single URL
+          urlList = [String(urls).trim()].filter(Boolean);
+      }
+  } else if (Array.isArray(urls)) {
+      urlList = urls.map(s => String(s).trim()).filter(Boolean);
+  } else {
+      urlList = [String(urls || '').trim()].filter(Boolean); // Handle single URL directly, or empty
+  }
+
+  if (urlList.length === 0) {
+    if (marker) replaceAll_(container, marker, '[No image uploaded]');
+    else if (container.appendParagraph) container.appendParagraph('[No image uploaded]');
+    Logger.log(`[${executionId}] No URLs provided for marker: ${marker}. Replaced/Appended with '[No image uploaded]'.`);
+    return;
+  }
+
+  let targetParagraph = null;
+
+  if (marker) { // If a marker is provided, try to find and replace it
+    const range = container.findText(marker);
+    if (range) {
+      targetParagraph = range.getElement().getParent().asParagraph();
+      range.getElement().asText().replaceText(marker, ''); // Clear the placeholder
+      targetParagraph.clear(); // Clear the paragraph to ensure clean image insertion
+      Logger.log(`[${executionId}] Marker found for image insertion: ${marker}`);
+    } else {
+      Logger.log(`[${executionId}] Marker not found for image insertion: ${marker}. Appending images to container.`);
+    }
+  }
+
+  // If no marker found or no marker provided, append to container
+  if (!targetParagraph) {
+      if (container.appendParagraph) {
+          targetParagraph = container.appendParagraph('');
+      } else {
+          Logger.log(`[${executionId}] Cannot append paragraph to container type: ${container.getType()}`);
+          return; // Cannot insert images if no paragraph to append to
+      }
+  }
+  
+  const cell = findAncestorTableCell_(targetParagraph);
+  const inCell = !!cell;
+
+  if (inCell) {
+    let currentParagraph = targetParagraph;
+    let imagesInCurrentRow = 0;
+
+    urlList.forEach((u, i) => {
+      if (imagesInCurrentRow >= COLS_PER_ROW) {
+        currentParagraph = cell.appendParagraph(''); // Start new paragraph in cell for next row of images
+        imagesInCurrentRow = 0;
+      }
+      appendImageToParagraph(currentParagraph, u, MAX_CELL_WIDTH, executionId);
+      imagesInCurrentRow++;
+      if (imagesInCurrentRow < COLS_PER_ROW && i < urlList.length - 1) {
+        currentParagraph.appendText('  '); // Add space between images in the same row
+      }
+    });
+    Logger.log(`[${executionId}] Images inserted in table cell for marker: ${marker}`);
+  } else {
+    urlList.forEach((u, i) => {
+      appendImageToParagraph(targetParagraph, u, MAX_BODY_WIDTH, executionId);
+      if (i < urlList.length - 1) {
+        targetParagraph.appendText(' '); // Add space between images
+      }
+    });
+    Logger.log(`[${executionId}] Images inserted in body for marker: ${marker}`);
+  }
+}
+
+/** Helper for insertImageAt_: appends a single image to a paragraph */
+function appendImageToParagraph(paragraph, url, maxWidth, executionId) {
+    try {
+        const id = extractDriveId_(url);
+        const blob = id ? DriveApp.getFileById(id).getBlob() : UrlFetchApp.fetch(url).getBlob();
+        const img = paragraph.appendInlineImage(blob);
+        clampImageWidth_(img, maxWidth);
+        Logger.log(`[${executionId}] Appended image: ${url}`);
+    } catch (e) {
+        Logger.log(`[${executionId}] Error embedding image from URL ${url}: ${e.message}`);
+        paragraph.appendText(` [[Image not available: ${url}]] `);
+    }
+}
+
+
+/**
+ * Clamps the width of an inline image to a maximum value, maintaining aspect ratio.
+ */
+function clampImageWidth_(img, maxWidth) {
+  try {
+    const originalWidth = img.getWidth();
+    const originalHeight = img.getHeight();
+    if (originalWidth > maxWidth) {
+      const newHeight = (originalHeight * maxWidth) / originalWidth;
+      img.setWidth(maxWidth).setHeight(newHeight);
+    }
+  } catch (e) {
+    Logger.log('Error clamping image width: ' + e.message);
+  }
+}
+
+/**
+ * Finds the nearest ancestor TableCell element for a given element.
+ */
+function findAncestorTableCell_(el) {
+  let cur = el;
+  while (cur) {
+    if (cur.getType && cur.getType() === DocumentApp.ElementType.TABLE_CELL) return cur.asTableCell();
+    if (!cur.getParent) break;
+    cur = cur.getParent();
+  }
+  return null;
+}
+
+/**
+ * Extracts Google Drive File ID from a URL.
+ */
+function extractDriveId_(url) {
+  if (!url) return '';
+  // Pattern for common Drive URLs: /file/d/ID/ or ?id=ID
+  const m1 = url.match(/\/file\/d\/([a-zA-Z0-9_-]{20,})\b/);
+  if (m1 && m1[1]) return m1[1];
+  const m2 = url.match(/[?&](?:id|fileId)=([a-zA-Z0-9_-]{20,})\b/);
+  if (m2 && m2[1]) return m2[1];
+  // If it's just the ID string directly
+  if (/^[a-zA-Z0-9_-]{20,}$/.test(url)) return url;
+  const m3 = url.match(/(?:open|uc)\?id=([a-zA-Z0-9_-]{20,})\b/);
+  if (m3 && m3[1]) return m3[1];
+  return '';
+}
+
+/**
+ * Replaces all occurrences of a marker text with replacement text in the container.
+ * @param {DocumentApp.Body|DocumentApp.TableCell} container The element to search within.
+ * @param {string} marker The text to find.
+ * @param {string} text The replacement text.
+ */
+function replaceAll_(container, marker, text) {
+  let r;
+  // Use a loop to replace all occurrences.
+  while ((r = container.findText(marker))) {
+    r.getElement().asText().replaceText(marker, text);
+  }
+}
+
+/**
+ * Finds the index of an element within its parent's children.
+ * @param {GoogleAppsScript.Document.Element} child The child element.
+ * @returns {number} The index of the child, or -1 if not found.
+ */
+function getElementIndex(child) {
+    const parent = child.getParent();
+    if (!parent || !parent.getNumChildren) return -1;
+    for (let i = 0; i < parent.getNumChildren(); i++) {
+        // Use object comparison instead of getId() which doesn't exist on all elements
+        if (parent.getChild(i) === child) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+/**
+ * Find a TABLE that has a row whose first cell equals/contains a given label (used for footer or main info table)
+ * Searches recursively into nested tables.
+ * @param {DocumentApp.Body} body The document body.
+ * @param {string} label The text to search for in the first cell of a row.
+ * @param {string} executionId Unique ID for logging.
+ * @returns {GoogleAppsScript.Document.Table|null} The found table or null if not found.
+ */
+function findTableByRowHeader_(body, label, executionId) {
+    const labelU = String(label).toUpperCase().trim();
+    const stack = [body];
+    while (stack.length) {
+        const el = stack.pop();
+        if (!el || !el.getNumChildren) continue;
+
+        if (el.getType && el.getType() === DocumentApp.ElementType.TABLE) {
+            const t = el.asTable();
+            for (let r = 0; r < t.getNumRows(); r++) {
+                const row = t.getRow(r);
+                if (row.getNumCells() > 0) {
+                    const firstCellText = row.getCell(0).getText().toUpperCase().trim();
+                    if (firstCellText.includes(labelU)) {
+                        Logger.log(`[${executionId}] Found table by row header: '${label}'`);
+                        return t;
+                    }
+                }
+            }
+        }
+        // Push children onto the stack in reverse order to process them depth-first
+        for (let i = el.getNumChildren() - 1; i >= 0; i--) {
+            stack.push(el.getChild(i));
+        }
+    }
+    Logger.log(`[${executionId}] Table with row header '${label}' not found.`);
+    return null;
+}
+
+/**
+ * Finds a specific row within a table by matching the text in its first cell.
+ * @param {GoogleAppsScript.Document.Table} table The table to search within.
+ * @param {string} rowHeader The exact text expected in the first cell of the row.
+ * @param {string} executionId Unique ID for logging.
+ * @returns {GoogleAppsScript.Document.TableRow|null} The found table row or null.
+ */
+function findRowInTable_(table, rowHeader, executionId) {
+    const headerUpper = String(rowHeader).toUpperCase().trim();
+    for (let i = 0; i < table.getNumRows(); i++) {
+        const row = table.getRow(i);
+        if (row.getNumCells() > 0) {
+            const cellText = row.getCell(0).getText().toUpperCase().trim();
+            if (cellText.includes(headerUpper)) {
+                Logger.log(`[${executionId}] Found row in table with header: '${rowHeader}'`);
+                return row;
+            }
+        }
+    }
+    Logger.log(`[${executionId}] Row with header '${rowHeader}' not found in table.`);
+    return null;
+}
+
+/**
+ * Fills the footer "Tarikh & Disediakan oleh:" box in the document.
+ * @param {GoogleAppsScript.Document.Body} body The document body.
+ * @param {string} dateStr Formatted date string.
+ * @param {string} mentorName Mentor's name.
+ * @param {string} executionId Unique ID for logging.
+ */
+function fillFooterPreparedBy_(body, dateStr, mentorName, executionId) {
+  const tbl = findTableByRowHeader_(body, 'Tarikh & Disediakan oleh:', executionId);
+  if (!tbl) return;
+  for (let r = 0; r < tbl.getNumRows(); r++) {
+    const row = tbl.getRow(r);
+    if (row.getNumCells() >= 2) {
+      const left = row.getCell(0).getText().trim();
+      if (left.includes('Tarikh & Disediakan oleh:')) {
+        row.getCell(1).clear().setText(`${dateStr}  ${mentorName}`);
+        Logger.log(`[${executionId}] Footer updated.`);
+        return;
+      }
+    }
+  }
+}
+
+// === DATE/TIME FORMATTING ===
+
+function formatDate(val) {
+    let d = val;
+    if (typeof val === 'number') d = serialToDate_(val);
+    if (typeof val === 'string') {
+        const t = new Date(val);
+        if (!isNaN(t.getTime())) d = t;
+    }
+    if (d instanceof Date && !isNaN(d.getTime())) {
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const yy = d.getFullYear();
+        return `${dd}/${mm}/${yy}`;
+    }
+    return String(val || '');
+}
+
+function formatTime(val) {
+    if (typeof val === 'number') {
+        const totalMinutes = Math.round(val * 24 * 60);
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+    }
+    if (val instanceof Date && !isNaN(val.getTime())) {
+        const hh = String(val.getHours()).padStart(2, '0');
+        const mm = String(val.getMinutes()).padStart(2, '0');
+        return `${hh}:${mm}`;
+    }
+    const s = String(val || '').trim();
+    if (/^\d{1,2}:\d{2}$/.test(s)) return s;
+    return s;
+}
+
+function serialToDate_(serial) {
+    return new Date(Math.round((serial - 25569) * 86400) * 1000);
+}
+
+
+// === TEST FUNCTIONS ===
+/**
+ * Test function to manually trigger document generation for a specific row.
+ * Use this for debugging directly within the Apps Script editor.
+ * IMPORTANT: Before running, ensure:
+ * 1. Your SPREADSHEET_ID, TEMPLATE_DOC_ID are correct.
+ * 2. The testRowNumber has complete and valid data.
+ * 3. The Mentee_Folder_ID in that row is valid and accessible by the script.
+ * 4. This Apps Script has permissions to Google Drive and Google Docs.
+ */
+function testProcessMajuRow() {
+  const testRowNumber = 2; // <<< IMPORTANT: Change this to a row number with Maju data
+  const executionId = 'TEST_MANUAL'; // Make sure this is set
+  Logger.log('Starting manual test for Maju document generation for row: ' + testRowNumber);
+
+  try {
+    const result = processMajuRow(testRowNumber, executionId); // Both parameters must be provided
+
+    if (result.processed) {
+      Logger.log('SUCCESS: Document processed for row ' + testRowNumber);
+      Logger.log('Generated Doc ID: ' + result.docId);
+      Logger.log('Doc URL: ' + `https://docs.google.com/document/d/${result.docId}/edit`);
+    } else if (result.skipped) {
+      Logger.log('SKIPPED: Document for row ' + testRowNumber + ' was already processed.');
+    } else {
+      Logger.log('UNEXPECTED RESULT: ' + JSON.stringify(result));
+    }
+  } catch (e) {
+    Logger.log('ERROR during testProcessMajuRow: ' + e.message);
+    Logger.log('Stack: ' + e.stack);
+  } finally {
+    Logger.log('Manual test finished.');
+  }
+}
+
+
+// === EXECUTION LOGGING (for doPost) ===
+// This part helps in debugging web app calls directly from Google Apps Script logs.
+// Global array to collect all debug logs during execution
+let debugLogs = [];
+
+// Test function to verify spreadsheet access
+function testSpreadsheetAccess() {
+  try {
+    Logger.log(`Testing spreadsheet access with ID: ${SPREADSHEET_ID}`);
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    Logger.log(`✅ Successfully opened spreadsheet: ${ss.getName()}`);
+    
+    const sheets = ss.getSheets();
+    Logger.log(`📊 Found ${sheets.length} sheets: ${sheets.map(s => s.getName()).join(', ')}`);
+    
+    return {
+      success: true,
+      spreadsheetName: ss.getName(),
+      sheetCount: sheets.length,
+      sheetNames: sheets.map(s => s.getName())
+    };
+    
+  } catch (error) {
+    Logger.log(`❌ Spreadsheet access failed: ${error.message}`);
+    Logger.log(`Error stack: ${error.stack}`);
+    
+    return {
+      success: false,
+      error: error.message,
+      spreadsheetId: SPREADSHEET_ID
+    };
+  }
+}
+
+function addDebugLog(executionId, message) {
+  // Simplified logging - just use Logger.log to avoid spreadsheet permission issues
+  Logger.log(`[${executionId}] ${message}`);
+}
+
+function saveAllDebugLogs(executionId) {
+  // Simplified approach - skip spreadsheet logging to avoid permission issues
+  Logger.log(`[${executionId}] Debug logging complete. All logs available in Apps Script console.`);
+  debugLogs = []; // Clear the array
+}
+
+function saveExecutionLog(logData) {
+  // Always log to Google Cloud Logs first
+  Logger.log(`[${logData.executionId}] EXECUTION LOG: ${JSON.stringify(logData)}`);
+  
+  // Save all collected debug logs before saving execution log
+  saveAllDebugLogs(logData.executionId);
+  
+  try {
+    Logger.log(`[${logData.executionId}] Attempting to open spreadsheet: ${SPREADSHEET_ID}`);
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    Logger.log(`[${logData.executionId}] Successfully opened spreadsheet`);
+    let logSheet = ss.getSheetByName('MajuExecutionLogs');
+    
+    if (!logSheet) {
+      Logger.log(`[${logData.executionId}] Creating new MajuExecutionLogs sheet`);
+      logSheet = ss.insertSheet('MajuExecutionLogs');
+      const headers = ['Timestamp', 'Execution ID', 'Step', 'Success', 'Mentee', 'Sesi', 'Doc ID', 'Row', 'Error', 'Error Stack', 'Details'];
+      logSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      Logger.log(`[${logData.executionId}] MajuExecutionLogs sheet created with headers`);
+    }
+    
+    const row = [
+      logData.timestamp,
+      logData.executionId,
+      logData.step,
+      logData.success,
+      logData.mentee || '',
+      logData.sesi || '',
+      logData.docId || '',
+      logData.rowNumber || '',
+      logData.error || '',
+      logData.errorStack || '',
+      logData.details || ''
+    ];
+    
+    logSheet.appendRow(row);
+    Logger.log(`[${logData.executionId}] Log saved to MajuExecutionLogs sheet, row: ${logSheet.getLastRow()}`);
+    
+  } catch (error) {
+    Logger.log(`[${logData.executionId}] ERROR saving execution log: ${error.message}`);
+    Logger.log(`[${logData.executionId}] Error stack: ${error.stack}`);
+    
+    // Try to save critical info to console at least
+    console.log('EXECUTION LOG SAVE FAILED:', {
+      executionId: logData.executionId,
+      step: logData.step,
+      success: logData.success,
+      error: error.message
+    });
+  }
+}
+
+// === BULK REGENERATION FUNCTIONS ===
+
+/**
+ * Regenerate documents for all existing entries (ADMIN FUNCTION)
+ * Use this to regenerate documents from existing Google Sheets data
+ * without requiring users to re-submit forms.
+ */
+function regenerateAllDocuments() {
+  const executionId = Utilities.getUuid().substring(0, 8);
+  Logger.log(`[${executionId}] Starting bulk document regeneration...`);
+  
+  try {
+    const result = getLaporanMajuSheetAndHeaders();
+    const sheet = result.sheet;
+    const headers = result.headers;
+    
+    if (!sheet || !headers) {
+      throw new Error('Could not access LaporanMaju sheet or headers');
+    }
+    
+    const dataRange = sheet.getDataRange();
+    const numRows = dataRange.getNumRows();
+    
+    Logger.log(`[${executionId}] Found ${numRows - 1} data rows to process`);
+    
+    let processedCount = 0;
+    let errorCount = 0;
+    const results = [];
+    
+    // Start from row 2 (skip headers)
+    for (let rowNumber = 2; rowNumber <= numRows; rowNumber++) {
+      try {
+        Logger.log(`[${executionId}] Processing row ${rowNumber}...`);
+        
+        const result = processMajuRow(rowNumber, `${executionId}-R${rowNumber}`);
+        
+        if (result.processed) {
+          processedCount++;
+          results.push({
+            row: rowNumber,
+            status: 'SUCCESS',
+            docId: result.docId,
+            mentee: result.mentee,
+            sesi: result.sesi
+          });
+          Logger.log(`[${executionId}] Row ${rowNumber} processed successfully - Doc: ${result.docId}`);
+        } else {
+          results.push({
+            row: rowNumber,
+            status: 'SKIPPED',
+            reason: 'Already processed or no data'
+          });
+        }
+        
+        // Add small delay to avoid hitting API limits
+        Utilities.sleep(1000);
+        
+      } catch (rowError) {
+        errorCount++;
+        results.push({
+          row: rowNumber,
+          status: 'ERROR',
+          error: rowError.message
+        });
+        Logger.log(`[${executionId}] Error processing row ${rowNumber}: ${rowError.message}`);
+      }
+    }
+    
+    Logger.log(`[${executionId}] Bulk regeneration completed. Processed: ${processedCount}, Errors: ${errorCount}`);
+    
+    // Save bulk operation log
+    saveBulkOperationLog(executionId, 'regenerateAll', processedCount, errorCount, results);
+    
+    return {
+      success: true,
+      totalRows: numRows - 1,
+      processed: processedCount,
+      errors: errorCount,
+      results: results
+    };
+    
+  } catch (error) {
+    Logger.log(`[${executionId}] Bulk regeneration failed: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
+ * Regenerate document for a specific row number (ADMIN FUNCTION)
+ * @param {number} rowNumber The row number to regenerate (starting from 2)
+ */
+function regenerateSpecificRow(rowNumber) {
+  const executionId = Utilities.getUuid().substring(0, 8);
+  Logger.log(`[${executionId}] Regenerating document for row ${rowNumber}...`);
+  
+  try {
+    if (!rowNumber || rowNumber < 2) {
+      throw new Error('Invalid row number. Must be 2 or greater.');
+    }
+    
+    const result = processMajuRow(rowNumber, executionId);
+    
+    Logger.log(`[${executionId}] Row ${rowNumber} regeneration completed - Doc: ${result.docId}`);
+    
+    return {
+      success: true,
+      row: rowNumber,
+      docId: result.docId,
+      mentee: result.mentee,
+      sesi: result.sesi,
+      processed: result.processed
+    };
+    
+  } catch (error) {
+    Logger.log(`[${executionId}] Row ${rowNumber} regeneration failed: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
+ * Regenerate documents for a specific mentee (all their sessions)
+ * @param {string} menteeName The exact name of the mentee
+ */
+function regenerateForMentee(menteeName) {
+  const executionId = Utilities.getUuid().substring(0, 8);
+  Logger.log(`[${executionId}] Regenerating all documents for mentee: ${menteeName}`);
+  
+  try {
+    const result = getLaporanMajuSheetAndHeaders();
+    const sheet = result.sheet;
+    const headers = result.headers;
+    
+    if (!sheet || !headers) {
+      throw new Error('Could not access LaporanMaju sheet or headers');
+    }
+    
+    const menteeNameCol = headers.indexOf('NAMA_MENTEE') + 1;
+    if (menteeNameCol === 0) {
+      throw new Error('NAMA_MENTEE column not found');
+    }
+    
+    const dataRange = sheet.getDataRange();
+    const values = dataRange.getValues();
+    
+    let processedCount = 0;
+    const results = [];
+    
+    // Find all rows for this mentee
+    for (let i = 1; i < values.length; i++) { // Skip header row
+      const rowData = values[i];
+      const rowMenteeName = (rowData[menteeNameCol - 1] || '').toString().trim();
+      
+      if (rowMenteeName.toLowerCase() === menteeName.toLowerCase()) {
+        const rowNumber = i + 1;
+        try {
+          Logger.log(`[${executionId}] Found ${menteeName} in row ${rowNumber}, processing...`);
+          
+          const result = processMajuRow(rowNumber, `${executionId}-${menteeName}-R${rowNumber}`);
+          
+          if (result.processed) {
+            processedCount++;
+            results.push({
+              row: rowNumber,
+              status: 'SUCCESS',
+              docId: result.docId,
+              sesi: result.sesi
+            });
+            Logger.log(`[${executionId}] Row ${rowNumber} processed for ${menteeName} - Doc: ${result.docId}`);
+          }
+          
+          Utilities.sleep(1000); // Delay between rows
+          
+        } catch (rowError) {
+          results.push({
+            row: rowNumber,
+            status: 'ERROR',
+            error: rowError.message
+          });
+          Logger.log(`[${executionId}] Error processing row ${rowNumber} for ${menteeName}: ${rowError.message}`);
+        }
+      }
+    }
+    
+    Logger.log(`[${executionId}] Completed regeneration for ${menteeName}. Processed: ${processedCount} documents`);
+    
+    return {
+      success: true,
+      mentee: menteeName,
+      processed: processedCount,
+      results: results
+    };
+    
+  } catch (error) {
+    Logger.log(`[${executionId}] Regeneration for ${menteeName} failed: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
+ * Get list of all mentees and their document status for admin review
+ */
+function getMenteeDocumentStatus() {
+  const executionId = Utilities.getUuid().substring(0, 8);
+  Logger.log(`[${executionId}] Getting mentee document status...`);
+  
+  try {
+    const result = getLaporanMajuSheetAndHeaders();
+    const sheet = result.sheet;
+    const headers = result.headers;
+    
+    const menteeNameCol = headers.indexOf('NAMA_MENTEE') + 1;
+    const sesiCol = headers.indexOf('SESI_NUMBER') + 1;
+    const docIdCol = headers.indexOf('Laporan_Maju_Doc_ID') + 1;
+    const timestampCol = 1; // Assuming timestamp is in column A
+    
+    const dataRange = sheet.getDataRange();
+    const values = dataRange.getValues();
+    
+    const menteeStatus = {};
+    
+    // Process each row
+    for (let i = 1; i < values.length; i++) {
+      const rowData = values[i];
+      const menteeName = (rowData[menteeNameCol - 1] || '').toString().trim();
+      const sesi = rowData[sesiCol - 1] || '';
+      const docId = rowData[docIdCol - 1] || '';
+      const timestamp = rowData[timestampCol - 1] || '';
+      
+      if (menteeName) {
+        if (!menteeStatus[menteeName]) {
+          menteeStatus[menteeName] = {
+            name: menteeName,
+            sessions: [],
+            totalSessions: 0,
+            documentsGenerated: 0
+          };
+        }
+        
+        menteeStatus[menteeName].sessions.push({
+          row: i + 1,
+          sesi: sesi,
+          hasDocument: !!docId,
+          docId: docId,
+          timestamp: timestamp
+        });
+        
+        menteeStatus[menteeName].totalSessions++;
+        if (docId) {
+          menteeStatus[menteeName].documentsGenerated++;
+        }
+      }
+    }
+    
+    Logger.log(`[${executionId}] Found ${Object.keys(menteeStatus).length} mentees`);
+    
+    return {
+      success: true,
+      mentees: Object.values(menteeStatus),
+      totalMentees: Object.keys(menteeStatus).length
+    };
+    
+  } catch (error) {
+    Logger.log(`[${executionId}] Error getting mentee status: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
+ * Save bulk operation log to spreadsheet
+ */
+function saveBulkOperationLog(executionId, operation, processedCount, errorCount, results) {
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    let logSheet = ss.getSheetByName('MajuBulkOperations');
+    
+    if (!logSheet) {
+      logSheet = ss.insertSheet('MajuBulkOperations');
+      const headers = ['Timestamp', 'Execution ID', 'Operation', 'Processed Count', 'Error Count', 'Results Summary'];
+      logSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    }
+    
+    const resultsSummary = results.slice(0, 10).map(r => `Row ${r.row}: ${r.status}`).join('; ');
+    
+    const row = [
+      new Date().toISOString(),
+      executionId,
+      operation,
+      processedCount,
+      errorCount,
+      resultsSummary + (results.length > 10 ? '...' : '')
+    ];
+    
+    logSheet.appendRow(row);
+    Logger.log(`[${executionId}] Bulk operation log saved`);
+    
+  } catch (error) {
+    Logger.log(`[${executionId}] Error saving bulk operation log: ${error.message}`);
+  }
+}
+
+/**
+ * Save template analysis to spreadsheet for easy debugging
+ */
+function saveTemplateAnalysis(executionId, allPlaceholders, potentialPlaceholders, docPreview) {
+  try {
+    Logger.log(`[${executionId}] Saving template analysis to spreadsheet`);
+    
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    let analysisSheet = ss.getSheetByName('MajuTemplateAnalysis');
+    
+    if (!analysisSheet) {
+      analysisSheet = ss.insertSheet('MajuTemplateAnalysis');
+      const headers = ['Timestamp', 'Execution ID', 'All Placeholders', 'Potential Placeholders', 'Document Preview'];
+      analysisSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      Logger.log(`[${executionId}] Created MajuTemplateAnalysis sheet`);
+    }
+    
+    const row = [
+      new Date().toISOString(),
+      executionId,
+      JSON.stringify(allPlaceholders),
+      JSON.stringify(potentialPlaceholders),
+      docPreview
+    ];
+    
+    analysisSheet.appendRow(row);
+    Logger.log(`[${executionId}] Template analysis saved to MajuTemplateAnalysis sheet`);
+    
+  } catch (error) {
+    Logger.log(`[${executionId}] Error saving template analysis: ${error.message}`);
+  }
+}
+
+// Optional: You can keep this for manual log review if needed
+function checkExecutionLogsManual() {
+  Logger.log('=== CHECKING EXECUTION LOGS (Maju) ===');
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const logSheet = ss.getSheetByName('MajuExecutionLogs');
+    if (!logSheet) { Logger.log('No Maju execution logs found.'); return; }
+    const data = logSheet.getDataRange().getValues();
+    Logger.log('Found ' + (data.length - 1) + ' execution log entries.');
+    for (let i = Math.max(1, data.length - 5); i < data.length; i++) { // Log last 5 entries
+      const row = data[i];
+      Logger.log('\n--- Execution ' + i + ' ---');
+      Logger.log('Timestamp: ' + row[0]);
+      Logger.log('Execution ID: ' + row[1]);
+      Logger.log('Step: ' + row[2]);
+      Logger.log('Success: ' + row[3]);
+      Logger.log('Mentee: ' + row[4]);
+      Logger.log('Doc ID: ' + row[6]);
+      Logger.log('Error: ' + row[8]);
+      Logger.log('Stack: ' + row[9]);
+    }
+  } catch (error) {
+    Logger.log('Error checking execution logs: ' + error.message);
+  }
+}
+
+// === PERMISSION TESTING FUNCTIONS ===
+function testPermissions() {
+  Logger.log("🧪 Testing Google Apps Script permissions...");
+  
+  try {
+    // Test 1: Spreadsheet access
+    Logger.log(`📊 Testing spreadsheet access with ID: ${SPREADSHEET_ID}`);
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    Logger.log(`✅ Spreadsheet access successful: ${ss.getName()}`);
+    
+    // Test 2: Document creation
+    Logger.log(`📄 Testing document template access with ID: ${TEMPLATE_DOC_ID}`);
+    const template = DocumentApp.openById(TEMPLATE_DOC_ID);
+    Logger.log(`✅ Template access successful: ${template.getName()}`);
+    
+    // Test 3: Drive access
+    Logger.log(`📁 Testing Drive access...`);
+    const testFolder = DriveApp.getFolderById('1YV_SfxSDEVrdLPFxZgJk8qyd2YhXrY99'); // Use a known folder ID
+    Logger.log(`✅ Drive access successful: ${testFolder.getName()}`);
+    
+    Logger.log("🎉 All permissions working correctly!");
+    return "All tests passed";
+    
+  } catch (error) {
+    Logger.log(`❌ Permission test failed: ${error.message}`);
+    Logger.log(`🔧 Error details: ${error.stack}`);
+    return `Error: ${error.message}`;
+  }
+}
+
+// Simple document creation test without sheet operations
+function testSimpleDocCreation() {
+  try {
+    Logger.log("📄 Testing simple document creation...");
+    Logger.log(`🔍 Template ID: ${TEMPLATE_DOC_ID}`);
+    
+    // First, let's check what type of file this is
+    const file = DriveApp.getFileById(TEMPLATE_DOC_ID);
+    Logger.log(`📋 File name: ${file.getName()}`);
+    Logger.log(`📋 File type: ${file.getMimeType()}`);
+    
+    // Try different approaches based on file type
+    let copy;
+    const mimeType = file.getMimeType();
+    
+    if (mimeType === 'application/vnd.google-apps.document') {
+      Logger.log("📄 Using DocumentApp for Google Docs...");
+      const template = DocumentApp.openById(TEMPLATE_DOC_ID);
+      copy = file.makeCopy("TEST_DOCUMENT_" + new Date().getTime());
+    } else {
+      Logger.log("📁 Using DriveApp for file copy...");
+      copy = file.makeCopy("TEST_DOCUMENT_" + new Date().getTime());
+    }
+    
+    Logger.log(`✅ Document created successfully: ${copy.getId()}`);
+    Logger.log(`🔗 Document URL: https://docs.google.com/document/d/${copy.getId()}/edit`);
+    
+    return {
+      success: true,
+      docId: copy.getId(),
+      url: `https://docs.google.com/document/d/${copy.getId()}/edit`
+    };
+    
+  } catch (error) {
+    Logger.log(`❌ Document creation failed: ${error.message}`);
+    Logger.log(`🔧 Error stack: ${error.stack}`);
+    return { success: false, error: error.message };
+  }
+}
+
+// =====================================================
+// NEW SIMPLE TABLE INSERTION FUNCTIONS
+// =====================================================
+
+/**
+ * Simple table insertion that replaces placeholders directly
+ * FIXED: Get paragraph index BEFORE modifying the document
+ */
+function insertTableFromJsonSimple(container, jsonData, placeholderToRemove, executionId, headingText) {
+  Logger.log(`[${executionId}] 🎯 SIMPLE TABLE INSERTION for '${headingText}'`);
+  
+  if (!jsonData || jsonData.length === 0) {
+    Logger.log(`[${executionId}] ❌ No JSON data provided`);
+    return null;
+  }
+
+  try {
+    // Step 1: Find the placeholder
+    const range = container.findText(placeholderToRemove);
+    
+    if (!range) {
+      Logger.log(`[${executionId}] ❌ Placeholder '${placeholderToRemove}' not found`);
+      return appendTableAtEndSimple(container, jsonData, headingText, executionId);
+    }
+
+    Logger.log(`[${executionId}] ✅ Found placeholder '${placeholderToRemove}'`);
+
+    // Step 2: Get the paragraph containing the placeholder AND its index BEFORE modifying
+    const element = range.getElement();
+    const paragraph = element.getParent();
+    const parentContainer = paragraph.getParent();
+    
+    Logger.log(`[${executionId}] 📋 Element type: ${element.getType()}`);
+    Logger.log(`[${executionId}] 📋 Paragraph type: ${paragraph.getType()}`);
+    Logger.log(`[${executionId}] 📋 Parent container type: ${parentContainer.getType()}`);
+
+    // CRITICAL: Get the index BEFORE any modifications with enhanced debugging
+    let paragraphIndex = -1;
+    const numChildren = parentContainer.getNumChildren();
+    
+    Logger.log(`[${executionId}] 🔍 DEBUG: Parent has ${numChildren} children`);
+    Logger.log(`[${executionId}] 🔍 DEBUG: Looking for paragraph with text: "${paragraph.getText()}"`);
+    
+    for (let i = 0; i < numChildren; i++) {
+      const child = parentContainer.getChild(i);
+      Logger.log(`[${executionId}] 🔍 DEBUG: Child ${i} type: ${child.getType()}`);
+      
+      if (child === paragraph) {
+        paragraphIndex = i;
+        Logger.log(`[${executionId}] 🎯 DEBUG: Found exact paragraph match at index ${i}`);
+        break;
+      }
+      
+      // Additional check: compare by text content if it's a paragraph
+      if (child.getType() === DocumentApp.ElementType.PARAGRAPH) {
+        const childText = child.getText ? child.getText() : '';
+        const targetText = paragraph.getText ? paragraph.getText() : '';
+        Logger.log(`[${executionId}] 🔍 DEBUG: Child ${i} text: "${childText}"`);
+        
+        if (childText === targetText && childText.includes(placeholderToRemove)) {
+          paragraphIndex = i;
+          Logger.log(`[${executionId}] 🎯 DEBUG: Found paragraph by text match at index ${i}`);
+          break;
+        }
+      }
+    }
+    
+    Logger.log(`[${executionId}] 📍 Found paragraph at index: ${paragraphIndex} (BEFORE modifications)`);
+
+    // Step 3: NOW replace placeholder with heading
+    element.asText().replaceText(placeholderToRemove, headingText);
+    paragraph.setHeading(DocumentApp.ParagraphHeading.HEADING2);
+    
+    Logger.log(`[${executionId}] ✅ Placeholder replaced with heading`);
+
+    // Step 4: Create table data
+    const tableData = buildTableSimple(jsonData);
+    Logger.log(`[${executionId}] 📊 Table data created: ${tableData.length} rows, ${tableData[0].length} columns`);
+
+    // Step 5: Insert table at the correct position (using the index we got BEFORE modifications)
+    if (paragraphIndex >= 0) {
+      const newTable = parentContainer.insertTable(paragraphIndex + 1, tableData);
+      
+      // Format table
+      newTable.setBorderWidth(1);
+      newTable.getRow(0).editAsText().setBold(true);
+      
+      const actualRows = newTable.getNumRows();
+      const actualCols = newTable.getRow(0).getNumCells();
+      Logger.log(`[${executionId}] ✅ SUCCESS: Table inserted at position ${paragraphIndex + 1} with ${actualRows} rows, ${actualCols} columns`);
+      
+      return newTable;
+    } else {
+      Logger.log(`[${executionId}] ⚠️ Could not determine paragraph index, using fallback`);
+      return appendTableAtEndSimple(container, jsonData, headingText, executionId);
+    }
+    
+  } catch (error) {
+    Logger.log(`[${executionId}] ❌ Error in simple insertion: ${error.message}`);
+    Logger.log(`[${executionId}] 📋 Stack trace: ${error.stack}`);
+    return appendTableAtEndSimple(container, jsonData, headingText, executionId);
+  }
+}
+
+/**
+ * Simple element index finder
+ */
+function getElementIndexSimple(targetElement, parentContainer) {
+  try {
+    const numChildren = parentContainer.getNumChildren();
+    
+    for (let i = 0; i < numChildren; i++) {
+      const child = parentContainer.getChild(i);
+      if (child === targetElement) {
+        return i;
+      }
+    }
+    
+    return -1;
+  } catch (error) {
+    Logger.log(`Error in getElementIndexSimple: ${error.message}`);
+    return -1;
+  }
+}
+
+/**
+ * Simple table builder from JSON data
+ */
+function buildTableSimple(jsonData) {
+  if (!jsonData || jsonData.length === 0) return [['No Data']];
+
+  // Get all unique headers from all objects to ensure Kemajuan and Cabaran are included
+  const allHeaders = new Set();
+  jsonData.forEach(item => {
+    Object.keys(item).forEach(key => allHeaders.add(key));
+  });
+
+  const headers = Array.from(allHeaders);
+
+  // Ensure proper column order for mentoring findings tables
+  const expectedOrder = ['Topik Perbincangan', 'Hasil yang Diharapkan', 'Kemajuan Mentee',
+                        'Cabaran dan Halangan Mentee', 'Pelan Tindakan', 'Kemajuan', 'Cabaran',
+                        'sesiNumber', 'tarikhSesi', 'lastUpdatedSession'];
+
+  // Sort headers to match expected order when possible
+  const sortedHeaders = expectedOrder.filter(h => headers.includes(h))
+    .concat(headers.filter(h => !expectedOrder.includes(h)));
+
+  const tableData = [sortedHeaders]; // Header row
+  
+  // Add data rows
+  jsonData.forEach(item => {
+    const row = sortedHeaders.map(header => {
+      const value = item[header];
+      
+      // Handle Pelan Tindakan array specially
+      if (Array.isArray(value) && header === 'Pelan Tindakan') {
+        return value.map(plan =>
+          `${plan.Tindakan || ''} (${plan['Jangkaan tarikh siap'] || 'N/A'})${plan.Catatan ? ' - ' + plan.Catatan : ''}`
+        ).join('\n');
+      }
+      
+      // Handle other arrays
+      if (Array.isArray(value)) {
+        return value.join(', ');
+      }
+      
+      // Handle objects
+      if (typeof value === 'object' && value !== null) {
+        return JSON.stringify(value);
+      }
+      
+      return String(value || '');
+    });
+    
+    tableData.push(row);
+  });
+  
+  return tableData;
+}
+
+/**
+ * Fallback: append table at document end
+ */
+function appendTableAtEndSimple(container, jsonData, headingText, executionId) {
+  try {
+    // Add heading
+    const headingParagraph = container.appendParagraph(headingText);
+    headingParagraph.setHeading(DocumentApp.ParagraphHeading.HEADING2);
+    
+    // Create and add table
+    const tableData = buildTableSimple(jsonData);
+    const table = container.appendTable(tableData);
+    
+    // Format table
+    table.setBorderWidth(1);
+    table.getRow(0).editAsText().setBold(true);
+    
+    Logger.log(`[${executionId}] ⚠️ FALLBACK: Table appended at document end`);
+    return table;
+    
+  } catch (error) {
+    Logger.log(`[${executionId}] ❌ Fallback failed: ${error.message}`);
+    return null;
+  }
+}
+
+  /**
+   * CONFIGURATION - Set your Maju spreadsheet ID here
+   */
+  const MAJU_SPREADSHEET_ID = '1yjxwqXSO8jtR-nbHA5X4h4YcNzC6jh0zCRsTkYovS7w';
+
+  /**
+   * Process unprocessed Maju rows and generate documents
+   * This runs every 1 minute via time-driven trigger
+   */
+  function processUnprocessedRows() {
+    try {
+      // Open Maju spreadsheet by ID
+      const ss = SpreadsheetApp.openById(MAJU_SPREADSHEET_ID);
+
+      // Process only Maju reports
+      processMajuUnprocessedRows(ss);
+
+      console.log('✅ processUnprocessedRows completed');
+
+    } catch (error) {
+      console.error('❌ Error in processUnprocessedRows:', error);
+    }
+  }
+
+  function processMajuUnprocessedRows(ss) {
+    try {
+      const sheet = ss.getSheetByName('LaporanMajuUM');
+      if (!sheet) {
+        console.error('❌ Sheet "LaporanMajuUM" not found!');
+        return;
+      }
+
+      const data = sheet.getDataRange().getValues();
+      if (data.length <= 1) {
+        console.log('No data rows in LaporanMajuUM');
+        return;
+      }
+
+      const headers = data[0];
+
+      // Find column indices
+      let docIdCol = headers.indexOf('Laporan_Maju_Doc_ID');
+      if (docIdCol === -1) docIdCol = headers.indexOf('DOC_ID');
+      if (docIdCol === -1) docIdCol = headers.indexOf('Doc_ID');
+
+      let folderIdCol = headers.indexOf('Mentee_Folder_ID');
+      if (folderIdCol === -1) folderIdCol = headers.indexOf('Folder_ID');
+      if (folderIdCol === -1) folderIdCol = headers.indexOf('FOLDER_ID');
+
+      if (docIdCol === -1) {
+        console.error('❌ Document ID column not found. Available columns:', headers);
+        return;
+      }
+      if (folderIdCol === -1) {
+        console.error('❌ Folder_ID column not found. Available columns:', headers);
+        return;
+      }
+
+      console.log(`✅ Found Doc ID column at index ${docIdCol}: "${headers[docIdCol]}"`);
+      console.log(`✅ Found Folder ID column at index ${folderIdCol}: "${headers[folderIdCol]}"`);
+      console.log(`📊 LaporanMaju: Checking ${data.length - 1} rows...`);
+
+      // Process rows starting from row 2 (skip header)
+      let processedCount = 0;
+      for (let i = 1; i < data.length; i++) {
+        const row = data[i];
+        const docId = row[docIdCol];
+        const folderId = row[folderIdCol];
+
+        // Log every row for debugging
+        console.log(`🔍 Row ${i + 1}: DocID="${docId || '(empty)'}", FolderID="${folderId || '(empty)'}"`);
+
+        // Skip if already processed
+        if (docId && docId !== '') {
+          console.log(`   ⏭️ Row ${i + 1}: Already has document, skipping`);
+          continue;
+        }
+
+        // Skip if no folder ID
+        if (!folderId || folderId === '') {
+          console.log(`   ⚠️ Row ${i + 1}: No Folder_ID, skipping`);
+          continue;
+        }
+
+        try {
+          console.log(`🔄 Processing Maju row ${i + 1}...`);
+          console.log(`   📁 Folder ID: ${folderId}`);
+
+          // Call your existing document generation function
+          const newDocId = processMajuRow(i + 1);
+
+          if (newDocId) {
+            // Update the sheet with the doc ID
+            sheet.getRange(i + 1, docIdCol + 1).setValue(newDocId);
+            SpreadsheetApp.flush(); // Force immediate write
+
+            console.log(`✅ Maju document created for row ${i + 1}: ${newDocId}`);
+            processedCount++;
+
+            // Optional: Send email notification
+            // sendMajuDocumentReadyEmail(row, headers, newDocId);
+          } else {
+            console.log(`⚠️ Row ${i + 1}: processMajuRow returned null/empty`);
+          }
+
+        } catch (error) {
+          console.error(`❌ Error processing Maju row ${i + 1}:`, error);
+          console.error(`   Error message: ${error.message}`);
+          console.error(`   Error stack: ${error.stack}`);
+        }
+
+        // Process only one row per execution to avoid timeout
+        if (processedCount > 0) {
+          console.log(`⏸️ Processed ${processedCount} row(s). Stopping to continue in next run.`);
+          return;
+        }
+      }
+
+      if (processedCount === 0) {
+        console.log('✅ LaporanMaju: All rows already processed or missing Folder_ID');
+      } else {
+        console.log(`✅ LaporanMaju: Processed ${processedCount} row(s)`);
+      }
+
+    } catch (error) {
+      console.error('❌ Error in processMajuUnprocessedRows:', error);
+      console.error('   Error stack:', error.stack);
+    }
+  }
+
+  // Optional: Email notification
+  function sendMajuDocumentReadyEmail(row, headers, docId) {
+    try {
+      const emailCol = headers.indexOf('EMAIL_MENTOR');
+      const menteeCol = headers.indexOf('NAMA_MENTEE');
+      const sesiCol = headers.indexOf('SESI_NUMBER');
+
+      if (emailCol === -1) return;
+
+      const email = row[emailCol];
+      if (!email) return;
+
+      const mentee = row[menteeCol] || 'Mentee';
+      const sesi = row[sesiCol] || '';
+      const docUrl = `https://docs.google.com/document/d/${docId}/edit`;
+
+      const subject = `Laporan Maju Sesi ${sesi} - ${mentee} telah siap`;
+      const body = `Assalamualaikum,\n\nLaporan Maju anda untuk ${mentee} (Sesi ${sesi}) telah berjaya dicipta.\n\nAnda boleh mengakses dokumen di sini:\n${docUrl}\n\nTerima
+  kasih.`;
+
+      MailApp.sendEmail(email, subject, body);
+      console.log(`📧 Email sent to ${email}`);
+    } catch (error) {
+      console.error('❌ Error sending email:', error);
+    }
+  }
+  /**
+ * onChange trigger handler
+ * Fires automatically when sheet changes
+ */
+function onSheetChange(e) {
+  try {
+    console.log('🔔 onChange trigger fired at: ' + new Date());
+    
+    // Call your existing processing function
+    processUnprocessedRows();
+    
+    console.log('✅ onChange processing completed');
+    
+  } catch (error) {
+    console.error('❌ Error in onSheetChange:', error);
+    console.error('   Error stack:', error.stack);
+  }
+}
+  /**
+ * Setup onChange trigger for V8 sheet
+ * Run this once to install the trigger
+ */
+function setupOnChangeTrigger() {
+  try {
+    // Get your spreadsheet
+    const ss = SpreadsheetApp.openById('1yjxwqXSO8jtR-nbHA5X4h4YcNzC6jh0zCRsTkYovS7w');
+    
+    // Delete any existing onChange triggers (cleanup)
+    const triggers = ScriptApp.getProjectTriggers();
+    triggers.forEach(trigger => {
+      if (trigger.getEventType() === ScriptApp.EventType.ON_CHANGE) {
+        ScriptApp.deleteTrigger(trigger);
+        console.log('🗑️ Deleted old onChange trigger');
+      }
+    });
+    
+    // Create new onChange trigger
+    ScriptApp.newTrigger('onSheetChange')
+      .forSpreadsheet(ss)
+      .onChange()
+      .create();
+    
+    console.log('✅ onChange trigger created successfully!');
+    console.log('   Function: onSheetChange');
+    console.log('   Spreadsheet: iTEKAD Mentor Portal');
+    
+  } catch (error) {
+    console.error('❌ Error setting up trigger:', error);
+  }
+}

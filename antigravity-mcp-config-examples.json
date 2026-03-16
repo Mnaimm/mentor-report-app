@@ -1,0 +1,88 @@
+{
+  "_comment": "Google Antigravity MCP Configuration Examples for Google Sheets",
+  "_instructions": "Copy one of the examples below to your actual mcp_config.json file",
+  "_config_location_windows": "C:\\Users\\<USERNAME>\\.gemini\\antigravity\\mcp_config.json",
+  "_config_location_mac_linux": "~/.gemini/antigravity/mcp_config.json",
+
+  "EXAMPLE_1_SERVICE_ACCOUNT_WITH_FILE": {
+    "mcpServers": {
+      "google-sheets": {
+        "command": "uvx",
+        "args": ["mcp-google-sheets@latest"],
+        "env": {
+          "SERVICE_ACCOUNT_PATH": "C:\\Users\\MyLenovo\\path\\to\\service-account-key.json",
+          "DRIVE_FOLDER_ID": "optional_shared_folder_id"
+        }
+      }
+    }
+  },
+
+  "EXAMPLE_2_BASE64_CREDENTIALS": {
+    "_note": "Reuse your existing GOOGLE_CREDENTIALS_BASE64 from .env",
+    "mcpServers": {
+      "google-sheets": {
+        "command": "uvx",
+        "args": ["mcp-google-sheets@latest"],
+        "env": {
+          "CREDENTIALS_CONFIG": "paste_your_base64_string_here"
+        }
+      }
+    }
+  },
+
+  "EXAMPLE_3_GOOGLE_APPLICATION_CREDENTIALS": {
+    "_note": "Standard Google Cloud authentication method",
+    "mcpServers": {
+      "google-sheets": {
+        "command": "uvx",
+        "args": ["mcp-google-sheets@latest"],
+        "env": {
+          "GOOGLE_APPLICATION_CREDENTIALS": "C:\\Users\\MyLenovo\\Downloads\\mentor-report\\credentials.json"
+        }
+      }
+    }
+  },
+
+  "EXAMPLE_4_MULTIPLE_MCP_SERVERS": {
+    "_note": "You can have multiple MCP servers configured",
+    "mcpServers": {
+      "google-sheets": {
+        "command": "uvx",
+        "args": ["mcp-google-sheets@latest"],
+        "env": {
+          "SERVICE_ACCOUNT_PATH": "C:\\path\\to\\service-account.json"
+        }
+      },
+      "github": {
+        "serverUrl": "https://api.githubcopilot.com/mcp/",
+        "headers": {
+          "Authorization": "Bearer YOUR_GITHUB_PAT"
+        }
+      }
+    }
+  },
+
+  "EXAMPLE_5_RECOMMENDED_FOR_YOUR_PROJECT": {
+    "_note": "Based on your existing setup, this is the recommended configuration",
+    "_instructions": "1. Get your GOOGLE_CREDENTIALS_BASE64 from .env file",
+    "_instructions2": "2. Replace the placeholder below with your actual base64 string",
+    "_instructions3": "3. Copy the mcpServers object to your mcp_config.json",
+    "mcpServers": {
+      "google-sheets": {
+        "command": "uvx",
+        "args": ["mcp-google-sheets@latest"],
+        "env": {
+          "CREDENTIALS_CONFIG": "PASTE_YOUR_GOOGLE_CREDENTIALS_BASE64_HERE"
+        }
+      }
+    }
+  },
+
+  "TROUBLESHOOTING": {
+    "_windows_path_note": "Always use double backslashes (\\\\) in Windows paths",
+    "_restart_required": "After editing mcp_config.json, restart Antigravity completely",
+    "_validate_json": "Ensure valid JSON syntax (no trailing commas, proper quotes)",
+    "_check_logs": "Check ~/.gemini/antigravity/logs/ for error messages",
+    "_tool_limit": "Keep total enabled MCP tools under 50 for best performance"
+  }
+}

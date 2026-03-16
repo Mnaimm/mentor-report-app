@@ -150,7 +150,16 @@ const H = {
   UMUlasanMarketing: 'UM_ULASAN_MARKETING',
 
   // Section 6: Premises Visit Date (1 field)
-  UMTarikhLawatanPremis: 'UM_TARIKH_LAWATAN_PREMIS'
+  UMTarikhLawatanPremis: 'UM_TARIKH_LAWATAN_PREMIS',
+
+  // CE-CI (82-86): Enhanced MIA Proof Workflow (5 columns)
+  // (Not accessed in doc generation - handled in web form)
+
+  // CJ-CM (87-90): Original contact info and kemaskini maklumat (4 columns)
+  LokasiBisnesOriginal: 'LOKASI_BISNES',      // CJ (87) - Original address
+  NoTelefonOriginal: 'NO_TELEFON',            // CK (88) - Original phone
+  AlamatBaharu: 'ALAMAT_BAHARU',              // CL (89) - Updated address
+  TelefonBaharu: 'TELEFON_BAHARU'             // CM (90) - Updated phone
 };
 
 // Mapping Sheet Headers
@@ -217,9 +226,21 @@ function doPost(e) {
       // UPLOAD PATH: Handle file upload to Google Drive
       return handleFileUpload(data);
     }
+    else if (data.action === 'regenerateDoc' && data.rowNumber) {
+      // REGENERATION PATH: Regenerate PDF for revised report
+      console.log('Regenerating document for row:', data.rowNumber);
+      const result = regenerateDocument(Number(data.rowNumber));
+      return ContentService.createTextOutput(JSON.stringify({
+        success: true,
+        docId: result.docId,
+        docUrl: result.docUrl,
+        message: 'Document regenerated successfully'
+      }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
     else {
       // Unknown action
-      throw new Error('Invalid action. Use "processRow" or "uploadImage"');
+      throw new Error('Invalid action. Use "processRow", "uploadImage", or "regenerateDoc"');
     }
 
   } catch (err) {
@@ -505,6 +526,10 @@ function processRowByIndex_(sheet, headers, idx, r) {
  * Replace common placeholders in document body
  */
 function replaceCommonPlaceholders_(body, row, map, sesiText, sesiNum, isSesi1) {
+  // --- Maklumat Berubah: Apply fallback logic for updated contact info ---
+  const alamat = row[H.AlamatBaharu] || row[H.LokasiBisnesOriginal] || map[M.Alamat] || '';
+  const telefon = row[H.TelefonBaharu] || row[H.NoTelefonOriginal] || map[M.NoTelefon] || '';
+
   const replacements = {
     '{{Nama Mentor}}': String(row[H.NamaMentor] || map[M.Mentor] || ''),
     '{{Nama Usahawan}}': String(row[H.NamaUsahawan] || ''),
@@ -513,9 +538,9 @@ function replaceCommonPlaceholders_(body, row, map, sesiText, sesiNum, isSesi1) 
     '{{Masa Sesi}}': formatTime_(row[H.MasaSesi]),
     '{{Sesi Laporan}}': sesiText,
     '{{Mod Sesi}}': String(row[H.ModSesi] || ''),
-    '{{no Telefon}}': String(map[M.NoTelefon] || ''),
+    '{{no Telefon}}': String(telefon),
     '{{EMAIL}}': String(map[M.Email] || ''),
-    '{{Alamat}}': String(map[M.Alamat] || ''),
+    '{{Alamat}}': String(alamat),
     '{{Batch No}}': String(map[M.Batch] || ''),
 
     // Sales data
@@ -1611,6 +1636,66 @@ function processUnprocessedRows() {
   }
 }
 
+/**
+ * Regenerates document for a specific row (for revised reports)
+ * Clears existing DOC_URL and Status, then calls processSingleRow
+ *
+ * @param {number} rowNumber - Row number to regenerate (1-indexed)
+ * @returns {Object} Result with docId and docUrl
+ */
+function regenerateDocument(rowNumber) {
+  console.log(`=== REGENERATING DOCUMENT FOR ROW ${rowNumber} ===`);
+
+  const lock = LockService.getScriptLock();
+  const lockAcquired = lock.tryLock(30000);
+
+  if (!lockAcquired) {
+    throw new Error('Could not acquire lock - another process is running');
+  }
+
+  try {
+    // Open sheet and get column indices
+    const { sheet, headers, idx } = openBangkitSheet_();
+
+    // Clear existing DOC_URL (column BB, index 52)
+    sheet.getRange(rowNumber, idx[H.DocUrl]).clearContent();
+    console.log(`Cleared DOC_URL for row ${rowNumber}`);
+
+    // Clear existing Status (column BA, index 52)
+    sheet.getRange(rowNumber, idx[H.Status]).clearContent();
+    console.log(`Cleared Status for row ${rowNumber}`);
+
+    // Now regenerate the document using existing logic
+    processRowByIndex_(sheet, headers, idx, rowNumber);
+
+    // Read back the new DOC_URL and Status
+    const newDocUrl = sheet.getRange(rowNumber, idx[H.DocUrl]).getValue();
+    const newStatus = sheet.getRange(rowNumber, idx[H.Status]).getValue();
+
+    // Extract docId from URL
+    const docIdMatch = String(newDocUrl).match(/\/document\/d\/([a-zA-Z0-9_-]+)/);
+    const docId = docIdMatch ? docIdMatch[1] : '';
+
+    console.log(`Document regenerated successfully`);
+    console.log(`New Doc ID: ${docId}`);
+    console.log(`New Doc URL: ${newDocUrl}`);
+
+    return {
+      success: true,
+      docId: docId,
+      docUrl: newDocUrl,
+      status: newStatus,
+      rowNumber: rowNumber
+    };
+
+  } catch (err) {
+    console.error('Regeneration error:', err.toString());
+    throw err;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 /***** ================== TESTING FUNCTIONS ================== *****/
 
 /**
@@ -1619,7 +1704,7 @@ function processUnprocessedRows() {
  */
 function testProcessSingleRow(rowNumber) {
   console.log('=== TESTING ROW', rowNumber, '===');
-  const result = processSingleRow(rowNumber || 2);
+  const result = processSingleRow(rowNumber || 155);
   console.log('Result:', JSON.stringify(result, null, 2));
   return result;
 }
@@ -1730,3 +1815,9 @@ function testDoPostProcessRow() {
   const result = JSON.parse(response.getContent());
   console.log('doPost result:', JSON.stringify(result, null, 2));
 }
+
+  function testRegenerateDoc() {
+    const testRowNumber = 179; // Change to your test row
+    const result = regenerateDocument(testRowNumber);
+    Logger.log('Result:', JSON.stringify(result, null, 2));
+  }

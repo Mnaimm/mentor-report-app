@@ -1,0 +1,123 @@
+[
+  {
+    "row": 15,
+    "data": {
+      "No": 16,
+      "NAME OF BUSINESS ": "D JASMINE LEGACY",
+      "Mentor": "HAZAZI ARIFFIN BIN ZAINAL ARIFFIN",
+      "NAME OF BUSINESS OWNER": "AINI BINTI BAKI",
+      "AGE": 51,
+      "BUSINESS SEGMENTATION": "GERAI SARAPAN",
+      "CONTACT NO": "011-59082004",
+      "BUSINESS  REGISTRATION": "725, JALAN JASMIN 13, TAMAN JASMIN SENAWANG, SEREMBAN",
+      "STATE": "NEGERI SEMBILAN",
+      "EMAIL ADDRESS": "ainijasmin5676@gmail.com",
+      "ON BOARDING TRAINING": "2025-12-17T16:00:00.000Z",
+      "AMOUNT APPROVED [RM]": 15000,
+      "GRANT APPROVED": 15000,
+      "DISBURSEMENT DATE": "2025-12-22T16:00:00.000Z",
+      "Program": "iTEKAD BangKIT"
+    },
+    "error": "duplicate key value violates unique constraint \"idx_mentor_assignments_unique_active\""
+  },
+  {
+    "row": 16,
+    "data": {
+      "No": 7,
+      "NAME OF BUSINESS ": "YO ENTERPRISE",
+      "Mentor": "HAZAZI ARIFFIN BIN ZAINAL ARIFFIN",
+      "NAME OF BUSINESS OWNER": "MOHD FIKRI BIN OTHMAN",
+      "AGE": 33,
+      "BUSINESS SEGMENTATION": "KONTRAKTOR - MEMASANG PERALATAN MAINAN ",
+      "CONTACT NO": "016-298 9858",
+      "BUSINESS  REGISTRATION": "NO 1680 JALAN SEREMBAN JAYA 10/11 TAMAN SEREMBAN JAYA, 70450 SEREMBAN, NEGERI SEMBILAN",
+      "STATE": "NEGERI SEMBILAN",
+      "EMAIL ADDRESS": "mfothman007@gmail.com",
+      "ON BOARDING TRAINING": "2025-11-26T16:00:00.000Z",
+      "AMOUNT APPROVED [RM]": 30000,
+      "DISBURSEMENT DATE": "2025-12-08T16:00:00.000Z",
+      "Program": "BangKIT-TUBF"
+    },
+    "error": "duplicate key value violates unique constraint \"idx_mentor_assignments_unique_active\""
+  },
+  {
+    "row": 17,
+    "data": {
+      "No": 8,
+      "NAME OF BUSINESS ": "AM ALTERNATE NIAGA",
+      "Mentor": "HAZAZI ARIFFIN BIN ZAINAL ARIFFIN",
+      "NAME OF BUSINESS OWNER": "MUHAMMAD KHAIRUL AMAL BIN ISMAIL",
+      "AGE": 33,
+      "BUSINESS SEGMENTATION": "ARCHERY BASED RECREATIONAL ACTIVITY",
+      "CONTACT NO": "010-4393747",
+      "BUSINESS  REGISTRATION": "NO.3, BLOK Z, FELDA PALONG 7, GEMAS",
+      "STATE": "NEGERI SEMBILAN",
+      "EMAIL ADDRESS": "amalz3p7@gmail.com",
+      "ON BOARDING TRAINING": "2025-11-26T16:00:00.000Z",
+      "AMOUNT APPROVED [RM]": 15000,
+      "DISBURSEMENT DATE": "2025-12-14T16:00:00.000Z",
+      "Program": "BangKIT-TUBF"
+    },
+    "error": "duplicate key value violates unique constraint \"idx_mentor_assignments_unique_active\""
+  },
+  {
+    "row": 53,
+    "data": {
+      "No": 3,
+      "NAME OF BUSINESS ": "IZAH TREATMENT",
+      "Mentor": "MUHAMAD HARIZ BIN MUHAMAD ADNAN",
+      "NAME OF BUSINESS OWNER": "NOR FAIZAH BINTI ZABIL",
+      "AGE": 31,
+      "BUSINESS SEGMENTATION": "PERKHIDMATAN SPA",
+      "CONTACT NO": "019-3954665",
+      "BUSINESS  REGISTRATION": "8-68, JLN ANGKASA SATU, FELDA SOEHARTO, 44010 KUALA KUBU BHARU, SELANGOR",
+      "STATE": "SELANGOR",
+      "EMAIL ADDRESS": "pae00zan@gmail.com/izahtreatment@gmail.com",
+      "ON BOARDING TRAINING": "2025-11-12T16:00:00.000Z",
+      "AMOUNT APPROVED [RM]": 50000,
+      "DISBURSEMENT DATE": "2025-12-18T16:00:00.000Z",
+      "Program": "BangKIT-TUBF"
+    },
+    "error": "duplicate key value violates unique constraint \"idx_mentor_assignments_unique_active\""
+  },
+  {
+    "row": 54,
+    "data": {
+      "No": 12,
+      "NAME OF BUSINESS ": "SITI NORALIZA BINTI MAT ALI",
+      "Mentor": "MUHAMAD HARIZ BIN MUHAMAD ADNAN",
+      "NAME OF BUSINESS OWNER": "SITI NORALIZA BINTI MAT ALI",
+      "AGE": 33,
+      "BUSINESS SEGMENTATION": "F&B",
+      "CONTACT NO": "011-33781304",
+      "BUSINESS  REGISTRATION": "PT 1047 KG JELUTONG TAMBAHAN KELIANG KALUMPANG, 44100 KERLING,SELANGOR",
+      "STATE": "SELANGOR",
+      "EMAIL ADDRESS": "sitinoraliza92@gmail.com",
+      "ON BOARDING TRAINING": "2025-12-17T16:00:00.000Z",
+      "AMOUNT APPROVED [RM]": 50000,
+      "GRANT APPROVED": 15000,
+      "Program": "BangKIT-TUBF"
+    },
+    "error": "duplicate key value violates unique constraint \"idx_mentor_assignments_unique_active\""
+  },
+  {
+    "row": 55,
+    "data": {
+      "No": 13,
+      "NAME OF BUSINESS ": "ZAI AUTO SPEED SERVICES",
+      "Mentor": "MUHAMAD HARIZ BIN MUHAMAD ADNAN",
+      "NAME OF BUSINESS OWNER": "NURSYARINA SHAMIZI BT ABD HAMID",
+      "AGE": 36,
+      "BUSINESS SEGMENTATION": "BENGKEL SERVICE KERETA",
+      "CONTACT NO": "018-9665681",
+      "BUSINESS  REGISTRATION": "NO.12, JLN 8/1, SEKSYEN 8 KOTA PUTERI, 48100 BATU ARANG, SELANGOR",
+      "STATE": "SELANGOR",
+      "EMAIL ADDRESS": "zaiautospeed85@gmail.com",
+      "ON BOARDING TRAINING": "2025-12-17T16:00:00.000Z",
+      "AMOUNT APPROVED [RM]": 50000,
+      "GRANT APPROVED": 17300,
+      "Program": "BangKIT-TUBF"
+    },
+    "error": "duplicate key value violates unique constraint \"idx_mentor_assignments_unique_active\""
+  }
+]

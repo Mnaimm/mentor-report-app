@@ -1,0 +1,39 @@
+﻿Fetching schema from https://oogrwqxlwyoswyfqgxxi.supabase.co...
+
+--- Schema Definitions ---
+
+
+Table: mentors
+Properties:
+  - id: string (uuid) [Note:
+This is a Primary Key.<pk/>]
+  - name: string (character varying) 
+  - email: string (character varying) 
+  - phone: string (character varying) 
+  - region: string (public.region_type) 
+  - program: string (public.program_type) 
+  - status: string (character varying) 
+  - created_at: string (timestamp with time zone) 
+  - updated_at: string (timestamp with time zone) 
+Required: id, name, email
+
+Table: assignments - NOT FOUND in OpenAPI definitions (Check permissions or if table exists)
+
+Table: batch_rounds
+Properties:
+  - id: string (uuid) [Note:
+This is a Primary Key.<pk/>]
+  - batch_name: string (character varying) 
+  - program: string (character varying) 
+  - round_number: integer (integer) 
+  - round_name: string (character varying) 
+  - period_label: string (character varying) 
+  - start_month: string (date) 
+  - end_month: string (date) 
+  - notes: string (character varying) 
+  - created_at: string (timestamp with time zone) 
+  - batch_id: string (uuid) [Note:
+This is a Foreign Key to `batches.id`.<fk table='batches' column='id'/>]
+Required: id, batch_name, program, round_number, round_name
+
+Time taken: 0.93s

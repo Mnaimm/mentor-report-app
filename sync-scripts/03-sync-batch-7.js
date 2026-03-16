@@ -23,7 +23,7 @@ const results = {
 
 const entrepreneurCache = new Map();
 const mentorCache = new Map();
-let batch7Id = null;
+let batchIds = { bangkit: null, maju: null };
 
 // Helper: Get mentor ID by name
 async function getMentorIdByName(mentorName) {
@@ -36,6 +36,7 @@ async function getMentorIdByName(mentorName) {
     .from('mentors')
     .select('id')
     .ilike('name', mentorName)
+    .limit(1)
     .maybeSingle();
 
   if (error) {
@@ -52,32 +53,51 @@ async function getMentorIdByName(mentorName) {
   return null;
 }
 
-// Helper: Get Batch 7 ID
-async function getBatch7Id() {
-  if (batch7Id) return batch7Id;
+// Helper: Get both Batch 7 Bangkit and Batch 6 MAJU IDs
+async function getBatchIds() {
+  if (batchIds.bangkit && batchIds.maju) return batchIds;
 
-  const { data, error } = await supabase
+  // Fetch Batch 7 Bangkit
+  const { data: bangkitBatch, error: bangkitError } = await supabase
     .from('batches')
     .select('id')
-    .eq('batch_name', 'Batch 7')
+    .eq('batch_name', 'Batch 7 Bangkit')
+    .limit(1)
     .maybeSingle();
 
-  if (error) throw error;
+  if (bangkitError) throw bangkitError;
 
-  if (!data) {
-    console.warn('   ⚠️  Batch 7 not found in database. Please run 01-sync-batches.js first.');
-    return null;
+  // Fetch Batch 6 MAJU
+  const { data: majuBatch, error: majuError } = await supabase
+    .from('batches')
+    .select('id')
+    .eq('batch_name', 'Batch 6 MAJU')
+    .limit(1)
+    .maybeSingle();
+
+  if (majuError) throw majuError;
+
+  if (!bangkitBatch || !majuBatch) {
+    const missing = [];
+    if (!bangkitBatch) missing.push('Batch 7 Bangkit');
+    if (!majuBatch) missing.push('Batch 6 MAJU');
+    console.warn(`   ⚠️  Batch(es) not found: ${missing.join(', ')}. Please run 01-sync-batches.js first.`);
   }
 
-  batch7Id = data.id;
-  return batch7Id;
+  batchIds = {
+    bangkit: bangkitBatch?.id || null,
+    maju: majuBatch?.id || null
+  };
+
+  return batchIds;
 }
 
 async function syncBatch7() {
   console.log('\n=== 03-sync-batch-7.js ===');
   console.log(`DRY_RUN: ${DRY_RUN}`);
-  console.log('Input: sync-data/all-m.json (69 rows - Batch 7 Maju)');
-  console.log('Output: entrepreneurs + mentor_assignments tables\n');
+  console.log('Input: sync-data/all-m.json');
+  console.log('Output: entrepreneurs + mentor_assignments tables');
+  console.log('Supports: Batch 7 Bangkit & Batch 6 MAJU\n');
 
   const dataPath = path.join(process.cwd(), 'sync-data', 'all-m.json');
   if (!fs.existsSync(dataPath)) {
@@ -88,12 +108,16 @@ async function syncBatch7() {
   const data = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
   console.log(`📊 Loaded ${data.length} rows from all-m.json\n`);
 
-  // Get Batch 7 ID
-  const batchId = await getBatch7Id();
-  if (!batchId && !DRY_RUN) {
-    console.error('❌ Cannot proceed without Batch 7 in database.');
+  // Get both batch IDs
+  const batches = await getBatchIds();
+  if ((!batches.bangkit || !batches.maju) && !DRY_RUN) {
+    console.error('❌ Cannot proceed without both batches in database.');
     process.exit(1);
   }
+
+  console.log(`📋 Batch IDs:`);
+  console.log(`   - Batch 7 Bangkit: ${batches.bangkit || 'NOT FOUND'}`);
+  console.log(`   - Batch 6 MAJU: ${batches.maju || 'NOT FOUND'}\n`);
 
   for (let i = 0; i < data.length; i++) {
     const row = data[i];
@@ -113,7 +137,16 @@ async function syncBatch7() {
         throw new Error('Missing business owner name');
       }
 
-      console.log(`[${rowNum}/${data.length}] Processing: ${ownerName}`);
+      // Determine batch based on program
+      const isBangkit = program?.toLowerCase().includes('bangkit');
+      const batchId = isBangkit ? batches.bangkit : batches.maju;
+      const batchName = isBangkit ? 'Batch 7 Bangkit' : 'Batch 6 MAJU';
+
+      if (!batchId && !DRY_RUN) {
+        throw new Error(`Batch ID not found for program: ${program}`);
+      }
+
+      console.log(`[${rowNum}/${data.length}] Processing: ${ownerName} (${program} → ${batchName})`);
 
       // Check if entrepreneur exists
       const cacheKey = `${ownerName.toLowerCase()}_${email?.toLowerCase() || 'no-email'}`;
@@ -125,7 +158,7 @@ async function syncBatch7() {
           query = query.eq('email', email.toLowerCase());
         }
 
-        const { data: existing, error: checkError } = await query.maybeSingle();
+        const { data: existing, error: checkError } = await query.limit(1).maybeSingle();
 
         if (checkError) throw checkError;
 
@@ -145,7 +178,7 @@ async function syncBatch7() {
                 business_name: businessName,
                 phone: phone,
                 program: program,
-                batch: 'Batch 7',
+                batch: batchName,
                 state: state,
                 business_type: businessType,
                 status: 'active'
@@ -157,12 +190,12 @@ async function syncBatch7() {
             entrepreneurId = newEntrepreneur.id;
             entrepreneurCache.set(cacheKey, entrepreneurId);
             results.entrepreneurs.success++;
-            console.log(`   ✅ Created entrepreneur: ${ownerName}`);
+            console.log(`   ✅ Created entrepreneur: ${ownerName} → ${batchName}`);
           } else {
             entrepreneurId = `dry-entrepreneur-${ownerName}`;
             entrepreneurCache.set(cacheKey, entrepreneurId);
             results.entrepreneurs.success++;
-            console.log(`   🔍 [DRY] Would create entrepreneur: ${ownerName}`);
+            console.log(`   🔍 [DRY] Would create entrepreneur: ${ownerName} → ${batchName}`);
           }
         }
       }
@@ -179,6 +212,7 @@ async function syncBatch7() {
             .eq('mentor_id', mentorId)
             .eq('entrepreneur_id', entrepreneurId)
             .eq('batch_id', batchId)
+            .limit(1)
             .maybeSingle();
 
           if (assignCheckError) throw assignCheckError;

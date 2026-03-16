@@ -99,7 +99,10 @@ async function syncBatches() {
     try {
       // Extract fields
       const batchName = row.Batch || row.batch;
-      const roundNumber = row['Mentoring Round'] || row.mentoring_round || 1;
+      const roundRaw = row['Mentoring Round'] || row.mentoring_round || '1';
+      // Parse round number from "Mentoring 1" -> 1
+      const roundNumberMatch = String(roundRaw).match(/(\d+)/);
+      const roundNumber = roundNumberMatch ? parseInt(roundNumberMatch[1]) : 1;
       const period = row.Period || row.period;
       const startMonth = row['Start Month'] || row.start_month;
       const endMonth = row['End Month'] || row.end_month;
@@ -111,6 +114,10 @@ async function syncBatches() {
 
       // Determine program
       const program = parseProgramFromBatch(batchName);
+
+      // Extract batch number from batch name (e.g., "Batch 7 Bangkit" -> 7)
+      const batchNumberMatch = batchName.match(/Batch\s+(\d+)/i);
+      const batchNumber = batchNumberMatch ? parseInt(batchNumberMatch[1]) : null;
 
       // === 1. Create/lookup batch ===
       let batchId = batchCache.get(batchName);
@@ -137,6 +144,7 @@ async function syncBatches() {
               .from('batches')
               .insert({
                 batch_name: batchName,
+                batch_number: batchNumber,
                 program: program,
                 description: notes || period,
                 status: 'active'
@@ -186,6 +194,7 @@ async function syncBatches() {
                 round_name: `Round ${roundNumber}`,
                 start_date: startDate,
                 end_date: endDate,
+                program: program,
                 description: period,
                 status: 'active'
               });

@@ -1,5 +1,5 @@
 // 05-sync-maju-reports.js
-// Syncs LaporanMajuUM.json (28 rows) to sessions + reports + upward_mobility_reports tables
+// Syncs LaporanMajuUM.json (28 rows) to reports + upward_mobility_reports tables
 
 import { createClient } from '@supabase/supabase-js';
 import * as fs from 'fs';
@@ -16,7 +16,6 @@ const supabase = createClient(
 const DRY_RUN = process.env.DRY_RUN !== 'false';
 
 const results = {
-  sessions: { success: 0, skipped: 0, failed: 0 },
   reports: { success: 0, skipped: 0, failed: 0 },
   um_reports: { success: 0, skipped: 0, failed: 0 },
   errors: []
@@ -36,6 +35,7 @@ async function getMentorId(email) {
     .from('mentors')
     .select('id')
     .eq('email', key)
+    .limit(1)
     .maybeSingle();
 
   if (error || !data) {
@@ -58,6 +58,7 @@ async function getEntrepreneurId(name) {
     .from('entrepreneurs')
     .select('id')
     .ilike('name', name)
+    .limit(1)
     .maybeSingle();
 
   if (error || !data) {
@@ -79,6 +80,19 @@ function safeJSONParse(jsonString, defaultValue = null) {
     console.warn(`   ⚠️  JSON parse error:`, error.message);
     return defaultValue;
   }
+}
+
+// Helper: Format time string or Date ISO string to HH:MM:SS
+function formatTime(val) {
+  if (!val) return null;
+  // If it's a full ISO string (e.g. 1899-12-30T09:04:35.000Z)
+  if (typeof val === 'string' && val.includes('T')) {
+    const timePart = val.split('T')[1]; // 09:04:35.000Z
+    if (timePart) {
+      return timePart.split('.')[0]; // 09:04:35
+    }
+  }
+  return val;
 }
 
 // Helper: Check if UM data exists
@@ -105,10 +119,10 @@ function buildUMReport(row, mentorId, entrepreneurId) {
     pekerjaan_sebelum: row.UM_PEKERJAAN_SEBELUM ? parseInt(row.UM_PEKERJAAN_SEBELUM) : null,
     pekerjaan_selepas: row.UM_PEKERJAAN_SELEPAS ? parseInt(row.UM_PEKERJAAN_SELEPAS) : null,
     pekerja_semasa: row.UM_PEKERJA_SEMASA ? parseInt(row.UM_PEKERJA_SEMASA) : null,
-    pembiayaan_sebelum: row.UM_PEMBIAYAAN_SEBELUM || null,
-    pembiayaan_selepas: row.UM_PEMBIAYAAN_SELEPAS || null,
-    ulasan_pekerja: row.UM_ULASAN_PEKERJA || null,
-    ulasan_pekerjaan: row.UM_ULASAN_PEKERJAAN || null
+    // pembiayaan_sebelum: row.UM_PEMBIAYAAN_SEBELUM || null,
+    // pembiayaan_selepas: row.UM_PEMBIAYAAN_SELEPAS || null,
+    // ulasan_pekerja: row.UM_ULASAN_PEKERJA || null,
+    // ulasan_pekerjaan: row.UM_ULASAN_PEKERJAAN || null
   };
 }
 
@@ -151,106 +165,87 @@ async function syncMajuReports() {
         throw new Error(`Missing mentor or entrepreneur ID`);
       }
 
-      // Check if session exists
-      const { data: existingSession, error: sessionCheckError } = await supabase
-        .from('sessions')
+      // Check if report already exists
+      const { data: existingReport, error: reportCheckError } = await supabase
+        .from('reports')
         .select('id')
         .eq('mentor_id', mentorId)
         .eq('entrepreneur_id', entrepreneurId)
         .eq('session_number', sessionNumber)
         .eq('program', 'Maju')
+        .limit(1)
         .maybeSingle();
 
-      if (sessionCheckError) throw sessionCheckError;
+      if (reportCheckError) throw reportCheckError;
 
-      if (existingSession) {
-        results.sessions.skipped++;
-        results.reports.skipped++;
-        console.log(`   ⏭️  Session already exists`);
-        continue;
-      }
+      // Parse JSON fields
+      const dataKewangan = safeJSONParse(row.DATA_KEWANGAN_BULANAN_JSON, []);
+      const mentoringFindings = safeJSONParse(row.MENTORING_FINDINGS_JSON, []);
+      const imageUrlsSesi = safeJSONParse(row.URL_GAMBAR_SESI_JSON, []);
+      const imageUrlsPremis = safeJSONParse(row.URL_GAMBAR_PREMIS_JSON, []);
 
-      // === 1. Create session ===
-      let sessionId;
+      // === 1. Create or Update report ===
+      const reportData = {
+        mentor_id: mentorId,
+        entrepreneur_id: entrepreneurId,
+        program: 'Maju',
+        session_number: sessionNumber,
+        session_date: sessionDate || null,
+        mod_sesi: row.MOD_SESI || null,
+        lokasi_f2f: row.LOKASI_F2F || null,
+        masa_mula: formatTime(row.MASA_MULA), // Use formatTime
+        masa_tamat: formatTime(row.MASA_TAMAT), // Use formatTime
+        nama_usahawan: entrepreneurName,
+        nama_syarikat: row.NAMA_BISNES || null,
+        lokasi_bisnes: row.LOKASI_BISNES || null,
+        produk_servis: row.PRODUK_SERVIS || null,
+        no_telefon: row.NO_TELEFON || null,
+        data_kewangan_bulanan: dataKewangan,
+        mentoring_findings: mentoringFindings,
+        latarbelakang_usahawan: row.LATARBELAKANG_USAHAWAN || null,
+        // status_perniagaan_keseluruhan: row.STATUS_PERNIAGAAN_KESELURUHAN || null, // Column does not exist
+        rumusan: row.RUMUSAN_DAN_LANGKAH_KEHADAPAN || null,
+        refleksi: {
+          perasaan: row.REFLEKSI_MENTOR_PERASAAN || null,
+          komitmen: row.REFLEKSI_MENTOR_KOMITMEN || null,
+          lain: row.REFLEKSI_MENTOR_LAIN || null
+        },
+        image_urls: {
+          sesi: imageUrlsSesi,
+          premis: imageUrlsPremis,
+          gw360: row.URL_GAMBAR_GW360 || null
+        },
+        mia_status: row.MIA_STATUS || 'Selesai',
+        mia_reason: row.MIA_REASON || null,
+        mia_proof_url: row.MIA_PROOF_URL || null,
+        folder_id: row.Mentee_Folder_ID || null,
+        source: 'google_sheets_sync'
+      };
 
       if (!DRY_RUN) {
-        const { data: newSession, error: sessionInsertError } = await supabase
-          .from('sessions')
-          .insert({
-            mentor_id: mentorId,
-            entrepreneur_id: entrepreneurId,
-            program: 'Maju',
-            session_date: sessionDate || null,
-            session_number: sessionNumber,
-            mod_sesi: row.MOD_SESI || null,
-            lokasi_f2f: row.LOKASI_F2F || null,
-            masa_mula: row.MASA_MULA || null,
-            masa_tamat: row.MASA_TAMAT || null,
-            status_sesi: row.MIA_STATUS || 'Selesai',
-            source: 'google_sheets_sync'
-          })
-          .select('id')
-          .single();
+        if (existingReport) {
+          // Update existing
+          const { error: reportUpdateError } = await supabase
+            .from('reports')
+            .update(reportData)
+            .eq('id', existingReport.id);
 
-        if (sessionInsertError) throw sessionInsertError;
-        sessionId = newSession.id;
-        results.sessions.success++;
-        console.log(`   ✅ Created session ${sessionNumber}`);
-      } else {
-        sessionId = `dry-session-${rowNum}`;
-        results.sessions.success++;
-        console.log(`   🔍 [DRY] Would create session ${sessionNumber}`);
-      }
+          if (reportUpdateError) throw reportUpdateError;
+          results.reports.success++;
+          console.log(`   ✅ Updated existing report`);
+        } else {
+          // Insert new
+          const { error: reportInsertError } = await supabase
+            .from('reports')
+            .insert(reportData);
 
-      // === 2. Create report ===
-      if (!DRY_RUN && sessionId && !sessionId.startsWith('dry-')) {
-        // Parse JSON fields
-        const dataKewangan = safeJSONParse(row.DATA_KEWANGAN_BULANAN_JSON, []);
-        const mentoringFindings = safeJSONParse(row.MENTORING_FINDINGS_JSON, []);
-        const imageUrlsSesi = safeJSONParse(row.URL_GAMBAR_SESI_JSON, []);
-        const imageUrlsPremis = safeJSONParse(row.URL_GAMBAR_PREMIS_JSON, []);
-
-        const { error: reportInsertError } = await supabase
-          .from('reports')
-          .insert({
-            session_id: sessionId,
-            mentor_id: mentorId,
-            entrepreneur_id: entrepreneurId,
-            program: 'Maju',
-            session_number: sessionNumber,
-            nama_usahawan: entrepreneurName,
-            nama_syarikat: row.NAMA_BISNES || null,
-            lokasi_bisnes: row.LOKASI_BISNES || null,
-            produk_servis: row.PRODUK_SERVIS || null,
-            no_telefon: row.NO_TELEFON || null,
-            data_kewangan_bulanan: dataKewangan,
-            mentoring_findings: mentoringFindings,
-            latarbelakang_usahawan: row.LATARBELAKANG_USAHAWAN || null,
-            status_perniagaan_keseluruhan: row.STATUS_PERNIAGAAN_KESELURUHAN || null,
-            rumusan: row.RUMUSAN_DAN_LANGKAH_KEHADAPAN || null,
-            refleksi: {
-              perasaan: row.REFLEKSI_MENTOR_PERASAAN || null,
-              komitmen: row.REFLEKSI_MENTOR_KOMITMEN || null,
-              lain: row.REFLEKSI_MENTOR_LAIN || null
-            },
-            image_urls: {
-              sesi: imageUrlsSesi,
-              premis: imageUrlsPremis,
-              gw360: row.URL_GAMBAR_GW360 || null
-            },
-            mia_status: row.MIA_STATUS || 'Selesai',
-            mia_reason: row.MIA_REASON || null,
-            mia_proof_url: row.MIA_PROOF_URL || null,
-            folder_id: row.Mentee_Folder_ID || null,
-            source: 'google_sheets_sync'
-          });
-
-        if (reportInsertError) throw reportInsertError;
-        results.reports.success++;
-        console.log(`   ✅ Created report`);
+          if (reportInsertError) throw reportInsertError;
+          results.reports.success++;
+          console.log(`   ✅ Created report`);
+        }
       } else if (DRY_RUN) {
         results.reports.success++;
-        console.log(`   🔍 [DRY] Would create report`);
+        console.log(`   🔍 [DRY] Would ${existingReport ? 'update' : 'create'} report`);
       }
 
       // === 3. Create UM report if data exists ===
@@ -277,7 +272,7 @@ async function syncMajuReports() {
       }
 
     } catch (error) {
-      results.sessions.failed++;
+      results.reports.failed++;
       results.errors.push({
         row: rowNum,
         data: row,
@@ -289,10 +284,10 @@ async function syncMajuReports() {
 
   // === Summary ===
   console.log('\n=== RESULTS ===');
-  console.log('Sessions:');
-  console.log(`  ✅ Created: ${results.sessions.success}`);
-  console.log(`  ⏭️  Skipped: ${results.sessions.skipped}`);
-  console.log(`  ❌ Failed: ${results.sessions.failed}`);
+  // console.log('Sessions:');
+  // console.log(`  ✅ Created: ${results.sessions.success}`);
+  // console.log(`  ⏭️  Skipped: ${results.sessions.skipped}`);
+  // console.log(`  ❌ Failed: ${results.sessions.failed}`);
   console.log('\nReports:');
   console.log(`  ✅ Created: ${results.reports.success}`);
   console.log(`  ⏭️  Skipped: ${results.reports.skipped}`);
