@@ -11,7 +11,6 @@ export default function MentorManagement({ userEmail, isReadOnlyUser, accessDeni
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterProgram, setFilterProgram] = useState('all');
-  const [filterRegion, setFilterRegion] = useState('all');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedMentor, setSelectedMentor] = useState(null);
@@ -22,8 +21,6 @@ export default function MentorManagement({ userEmail, isReadOnlyUser, accessDeni
     ic_number: '',
     address: '',
     state: '',
-    region: '',
-    program: '',
     bank_account: '',
     emergency_contact: ''
   });
@@ -127,8 +124,6 @@ export default function MentorManagement({ userEmail, isReadOnlyUser, accessDeni
       ic_number: mentor.ic_number || '',
       address: mentor.address || '',
       state: mentor.state || '',
-      region: mentor.region || '',
-      program: mentor.program || '',
       bank_account: mentor.bank_account || '',
       emergency_contact: mentor.emergency_contact || ''
     });
@@ -143,8 +138,6 @@ export default function MentorManagement({ userEmail, isReadOnlyUser, accessDeni
       ic_number: '',
       address: '',
       state: '',
-      region: '',
-      program: '',
       bank_account: '',
       emergency_contact: ''
     });
@@ -162,10 +155,10 @@ export default function MentorManagement({ userEmail, isReadOnlyUser, accessDeni
       mentor.phone?.includes(searchQuery);
 
     const matchesStatus = filterStatus === 'all' || mentor.status === filterStatus;
-    const matchesProgram = filterProgram === 'all' || mentor.program === filterProgram;
-    const matchesRegion = filterRegion === 'all' || mentor.region === filterRegion;
+    const matchesProgram = filterProgram === 'all' ||
+      (mentor.programs_served && mentor.programs_served.includes(filterProgram));
 
-    return matchesSearch && matchesStatus && matchesProgram && matchesRegion;
+    return matchesSearch && matchesStatus && matchesProgram;
   });
 
   // Stats
@@ -175,12 +168,6 @@ export default function MentorManagement({ userEmail, isReadOnlyUser, accessDeni
     inactive: mentors.filter(m => m.status === 'inactive').length,
     totalMentees: mentors.reduce((sum, m) => sum + (m.active_mentees || 0), 0)
   };
-
-  const regions = [
-    'Penang', 'Kedah', 'Perlis', 'Perak', 'Selangor', 'Kuala Lumpur',
-    'Negeri Sembilan', 'Melaka', 'Johor', 'Pahang', 'Terengganu',
-    'Kelantan', 'Sabah', 'Sarawak', 'Labuan'
-  ];
 
   const programs = ['Bangkit', 'Maju', 'TUBF'];
 
@@ -218,7 +205,7 @@ export default function MentorManagement({ userEmail, isReadOnlyUser, accessDeni
 
         {/* Filters & Search */}
         <div className="bg-white p-4 rounded-lg shadow mb-6">
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <input
               type="text"
               placeholder="Cari nama, email, atau telefon..."
@@ -242,14 +229,6 @@ export default function MentorManagement({ userEmail, isReadOnlyUser, accessDeni
             >
               <option value="all">Semua Program</option>
               {programs.map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
-            <select
-              value={filterRegion}
-              onChange={(e) => setFilterRegion(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md"
-            >
-              <option value="all">Semua Zon</option>
-              {regions.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
           {!isReadOnlyUser && (
@@ -279,8 +258,8 @@ export default function MentorManagement({ userEmail, isReadOnlyUser, accessDeni
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Nama</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Email</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Telefon</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Zon</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Program</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Zon</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Mentee Aktif</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Status</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Tindakan</th>
@@ -299,8 +278,8 @@ export default function MentorManagement({ userEmail, isReadOnlyUser, accessDeni
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">{mentor.name}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{mentor.email}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{mentor.phone || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{mentor.region || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{mentor.program || '-'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{mentor.programs_served || '—'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{mentor.zones_covered || '—'}</td>
                       <td className="px-4 py-3 text-sm text-center">
                         <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
                           mentor.active_mentees > 0 ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
@@ -395,32 +374,6 @@ export default function MentorManagement({ userEmail, isReadOnlyUser, accessDeni
                       onChange={handleInputChange}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md"
                     />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Zon *</label>
-                    <select
-                      name="region"
-                      value={formData.region}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    >
-                      <option value="">Pilih Zon</option>
-                      {regions.map(r => <option key={r} value={r}>{r}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Program *</label>
-                    <select
-                      name="program"
-                      value={formData.program}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    >
-                      <option value="">Pilih Program</option>
-                      {programs.map(p => <option key={p} value={p}>{p}</option>)}
-                    </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Negeri</label>
@@ -533,32 +486,6 @@ export default function MentorManagement({ userEmail, isReadOnlyUser, accessDeni
                       onChange={handleInputChange}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md"
                     />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Zon *</label>
-                    <select
-                      name="region"
-                      value={formData.region}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    >
-                      <option value="">Pilih Zon</option>
-                      {regions.map(r => <option key={r} value={r}>{r}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Program *</label>
-                    <select
-                      name="program"
-                      value={formData.program}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                    >
-                      <option value="">Pilih Program</option>
-                      {programs.map(p => <option key={p} value={p}>{p}</option>)}
-                    </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Negeri</label>

@@ -32,16 +32,14 @@ export default async function handler(req, res) {
         ic_number,
         address,
         state,
-        region,
-        program,
         bank_account,
         emergency_contact
       } = req.body;
 
       // Validation
-      if (!name || !email || !region || !program) {
+      if (!name || !email) {
         return res.status(400).json({
-          error: 'Missing required fields: name, email, region, program'
+          error: 'Missing required fields: name, email'
         });
       }
 
@@ -71,7 +69,7 @@ export default async function handler(req, res) {
         }
       }
 
-      // Update mentor (Supabase client handles enum types automatically)
+      // Update mentor (region and program are NOT updated - derived from assignments)
       const { data: updatedMentor, error: updateError } = await supabase
         .from('mentors')
         .update({
@@ -81,8 +79,6 @@ export default async function handler(req, res) {
           ic_number: ic_number || null,
           address: address || null,
           state: state || null,
-          region,
-          program,
           bank_account: bank_account || null,
           emergency_contact: emergency_contact || null,
           updated_at: new Date().toISOString()

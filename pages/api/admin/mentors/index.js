@@ -18,52 +18,80 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      // Fetch all mentors with their active mentee count
-      const { data: mentors, error } = await supabase
-        .from('mentors')
-        .select(`
-          id,
-          name,
-          email,
-          phone,
-          ic_number,
-          address,
-          state,
-          region,
-          program,
-          status,
-          bank_account,
-          emergency_contact,
-          created_at
-        `)
-        .order('name', { ascending: true });
+      const { data: mentors, error } = await supabase.rpc('get_mentors_with_programs_and_zones');
 
-      if (error) throw error;
+      if (error) {
+        console.error('RPC call failed, falling back to manual aggregation:', error);
 
-      // For each mentor, count active mentees
-      const mentorsWithCounts = await Promise.all(
-        mentors.map(async (mentor) => {
-          const { count, error: countError } = await supabase
-            .from('mentor_assignments')
-            .select('*', { count: 'exact', head: true })
-            .eq('mentor_id', mentor.id)
-            .eq('status', 'active')
-            .eq('is_active', true);
+        const { data: mentorsRaw, error: fetchError } = await supabase
+          .from('mentors')
+          .select(`
+            id,
+            name,
+            email,
+            phone,
+            ic_number,
+            address,
+            state,
+            status,
+            bank_account,
+            emergency_contact,
+            created_at
+          `)
+          .eq('status', 'active')
+          .order('name', { ascending: true });
 
-          if (countError) {
-            console.error(`Error counting mentees for ${mentor.email}:`, countError);
-          }
+        if (fetchError) throw fetchError;
 
-          return {
-            ...mentor,
-            active_mentees: count || 0
-          };
-        })
-      );
+        const mentorsWithData = await Promise.all(
+          mentorsRaw.map(async (mentor) => {
+            const { data: assignments } = await supabase
+              .from('mentor_assignments')
+              .select(`
+                id,
+                status,
+                is_active,
+                entrepreneurs (
+                  program,
+                  zone
+                )
+              `)
+              .eq('mentor_id', mentor.id)
+              .eq('status', 'active')
+              .eq('is_active', true);
+
+            const activeCount = assignments?.length || 0;
+            const programs = [...new Set(
+              assignments
+                ?.map(a => a.entrepreneurs?.program)
+                .filter(Boolean)
+                .sort() || []
+            )].join(', ');
+            const zones = [...new Set(
+              assignments
+                ?.map(a => a.entrepreneurs?.zone)
+                .filter(Boolean)
+                .sort() || []
+            )].join(', ');
+
+            return {
+              ...mentor,
+              active_mentees: activeCount,
+              programs_served: programs || null,
+              zones_covered: zones || null
+            };
+          })
+        );
+
+        return res.status(200).json({
+          success: true,
+          data: mentorsWithData
+        });
+      }
 
       return res.status(200).json({
         success: true,
-        data: mentorsWithCounts
+        data: mentors
       });
 
     } else if (req.method === 'POST') {
@@ -75,16 +103,14 @@ export default async function handler(req, res) {
         ic_number,
         address,
         state,
-        region,
-        program,
         bank_account,
         emergency_contact
       } = req.body;
 
       // Validation
-      if (!name || !email || !region || !program) {
+      if (!name || !email) {
         return res.status(400).json({
-          error: 'Missing required fields: name, email, region, program'
+          error: 'Missing required fields: name, email'
         });
       }
 
@@ -101,7 +127,7 @@ export default async function handler(req, res) {
         });
       }
 
-      // Insert mentor (Supabase client handles enum types automatically)
+      // Insert mentor (region and program are NULL - derived from assignments)
       const { data: newMentor, error: insertError } = await supabase
         .from('mentors')
         .insert([{
@@ -111,8 +137,8 @@ export default async function handler(req, res) {
           ic_number: ic_number || null,
           address: address || null,
           state: state || null,
-          region,
-          program,
+          region: null,
+          program: null,
           status: 'active',
           bank_account: bank_account || null,
           emergency_contact: emergency_contact || null
