@@ -1,6 +1,12 @@
+import { createClient } from '@supabase/supabase-js';
 import { getSession } from 'next-auth/react';
 import { canAccessAdmin } from '../../../lib/auth';
-import supabaseAdmin from '../../../lib/supabaseAdmin';
+
+// Use SERVICE_ROLE_KEY for admin endpoints (bypasses RLS)
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 export default async function handler(req, res) {
   // 1. Auth
@@ -17,7 +23,7 @@ export default async function handler(req, res) {
 
   try {
     // Pending Verification: reports submitted but not yet approved
-    const { count: pendingVerification, error: e1 } = await supabaseAdmin
+    const { count: pendingVerification, error: e1 } = await supabase
       .from('reports')
       .select('*', { count: 'exact', head: true })
       .eq('status', 'submitted');
@@ -25,7 +31,7 @@ export default async function handler(req, res) {
     if (e1) throw e1;
 
     // Open MIA: MIA requests not yet approved or rejected
-    const { count: openMIA, error: e2 } = await supabaseAdmin
+    const { count: openMIA, error: e2 } = await supabase
       .from('mia_requests')
       .select('*', { count: 'exact', head: true })
       .not('status', 'in', '(approved,rejected)');
@@ -33,7 +39,7 @@ export default async function handler(req, res) {
     if (e2) throw e2;
 
     // Unpaid Approved: reports approved but payment still pending
-    const { count: unpaidApproved, error: e3 } = await supabaseAdmin
+    const { count: unpaidApproved, error: e3 } = await supabase
       .from('reports')
       .select('*', { count: 'exact', head: true })
       .eq('status', 'approved')
@@ -42,7 +48,7 @@ export default async function handler(req, res) {
     if (e3) throw e3;
 
     // Active Payment Batches: batches not yet paid
-    const { count: activePaymentBatches, error: e4 } = await supabaseAdmin
+    const { count: activePaymentBatches, error: e4 } = await supabase
       .from('payment_batches')
       .select('*', { count: 'exact', head: true })
       .neq('status', 'paid');

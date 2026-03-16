@@ -1,6 +1,12 @@
+import { createClient } from '@supabase/supabase-js';
 import { getSession } from 'next-auth/react';
 import { canAccessAdmin } from '../../../../../lib/auth';
-import supabaseAdmin from '../../../../../lib/supabaseAdmin';
+
+// Use SERVICE_ROLE_KEY for admin endpoints (bypasses RLS)
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 export default async function handler(req, res) {
   // 1. Auth check
@@ -23,7 +29,7 @@ export default async function handler(req, res) {
 
   try {
     // 1. Check if mentor exists
-    const { data: mentor, error: mentorError } = await supabaseAdmin
+    const { data: mentor, error: mentorError } = await supabase
       .from('mentors')
       .select('id, name, email, status')
       .eq('id', id)
@@ -38,7 +44,7 @@ export default async function handler(req, res) {
     }
 
     // 2. Check for active mentees (CRITICAL VALIDATION)
-    const { count: activeMentees, error: countError } = await supabaseAdmin
+    const { count: activeMentees, error: countError } = await supabase
       .from('mentor_assignments')
       .select('*', { count: 'exact', head: true })
       .eq('mentor_id', id)
@@ -55,7 +61,7 @@ export default async function handler(req, res) {
     }
 
     // 3. Update mentor status to inactive
-    const { error: updateError } = await supabaseAdmin
+    const { error: updateError } = await supabase
       .from('mentors')
       .update({
         status: 'inactive',
@@ -67,7 +73,7 @@ export default async function handler(req, res) {
 
     // 4. Remove mentor role from user_roles (but don't delete user record)
     try {
-      const { error: roleError } = await supabaseAdmin
+      const { error: roleError } = await supabase
         .from('user_roles')
         .delete()
         .eq('email', mentor.email)
@@ -82,7 +88,7 @@ export default async function handler(req, res) {
 
     // 5. Log activity
     try {
-      await supabaseAdmin
+      await supabase
         .from('activity_logs')
         .insert([{
           action: 'mentor_retired',

@@ -1,6 +1,12 @@
+import { createClient } from '@supabase/supabase-js';
 import { getSession } from 'next-auth/react';
 import { canAccessAdmin } from '../../../../lib/auth';
-import supabaseAdmin from '../../../../lib/supabaseAdmin';
+
+// Use SERVICE_ROLE_KEY for admin endpoints (bypasses RLS)
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 export default async function handler(req, res) {
   // 1. Auth check
@@ -13,7 +19,7 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       // Fetch all mentors with their active mentee count
-      const { data: mentors, error } = await supabaseAdmin
+      const { data: mentors, error } = await supabase
         .from('mentors')
         .select(`
           id,
@@ -37,7 +43,7 @@ export default async function handler(req, res) {
       // For each mentor, count active mentees
       const mentorsWithCounts = await Promise.all(
         mentors.map(async (mentor) => {
-          const { count, error: countError } = await supabaseAdmin
+          const { count, error: countError } = await supabase
             .from('mentor_assignments')
             .select('*', { count: 'exact', head: true })
             .eq('mentor_id', mentor.id)
@@ -83,7 +89,7 @@ export default async function handler(req, res) {
       }
 
       // Check if mentor already exists
-      const { data: existing } = await supabaseAdmin
+      const { data: existing } = await supabase
         .from('mentors')
         .select('id')
         .eq('email', email)
@@ -96,7 +102,7 @@ export default async function handler(req, res) {
       }
 
       // Insert mentor (Supabase client handles enum types automatically)
-      const { data: newMentor, error: insertError } = await supabaseAdmin
+      const { data: newMentor, error: insertError } = await supabase
         .from('mentors')
         .insert([{
           name,
@@ -118,7 +124,7 @@ export default async function handler(req, res) {
 
       // Also add mentor role to user_roles table
       try {
-        const { error: roleError } = await supabaseAdmin
+        const { error: roleError } = await supabase
           .from('user_roles')
           .insert([{
             email,
