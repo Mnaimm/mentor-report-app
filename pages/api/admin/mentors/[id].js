@@ -1,16 +1,11 @@
-import { createClient } from '@supabase/supabase-js';
-import { getSession } from 'next-auth/react';
+import { unstable_getServerSession } from 'next-auth/next';
+import { authOptions } from '../../auth/[...nextauth]';
 import { canAccessAdmin } from '../../../../lib/auth';
-
-// Use SERVICE_ROLE_KEY for admin endpoints (bypasses RLS)
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+import supabaseAdmin from '../../../../lib/supabaseAdmin';
 
 export default async function handler(req, res) {
   // 1. Auth check
-  const session = await getSession({ req });
+  const session = await unstable_getServerSession(req, res, authOptions);
   if (!session) return res.status(401).json({ error: 'Unauthorized' });
 
   const hasAccess = await canAccessAdmin(session.user.email);
@@ -44,7 +39,7 @@ export default async function handler(req, res) {
       }
 
       // Check if email is being changed and already exists
-      const { data: currentMentor } = await supabase
+      const { data: currentMentor } = await supabaseAdmin
         .from('mentors')
         .select('email')
         .eq('id', id)
@@ -55,7 +50,7 @@ export default async function handler(req, res) {
       }
 
       if (email !== currentMentor.email) {
-        const { data: existing } = await supabase
+        const { data: existing } = await supabaseAdmin
           .from('mentors')
           .select('id')
           .eq('email', email)
@@ -70,7 +65,7 @@ export default async function handler(req, res) {
       }
 
       // Update mentor (region and program are NOT updated - derived from assignments)
-      const { data: updatedMentor, error: updateError } = await supabase
+      const { data: updatedMentor, error: updateError } = await supabaseAdmin
         .from('mentors')
         .update({
           name,
@@ -92,7 +87,7 @@ export default async function handler(req, res) {
       // If email changed, update user_roles too
       if (email !== currentMentor.email) {
         try {
-          await supabase
+          await supabaseAdmin
             .from('user_roles')
             .update({ email })
             .eq('email', currentMentor.email)
@@ -110,7 +105,7 @@ export default async function handler(req, res) {
 
     } else if (req.method === 'GET') {
       // Get single mentor details
-      const { data: mentor, error } = await supabase
+      const { data: mentor, error } = await supabaseAdmin
         .from('mentors')
         .select('*')
         .eq('id', id)
@@ -122,7 +117,7 @@ export default async function handler(req, res) {
       }
 
       // Get active mentee count
-      const { count } = await supabase
+      const { count } = await supabaseAdmin
         .from('mentor_assignments')
         .select('*', { count: 'exact', head: true })
         .eq('mentor_id', id)

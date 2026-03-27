@@ -1,16 +1,11 @@
-import { createClient } from '@supabase/supabase-js';
-import { getSession } from 'next-auth/react';
+import { unstable_getServerSession } from 'next-auth/next';
+import { authOptions } from '../../auth/[...nextauth]';
 import { canAccessAdmin } from '../../../../lib/auth';
-
-// Use SERVICE_ROLE_KEY for admin endpoints (bypasses RLS)
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+import supabaseAdmin from '../../../../lib/supabaseAdmin';
 
 export default async function handler(req, res) {
   // 1. Auth check
-  const session = await getSession({ req });
+  const session = await unstable_getServerSession(req, res, authOptions);
   if (!session) return res.status(401).json({ error: 'Unauthorized' });
 
   const hasAccess = await canAccessAdmin(session.user.email);
@@ -18,12 +13,8 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      const { data: mentors, error } = await supabase.rpc('get_mentors_with_programs_and_zones');
-
-      if (error) {
-        console.error('RPC call failed, falling back to manual aggregation:', error);
-
-        const { data: mentorsRaw, error: fetchError } = await supabase
+      // Fetch mentors with manual aggregation
+      const { data: mentorsRaw, error: fetchError } = await supabaseAdmin
           .from('mentors')
           .select(`
             id,
@@ -45,7 +36,7 @@ export default async function handler(req, res) {
 
         const mentorsWithData = await Promise.all(
           mentorsRaw.map(async (mentor) => {
-            const { data: assignments } = await supabase
+            const { data: assignments } = await supabaseAdmin
               .from('mentor_assignments')
               .select(`
                 id,
@@ -83,15 +74,9 @@ export default async function handler(req, res) {
           })
         );
 
-        return res.status(200).json({
-          success: true,
-          data: mentorsWithData
-        });
-      }
-
       return res.status(200).json({
         success: true,
-        data: mentors
+        data: mentorsWithData
       });
 
     } else if (req.method === 'POST') {
@@ -115,7 +100,7 @@ export default async function handler(req, res) {
       }
 
       // Check if mentor already exists
-      const { data: existing } = await supabase
+      const { data: existing } = await supabaseAdmin
         .from('mentors')
         .select('id')
         .eq('email', email)
@@ -128,7 +113,7 @@ export default async function handler(req, res) {
       }
 
       // Insert mentor (region and program are NULL - derived from assignments)
-      const { data: newMentor, error: insertError } = await supabase
+      const { data: newMentor, error: insertError } = await supabaseAdmin
         .from('mentors')
         .insert([{
           name,
@@ -150,7 +135,7 @@ export default async function handler(req, res) {
 
       // Also add mentor role to user_roles table
       try {
-        const { error: roleError } = await supabase
+        const { error: roleError } = await supabaseAdmin
           .from('user_roles')
           .insert([{
             email,

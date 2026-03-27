@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import { getSession } from 'next-auth/react';
 import { canAccessAdmin, isReadOnly } from '../../lib/auth';
 import AccessDenied from '../../components/AccessDenied';
 import ReadOnlyBadge from '../../components/ReadOnlyBadge';
 
 export default function MentorManagement({ userEmail, isReadOnlyUser, accessDenied }) {
+  const router = useRouter();
   const [mentors, setMentors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -101,11 +103,14 @@ export default function MentorManagement({ userEmail, isReadOnlyUser, accessDeni
     }
 
     try {
+      console.log('🔄 Retiring mentor:', mentor.id, mentor.name);
       const res = await fetch(`/api/admin/mentors/${mentor.id}/retire`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
+      console.log('📡 Response status:', res.status);
       const json = await res.json();
+      console.log('📦 Response body:', json);
       if (!json.success) throw new Error(json.error);
 
       alert('✅ Mentor berjaya ditamatkan');
@@ -299,19 +304,27 @@ export default function MentorManagement({ userEmail, isReadOnlyUser, accessDeni
                       <td className="px-4 py-3 text-sm">
                         {!isReadOnlyUser && (
                           <div className="flex gap-2">
-                            <button
-                              onClick={() => openEditModal(mentor)}
-                              className="text-blue-600 hover:text-blue-800 font-medium"
-                            >
-                              Edit
-                            </button>
                             {mentor.status === 'active' && (
-                              <button
-                                onClick={() => handleRetireMentor(mentor)}
-                                className="text-red-600 hover:text-red-800 font-medium"
-                              >
-                                Tamatkan
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => openEditModal(mentor)}
+                                  className="text-blue-600 hover:text-blue-800 font-medium"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => router.push(`/admin/reassign-mentor?mentorId=${mentor.id}`)}
+                                  className="text-blue-600 hover:text-blue-800 font-medium"
+                                >
+                                  Tugaskan Semula
+                                </button>
+                                <button
+                                  onClick={() => handleRetireMentor(mentor)}
+                                  className="text-red-600 hover:text-red-800 font-medium"
+                                >
+                                  Tamatkan Penugasan
+                                </button>
+                              </>
                             )}
                           </div>
                         )}
