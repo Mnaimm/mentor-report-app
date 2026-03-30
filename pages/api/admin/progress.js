@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { canAccessAdmin } from '../../../lib/auth';
-import { supabaseAdmin } from '../../../lib/supabaseClient';
+import supabaseAdmin from '../../../lib/supabaseAdmin';
 
 const normalizeProgram = (program) => (program ? String(program).toLowerCase() : 'all');
 

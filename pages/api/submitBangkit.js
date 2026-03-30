@@ -1,7 +1,7 @@
 // pages/api/submitReport.js
 import { google } from 'googleapis';
 import cache from '../../lib/simple-cache';
-import { supabase, supabaseAdmin } from '../../lib/supabaseClient';
+import supabaseAdmin from '../../lib/supabaseAdmin';
 import { prepareMIARequestPayload, MIA_STATUS } from '../../lib/mia';
 
 
@@ -503,9 +503,6 @@ export default async function handler(req, res) {
     };
 
     // INSERT INTO supabaseAdmin (BLOCKING)
-    console.log(' Attempting reports insert with client type:',
-      supabaseAdmin === supabase ? 'SAME CLIENT (bug!)' : 'admin client'
-    );
     const { data: insertedData, error: supabaseInsertError } = await supabaseAdmin
       .from('reports')
       .insert(supabasePayload)

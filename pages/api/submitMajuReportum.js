@@ -1,7 +1,7 @@
 // pages/api/submitMajuReport.js
 import { google } from 'googleapis';
 import cache from '../../lib/simple-cache';
-import { supabaseAdmin } from '../../lib/supabaseClient';
+import supabaseAdmin from '../../lib/supabaseAdmin';
 import { prepareMIARequestPayload } from '../../lib/mia';
 
 
