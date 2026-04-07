@@ -1,7 +1,7 @@
 import { unstable_getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { canAccessAdmin } from '../../../lib/auth';
-import supabaseAdmin from '../../../lib/supabaseAdmin';
+import { createAdminClient } from '../../../lib/supabaseAdmin';
 import { google } from 'googleapis';
 
 const getGoogleAuth = () => {
@@ -84,6 +84,8 @@ async function updateMappingSheet(menteeName, menteeEmail, newMentorName, newMen
 }
 
 export default async function handler(req, res) {
+  const supabaseAdmin = createAdminClient();
+
   // 1. Auth
   const session = await unstable_getServerSession(req, res, authOptions);
   if (!session) return res.status(401).json({ error: 'Unauthorized' });
@@ -123,6 +125,12 @@ export default async function handler(req, res) {
         .eq('status', 'active')
         .eq('is_active', true)
         .order('entrepreneurs(name)', { ascending: true });
+
+      console.log('reassign-mentor mentees raw result:', {
+        mentorId,
+        count: data?.length || 0,
+        error
+      });
 
       if (error) throw error;
 

@@ -1,9 +1,11 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { canAccessAdmin } from '../../../lib/auth';
-import supabaseAdmin from '../../../lib/supabaseAdmin';
+import { createAdminClient } from '../../../lib/supabaseAdmin';
 
 export default async function handler(req, res) {
+  const supabaseAdmin = createAdminClient();
+
   // 1. Auth
   const session = await getServerSession(req, res, authOptions);
   if (!session) return res.status(401).json({ error: 'Unauthorized' });
@@ -41,6 +43,12 @@ export default async function handler(req, res) {
       .eq('mentors.status', 'active')
       .neq('mentor_id', excludeMentorId);
 
+    console.log('available-mentors assignments raw result:', {
+      excludeMentorId,
+      count: assignments?.length || 0,
+      error: fetchError
+    });
+
     if (fetchError) {
       console.error('❌ Error fetching mentor assignments:', fetchError);
       throw fetchError;
@@ -69,6 +77,12 @@ export default async function handler(req, res) {
       .select('id, name, email')
       .eq('status', 'active')
       .neq('id', excludeMentorId);
+
+    console.log('available-mentors all active mentors raw result:', {
+      excludeMentorId,
+      count: allActiveMentors?.length || 0,
+      error: allError
+    });
 
     if (allError) {
       console.error('❌ Error fetching all mentors:', allError);
