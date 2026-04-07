@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from './auth/[...nextauth]';
-import { google } from 'googleapis';
+import supabaseAdmin from '../../lib/supabaseAdmin';
 
 export default async function handler(req, res) {
   // Auth check - require login
@@ -15,64 +15,103 @@ export default async function handler(req, res) {
   }
 
   try {
-    const mentorEmail = session.user.email;
+    const mentorEmail = session.user.email.toLowerCase().trim();
 
     console.log('🔍 Fetching entrepreneurs for mentor:', mentorEmail);
 
-    // Fetch from Google Sheets mapping (which has all the data including address)
-    const credentialsJson = Buffer.from(process.env.GOOGLE_CREDENTIALS_BASE64, 'base64').toString('ascii');
-    const credentials = JSON.parse(credentialsJson);
+    // Step 1: Get mentor ID from email using mentors table
+    const { data: mentor, error: mentorError } = await supabaseAdmin
+      .from('mentors')
+      .select('id, name, email')
+      .eq('email', mentorEmail)
+      .eq('status', 'active')
+      .single();
 
-    const auth = new google.auth.GoogleAuth({
-      credentials,
-      scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
-    });
-
-    const sheets = google.sheets({ version: 'v4', auth });
-
-    const mappingResponse = await sheets.spreadsheets.values.get({
-      spreadsheetId: process.env.GOOGLE_SHEETS_MAPPING_ID,
-      range: 'mapping!A:L',
-    });
-    const mappingRows = mappingResponse.data.values;
-
-    if (!mappingRows || mappingRows.length < 2) {
-      return res.status(404).json({ error: 'No data found in mapping sheet.' });
+    if (mentorError || !mentor) {
+      console.error('❌ Mentor not found:', mentorError);
+      return res.status(404).json({
+        error: 'Mentor not found',
+        success: false,
+        data: []
+      });
     }
 
-    // Filter rows for this mentor and transform to usable format
-    const entrepreneurs = mappingRows.slice(1)
-      .filter(row => {
-        const rowMentorEmail = (row[3] || '').toLowerCase().trim();
-        return rowMentorEmail === mentorEmail.toLowerCase().trim();
-      })
-      .map(row => {
-        const batch = row[0] || '';
-        let programType = 'Unknown';
-        if (batch.toLowerCase().includes('bangkit')) {
-          programType = 'Bangkit';
-        } else if (batch.toLowerCase().includes('maju')) {
-          programType = 'Maju';
-        }
+    console.log('✅ Found mentor:', mentor.name, '(ID:', mentor.id + ')');
 
-        return {
-          mentee_name: row[4] || '',
-          entrepreneur_id: row[5] || '',
-          business_name: row[6] || '',
-          address: row[7] || '',
-          phone: row[8] || '',
-          email: row[10] || '',
-          business_type: row[11] || '',
-          zone: row[1] || '',
-          batch: batch,
-          program_type: programType,
-          mentor_name: row[2] || '',
-          mentor_email: row[3] || '',
-          folder_id: row[9] || ''
-        };
-      });
+    // Step 2: Fetch active assignments with entrepreneur data
+    const { data: assignments, error: assignmentsError } = await supabaseAdmin
+      .from('mentor_assignments')
+      .select(`
+        id,
+        batch_id,
+        entrepreneur_id,
+        entrepreneurs (
+          id,
+          name,
+          email,
+          phone,
+          business_name,
+          address,
+          region,
+          zone,
+          state,
+          district,
+          program,
+          batch,
+          folder_id,
+          status
+        ),
+        batches (
+          batch_name
+        )
+      `)
+      .eq('mentor_id', mentor.id)
+      .eq('status', 'active')
+      .eq('is_active', true)
+      .order('entrepreneurs(name)', { ascending: true });
 
-    console.log(`✅ Found ${entrepreneurs.length} entrepreneurs for ${mentorEmail}`);
+    if (assignmentsError) {
+      console.error('❌ Error fetching assignments:', assignmentsError);
+      throw assignmentsError;
+    }
+
+    console.log(`✅ Found ${assignments?.length || 0} active assignments`);
+
+    // Step 3: Transform to match frontend expected format
+    const entrepreneurs = (assignments || []).map(assignment => {
+      const e = assignment.entrepreneurs;
+      if (!e) return null;
+
+      // Determine program type from batch name or program field
+      let programType = e.program || 'Unknown';
+      const batchName = assignment.batches?.batch_name || e.batch || '';
+
+      if (batchName.toLowerCase().includes('bangkit') || programType.toLowerCase().includes('bangkit')) {
+        programType = 'Bangkit';
+      } else if (batchName.toLowerCase().includes('maju') || programType.toLowerCase().includes('maju')) {
+        programType = 'Maju';
+      }
+
+      return {
+        id: e.id,
+        mentee_name: e.name || '',
+        entrepreneur_id: e.id || '',
+        business_name: e.business_name || '',
+        address: e.address || '',
+        phone: e.phone || '',
+        email: e.email || '',
+        zone: e.zone || e.state || '',
+        state: e.state || '',
+        batch: batchName || e.batch || '',
+        program_type: programType,
+        mentor_name: mentor.name,
+        mentor_email: mentor.email,
+        folder_id: e.folder_id || '',
+        status: e.status || ''
+      };
+    }).filter(Boolean); // Remove null entries
+
+    console.log(`✅ Returning ${entrepreneurs.length} entrepreneurs for ${mentorEmail}`);
 
     return res.status(200).json({
       success: true,
@@ -84,7 +123,9 @@ export default async function handler(req, res) {
     console.error('❌ Error in getMentorEntrepreneurs:', error);
     return res.status(500).json({
       error: 'Internal server error',
-      details: error.message
+      details: error.message,
+      success: false,
+      data: []
     });
   }
 }

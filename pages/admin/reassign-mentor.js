@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { getSession } from 'next-auth/react';
 import { canAccessAdmin, isReadOnly } from '../../lib/auth';
-import { supabase } from '../../lib/supabaseClient';
 import AccessDenied from '../../components/AccessDenied';
 import ReadOnlyBadge from '../../components/ReadOnlyBadge';
 
@@ -118,62 +117,18 @@ export default function ReassignMentor({ userEmail, isReadOnlyUser, accessDenied
   const fetchAvailableMentors = async () => {
     setLoading(true);
     try {
-      const { data, error: fetchError } = await supabase
-        .from('mentor_assignments')
-        .select(`
-          mentor_id,
-          mentors!inner (
-            id,
-            name,
-            email,
-            status
-          )
-        `)
-        .eq('status', 'active')
-        .eq('is_active', true)
-        .eq('mentors.status', 'active')
-        .neq('mentor_id', sourceMentor.id);
+      const res = await fetch(`/api/admin/available-mentors?excludeMentorId=${sourceMentor.id}`);
+      const json = await res.json();
 
-      if (fetchError) throw fetchError;
+      if (!json.success) {
+        throw new Error(json.error || 'Failed to fetch available mentors');
+      }
 
-      // Group by mentor and count active mentees
-      const mentorCounts = {};
-      data.forEach(assignment => {
-        const mentor = assignment.mentors;
-        if (!mentorCounts[mentor.id]) {
-          mentorCounts[mentor.id] = {
-            id: mentor.id,
-            name: mentor.name,
-            email: mentor.email,
-            active_mentees: 0
-          };
-        }
-        mentorCounts[mentor.id].active_mentees++;
-      });
-
-      // Also include mentors with 0 active mentees
-      const { data: allActiveMentors, error: allError } = await supabase
-        .from('mentors')
-        .select('id, name, email')
-        .eq('status', 'active')
-        .neq('id', sourceMentor.id);
-
-      if (allError) throw allError;
-
-      allActiveMentors.forEach(mentor => {
-        if (!mentorCounts[mentor.id]) {
-          mentorCounts[mentor.id] = {
-            id: mentor.id,
-            name: mentor.name,
-            email: mentor.email,
-            active_mentees: 0
-          };
-        }
-      });
-
-      setAvailableMentors(Object.values(mentorCounts).sort((a, b) => a.name.localeCompare(b.name)));
+      console.log('✅ Available mentors for dropdown:', json.data?.length || 0, 'mentors');
+      setAvailableMentors(json.data || []);
     } catch (err) {
-      console.error('Error fetching available mentors:', err);
+      console.error('❌ Error fetching available mentors:', err);
+      setError(err.message);
     } finally {
       setLoading(false);
     }
