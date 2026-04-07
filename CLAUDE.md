@@ -97,6 +97,100 @@ When `isReadOnlyUser` is true, disable all write buttons (add, edit, retire, app
 
 Wrap all Sheets sync in try/catch. Never let a Sheets failure block a DB operation or return an error to the user. Log errors to console only. DB is source of truth.
 
+---
+
+## Known Bug Patterns & Architecture Rules
+
+### Anti-Patterns Fixed (commit 858206e - April 2026)
+
+#### ❌ NEVER import supabaseAdmin in client-side page components
+
+**WRONG:**
+```javascript
+// pages/admin/reassign-mentor.js
+import supabaseAdmin from '../../lib/supabaseAdmin'; // ❌ BREAKS - service key not available client-side
+
+const { data } = await supabaseAdmin.from('mentors').select('*'); // ❌ Will error
+```
+
+**RIGHT:**
+```javascript
+// pages/admin/reassign-mentor.js
+const res = await fetch('/api/admin/available-mentors'); // ✅ Call server-side API
+const { data } = await res.json();
+
+// pages/api/admin/available-mentors.js (server-side)
+import supabaseAdmin from '../../../lib/supabaseAdmin'; // ✅ OK here
+const { data } = await supabaseAdmin.from('mentors').select('*');
+```
+
+**Bug it caused:** `/admin/reassign-mentor` dropdown was empty because RLS blocked the query when using wrong client.
+
+---
+
+#### ❌ NEVER fetch dashboard/display data from Google Sheets
+
+**WRONG:**
+```javascript
+// pages/api/getMentorEntrepreneurs.js
+const sheets = google.sheets({ version: 'v4', auth }); // ❌ Stale data
+const response = await sheets.spreadsheets.values.get({...});
+```
+
+**RIGHT:**
+```javascript
+// pages/api/getMentorEntrepreneurs.js
+import supabaseAdmin from '../../lib/supabaseAdmin'; // ✅ Live data
+const { data } = await supabaseAdmin
+  .from('mentor_assignments')
+  .select('*, entrepreneurs(*)')
+  .eq('status', 'active');
+```
+
+**Why:** Google Sheets is ONLY for Apps Script PDF generation. All mentor and admin dashboard pages MUST read from Supabase.
+
+**Bug it caused:** Some mentees not showing on `/mentor/usahawan-saya` because reassignments done in Supabase were not synced to Sheets yet (sync is fire-and-forget, can fail silently).
+
+---
+
+### ✅ Correct Pattern for All Data Fetching
+
+```
+┌─────────────────────────────────────┐
+│  CLIENT (Browser)                   │
+│  pages/admin/*.js                   │
+│  pages/mentor/*.js                  │
+│                                     │
+│  ❌ NO supabaseAdmin import         │
+│  ❌ NO Google Sheets API            │
+│  ✅ Uses fetch() to call /api/*     │
+└──────────────┬──────────────────────┘
+               │ HTTP Request
+               ▼
+┌─────────────────────────────────────┐
+│  SERVER (Next.js API Routes)        │
+│  pages/api/**/*.js                  │
+│                                     │
+│  ✅ Uses supabaseAdmin              │
+│  ✅ Bypasses RLS (service role)     │
+│  ⚠️  Sheets sync (non-blocking)     │
+└──────────────┬──────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────┐
+│  SUPABASE DATABASE                  │
+│  Single source of truth             │
+│  All live data lives here           │
+└─────────────────────────────────────┘
+```
+
+**Key principles:**
+1. **Server-side**: Use `supabaseAdmin` (service role) via API routes ONLY
+2. **Client-side**: Use `fetch()` to call your own `/api/` endpoints
+3. **Single source of truth**: Supabase for all live data, Sheets only for PDF generation
+
+---
+
 ### 5. No inline `--` SQL comments inside template literals with dynamic values
 
 If a template literal contains dynamic values (mentor names, emails, etc.), do not use `--` SQL comments inside the string — they will break queries if a value contains `--`.
