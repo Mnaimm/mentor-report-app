@@ -166,8 +166,8 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'sourceMentorId is required' });
   }
 
-  if (!Array.isArray(reassignments) || reassignments.length === 0) {
-    return res.status(400).json({ error: 'reassignments array is required and must not be empty' });
+  if (!Array.isArray(reassignments)) {
+    return res.status(400).json({ error: 'reassignments array is required' });
   }
 
   // Validate each reassignment has required fields
@@ -178,6 +178,14 @@ export default async function handler(req, res) {
         error: 'Each reassignment must have: assignmentId, entrepreneurId, newMentorId, newMentorEmail, menteeName'
       });
     }
+  }
+
+  if (reassignments.length === 0) {
+    return res.status(200).json({
+      success: true,
+      updated: [],
+      errors: []
+    });
   }
 
   // 4. Process reassignments

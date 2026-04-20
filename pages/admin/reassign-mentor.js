@@ -6,6 +6,7 @@ import AccessDenied from '../../components/AccessDenied';
 import ReadOnlyBadge from '../../components/ReadOnlyBadge';
 
 export default function ReassignMentor({ userEmail, isReadOnlyUser, accessDenied }) {
+  const KEEP_ASSIGNMENT_VALUE = 'keep';
   const router = useRouter();
   const { mentorId } = router.query;
 
@@ -151,10 +152,10 @@ export default function ReassignMentor({ userEmail, isReadOnlyUser, accessDenied
   };
 
   const goToStep3 = () => {
-    // Check all mentees have a new mentor assigned
-    const unassigned = mentees.filter(m => !reassignments[m.entrepreneurId]);
+    // Each mentee must be explicitly marked as reassigned or kept unchanged.
+    const unassigned = mentees.filter(m => reassignments[m.entrepreneurId] === undefined);
     if (unassigned.length > 0) {
-      alert(`Sila tetapkan mentor baru untuk semua mentee. ${unassigned.length} mentee belum ditetapkan.`);
+      alert(`Sila pilih tindakan untuk semua mentee. ${unassigned.length} mentee belum ditetapkan.`);
       return;
     }
     setStep(3);
@@ -165,10 +166,12 @@ export default function ReassignMentor({ userEmail, isReadOnlyUser, accessDenied
     setSubmitError(null);
 
     try {
-      // Build payload
-      const payload = {
-        sourceMentorId: sourceMentor.id,
-        reassignments: mentees.map(mentee => {
+      const reassignmentsToProcess = mentees
+        .filter(mentee => {
+          const selectedMentorId = reassignments[mentee.entrepreneurId];
+          return selectedMentorId && selectedMentorId !== KEEP_ASSIGNMENT_VALUE;
+        })
+        .map(mentee => {
           const newMentorId = reassignments[mentee.entrepreneurId];
           const newMentor = availableMentors.find(m => m.id === newMentorId);
 
@@ -176,14 +179,19 @@ export default function ReassignMentor({ userEmail, isReadOnlyUser, accessDenied
             assignmentId: mentee.assignmentId,
             entrepreneurId: mentee.entrepreneurId,
             batchId: mentee.batchId,
-            newMentorId: newMentorId,
-            newMentorName: newMentor.name,
-            newMentorEmail: newMentor.email,
+            newMentorId,
+            newMentorName: newMentor?.name,
+            newMentorEmail: newMentor?.email,
             menteeName: mentee.name,
             menteeEmail: mentee.email,
             folderId: folderIds[mentee.entrepreneurId] || null
           };
-        })
+        });
+
+      // Build payload
+      const payload = {
+        sourceMentorId: sourceMentor.id,
+        reassignments: reassignmentsToProcess
       };
 
       const res = await fetch('/api/admin/reassign-mentor', {
@@ -224,7 +232,17 @@ export default function ReassignMentor({ userEmail, isReadOnlyUser, accessDenied
     m.email.toLowerCase().includes(searchMentor.toLowerCase())
   );
 
-  const assignedCount = mentees.filter(m => reassignments[m.entrepreneurId]).length;
+  const selectedCount = mentees.filter(m => reassignments[m.entrepreneurId] !== undefined).length;
+  const reassignedCount = mentees.filter(m => {
+    const selectedMentorId = reassignments[m.entrepreneurId];
+    return selectedMentorId && selectedMentorId !== KEEP_ASSIGNMENT_VALUE;
+  }).length;
+  const isReadyForStep3 = mentees.length > 0 && selectedCount === mentees.length;
+  const menteesToConfirm = mentees.filter(m => {
+    const selectedMentorId = reassignments[m.entrepreneurId];
+    return selectedMentorId && selectedMentorId !== KEEP_ASSIGNMENT_VALUE;
+  });
+  const keptMentees = mentees.filter(m => reassignments[m.entrepreneurId] === KEEP_ASSIGNMENT_VALUE);
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -334,11 +352,11 @@ export default function ReassignMentor({ userEmail, isReadOnlyUser, accessDenied
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-xl font-bold text-gray-800 mb-4">Langkah 2: Tugaskan Mentor Baru</h2>
             <p className="text-gray-600 mb-4">
-              Tetapkan mentor baru untuk setiap mentee di bawah <strong>{sourceMentor.name}</strong>.
+              Pilih mentor baru atau kekalkan mentor semasa untuk setiap mentee di bawah <strong>{sourceMentor.name}</strong>.
             </p>
 
             <div className="mb-4 text-sm text-gray-700">
-              <strong>{assignedCount} / {mentees.length}</strong> mentee telah ditetapkan mentor baru
+              <strong>{reassignedCount}</strong> mentee akan ditugaskan semula. <strong>{selectedCount} / {mentees.length}</strong> mentee telah dipilih tindakan.
             </div>
 
             {loading ? (
@@ -378,11 +396,12 @@ export default function ReassignMentor({ userEmail, isReadOnlyUser, accessDenied
                           </td>
                           <td className="px-4 py-3">
                             <select
-                              value={selectedMentorId || ''}
+                              value={selectedMentorId ?? ''}
                               onChange={(e) => handleMentorSelect(mentee.entrepreneurId, e.target.value)}
                               className="px-2 py-1 border border-gray-300 rounded text-sm min-w-[200px]"
                             >
-                              <option value="">-- Pilih Mentor --</option>
+                              <option value="">-- Pilih Tindakan --</option>
+                              <option value={KEEP_ASSIGNMENT_VALUE}>-- Kekal (tiada perubahan) --</option>
                               {availableMentors.map(m => (
                                 <option key={m.id} value={m.id}>
                                   {m.name} ({m.active_mentees} mentee)
@@ -410,9 +429,9 @@ export default function ReassignMentor({ userEmail, isReadOnlyUser, accessDenied
               </button>
               <button
                 onClick={goToStep3}
-                disabled={assignedCount !== mentees.length}
+                disabled={!isReadyForStep3}
                 className={`px-6 py-2 rounded-md font-medium
-                  ${assignedCount !== mentees.length
+                  ${!isReadyForStep3
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     : 'bg-blue-600 text-white hover:bg-blue-700'}`}
               >
@@ -426,35 +445,45 @@ export default function ReassignMentor({ userEmail, isReadOnlyUser, accessDenied
         {step === 3 && !submitSuccess && (
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-xl font-bold text-gray-800 mb-4">Langkah 3: Sahkan & Laksana</h2>
-            <p className="text-gray-600 mb-4">Semak penugasan semula sebelum mengesahkan.</p>
+            <p className="text-gray-600 mb-4">Semak hanya mentee yang akan ditugaskan semula sebelum mengesahkan.</p>
 
-            <div className="overflow-x-auto mb-6">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mentee</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Program</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mentor Lama</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mentor Baru</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Folder ID</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {mentees.map(mentee => {
-                    const newMentor = availableMentors.find(m => m.id === reassignments[mentee.entrepreneurId]);
-                    return (
-                      <tr key={mentee.entrepreneurId}>
-                        <td className="px-4 py-3 text-sm text-gray-800">{mentee.name}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{mentee.program}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{sourceMentor.name}</td>
-                        <td className="px-4 py-3 text-sm text-blue-600 font-medium">{newMentor?.name}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{folderIds[mentee.entrepreneurId] || '-'}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <div className="mb-4 text-sm text-gray-700">
+              <strong>{menteesToConfirm.length}</strong> mentee akan dipindahkan. <strong>{keptMentees.length}</strong> mentee kekal dengan mentor semasa.
             </div>
+
+            {menteesToConfirm.length === 0 ? (
+              <div className="mb-6 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                Tiada mentee dipilih untuk penugasan semula. Jika anda teruskan, tiada perubahan akan dibuat.
+              </div>
+            ) : (
+              <div className="overflow-x-auto mb-6">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mentee</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Program</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mentor Lama</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mentor Baru</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Folder ID</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {menteesToConfirm.map(mentee => {
+                      const newMentor = availableMentors.find(m => m.id === reassignments[mentee.entrepreneurId]);
+                      return (
+                        <tr key={mentee.entrepreneurId}>
+                          <td className="px-4 py-3 text-sm text-gray-800">{mentee.name}</td>
+                          <td className="px-4 py-3 text-sm text-gray-600">{mentee.program}</td>
+                          <td className="px-4 py-3 text-sm text-gray-600">{sourceMentor.name}</td>
+                          <td className="px-4 py-3 text-sm text-blue-600 font-medium">{newMentor?.name}</td>
+                          <td className="px-4 py-3 text-sm text-gray-600">{folderIds[mentee.entrepreneurId] || '-'}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
             {submitError && (
               <div className="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded mb-4">
@@ -488,6 +517,12 @@ export default function ReassignMentor({ userEmail, isReadOnlyUser, accessDenied
         {submitSuccess && (
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-2xl font-bold text-green-600 mb-4">✓ Penugasan Semula Berjaya</h2>
+
+            {results.updated.length === 0 && results.errors.length === 0 && (
+              <div className="mb-6 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                Tiada mentee ditugaskan semula. Semua mentee kekal dengan mentor semasa.
+              </div>
+            )}
 
             {results.updated.length > 0 && (
               <div className="mb-6">
