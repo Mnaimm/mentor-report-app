@@ -1011,6 +1011,8 @@ export default function LaporanSesiPage() {
 
         } catch (error) {
           console.error('❌ Upload setup failed:', error);
+          setError('Gagal memuat naik gambar. Sila semak sambungan internet dan cuba lagi. Jika masalah berterusan, hubungi admin.');
+          setIsSubmitting(false);
           reject(error);
         }
       });

@@ -661,14 +661,18 @@ const LaporanMajuPage = () => {
 
   const handleMIAFileChange = (proofType, fileList) => {
     const file = fileList?.[0] || null;
+
+    // Clone File object to prevent it from becoming invalid when DOM re-renders
+    const clonedFile = file ? new File([file], file.name, { type: file.type }) : null;
+
     setFiles((prev) => ({
       ...prev,
       mia: {
         ...prev.mia,
-        [proofType]: file
+        [proofType]: clonedFile
       }
     }));
-    console.log('Updated MIA proofs:', proofType, file);
+    console.log('Updated MIA proofs:', proofType, clonedFile);
   };
 
   // Batch upload function
@@ -705,6 +709,9 @@ const LaporanMajuPage = () => {
 
     } catch (error) {
       console.error('❌ Upload setup failed:', error);
+      setMessage('Gagal memuat naik gambar. Sila semak sambungan internet dan cuba lagi. Jika masalah berterusan, hubungi admin.');
+      setMessageType('error');
+      setLoading(false);
       reject(error);
     }
   });
@@ -742,6 +749,9 @@ const LaporanMajuPage = () => {
 
     } catch (error) {
       console.error('❌ MIA proof upload failed:', error);
+      setMessage('Gagal memuat naik gambar. Sila semak sambungan internet dan cuba lagi. Jika masalah berterusan, hubungi admin.');
+      setMessageType('error');
+      setLoading(false);
       reject(error);
     }
   });
