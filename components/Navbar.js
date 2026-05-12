@@ -161,7 +161,14 @@ export default function Navbar() {
                         className={`block px-4 py-2 text-sm ${isCurrentPage('/admin/mentors') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:bg-blue-50'}`}
                         onClick={(e) => isCurrentPage('/admin/mentors') && e.preventDefault()}
                       >
-                        Mentors
+                        Direktori Mentor
+                      </Link>
+                      <Link
+                        href="/admin/mentors/manage"
+                        className={`block px-4 py-2 text-sm ${isCurrentPage('/admin/mentors/manage') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:bg-blue-50'}`}
+                        onClick={(e) => isCurrentPage('/admin/mentors/manage') && e.preventDefault()}
+                      >
+                        Pengurusan Mentor
                       </Link>
                       <Link
                         href="/admin/payment-review"
@@ -169,6 +176,13 @@ export default function Navbar() {
                         onClick={(e) => isCurrentPage('/admin/payment-review') && e.preventDefault()}
                       >
                         Payment Review
+                      </Link>
+                      <Link
+                        href="/zon-saya"
+                        className={`block px-4 py-2 text-sm ${isCurrentPage('/zon-saya') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:bg-blue-50'}`}
+                        onClick={(e) => isCurrentPage('/zon-saya') && e.preventDefault()}
+                      >
+                        Perbandingan Zon
                       </Link>
                     </div>
                   </div>
@@ -392,7 +406,20 @@ export default function Navbar() {
                           }
                         }}
                       >
-                        Mentors
+                        Direktori Mentor
+                      </Link>
+                      <Link
+                        href="/admin/mentors/manage"
+                        className={`block px-3 py-2 rounded-md text-sm transition-colors ${isCurrentPage('/admin/mentors/manage') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
+                        onClick={(e) => {
+                          if (isCurrentPage('/admin/mentors/manage')) {
+                            e.preventDefault();
+                          } else {
+                            setMobileMenuOpen(false);
+                          }
+                        }}
+                      >
+                        Pengurusan Mentor
                       </Link>
                       <Link
                         href="/admin/payment-review"
@@ -406,6 +433,19 @@ export default function Navbar() {
                         }}
                       >
                         Payment Review
+                      </Link>
+                      <Link
+                        href="/zon-saya"
+                        className={`block px-3 py-2 rounded-md text-sm transition-colors ${isCurrentPage('/zon-saya') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
+                        onClick={(e) => {
+                          if (isCurrentPage('/zon-saya')) {
+                            e.preventDefault();
+                          } else {
+                            setMobileMenuOpen(false);
+                          }
+                        }}
+                      >
+                        Perbandingan Zon
                       </Link>
                     </div>
                   </div>
