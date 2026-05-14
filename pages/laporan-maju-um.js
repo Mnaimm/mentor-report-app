@@ -2799,24 +2799,6 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                 </Section>
               </div>
 
-              {/* --- Bahagian Upward Mobility --- */}
-              {(currentSessionNumber === 2 || currentSessionNumber === 4) && (
-                <div className="bg-white p-6 rounded-lg shadow-sm">
-                  <Section title="Bahagian Upward Mobility">
-                    <InfoCard title="Peringatan Penting" type="info">
-                      <p>[SESI 2 & 4 SAHAJA] Sila lengkapkan borang Forms Upward Mobility di pautan berikut:</p>
-                      <a
-                        href="/upward-mobility"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline font-medium"
-                      >
-                        Link to Upward Mobility Google Form
-                      </a>
-                    </InfoCard>
-                  </Section>
-                </div>
-              )}
             </>
           )
           }
