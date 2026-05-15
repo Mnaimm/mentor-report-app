@@ -4,7 +4,8 @@ node_modules/
 # ==========================================
 # LOCAL DOCUMENTATION & WORKING NOTES
 # ==========================================
-/docs
+/docs/*
+!/docs/portal-flows.html
 
 # ==========================================
 # ENVIRONMENT & SECRETS
@@ -14,6 +15,7 @@ node_modules/
 .env.*.local
 .env.migration
 mentor-reporting-tool-fa84de51b7ce.json
+.gemini/
 
 # ==========================================
 # DEBUG & DEVELOPMENT

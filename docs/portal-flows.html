@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>iTEKAD Portal — Flow Visualizer</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f1117;color:#e2e8f0;min-height:100vh;overflow-x:hidden}
+h1{font-size:1.25rem;font-weight:700;color:#f8fafc}
+.header{padding:14px 24px;border-bottom:1px solid #1e2433;background:#0f1117;display:flex;align-items:center;gap:16px}
+.header p{font-size:0.8rem;color:#64748b}
+.flows{display:flex;gap:8px;padding:12px 24px;background:#0a0d14;border-bottom:1px solid #1e2433;flex-wrap:wrap}
+.flow-btn{padding:7px 14px;border-radius:6px;border:1px solid #2d3748;background:#1a1f2e;color:#94a3b8;font-size:0.78rem;cursor:pointer;font-weight:500;transition:all .2s;white-space:nowrap}
+.flow-btn:hover{border-color:#4a5568;color:#e2e8f0}
+.flow-btn.active{color:#fff;border-color:transparent;font-weight:600}
+.flow-btn[data-id="submit-bangkit"].active{background:#1d4ed8}
+.flow-btn[data-id="submit-maju"].active{background:#6d28d9}
+.flow-btn[data-id="mia-approval"].active{background:#b45309}
+.flow-btn[data-id="email-reminder"].active{background:#047857}
+.flow-btn[data-id="mentor-import"].active{background:#0e7490}
+.flow-btn[data-id="admin-verify"].active{background:#b91c1c}
+.canvas-area{padding:16px 24px;overflow-x:auto}
+.canvas-wrap{position:relative;min-width:1060px}
+svg.overlay{position:absolute;top:0;left:0;pointer-events:none;overflow:visible}
+.col-header{position:absolute;top:0;font-size:0.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:4px 8px;border-radius:4px;color:#94a3b8}
+.ch-page{color:#a78bfa;background:#1e1a2e}
+.ch-api{color:#60a5fa;background:#1a2035}
+.ch-lib{color:#34d399;background:#0f2520}
+.ch-db{color:#f59e0b;background:#211a00}
+.ch-ext{color:#f87171;background:#2a1010}
+.node{position:absolute;border-radius:6px;display:flex;flex-direction:column;justify-content:center;padding:0 10px;cursor:default;transition:all .25s;border:1px solid transparent;user-select:none}
+.node .label{font-size:0.72rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.node .sub{font-size:0.6rem;color:#64748b;margin-top:1px}
+.node.page{background:#1a1a2e;border-color:#312e6e;color:#c4b5fd}
+.node.api{background:#1a2035;border-color:#1e3a6e;color:#93c5fd}
+.node.lib{background:#0f2520;border-color:#14453a;color:#6ee7b7}
+.node.db{background:#221900;border-color:#4a3600;color:#fcd34d}
+.node.ext{background:#2a1010;border-color:#5a2020;color:#fca5a5}
+.node.planned{opacity:.6;border-style:dashed}
+.node.active-node{box-shadow:0 0 0 2px #fff2,0 0 14px 3px var(--glow,#fff3);transform:translateY(-1px);border-color:var(--nc,#fff5)}
+.node.page.active-node{--glow:#a78bfa55;--nc:#a78bfa}
+.node.api.active-node{--glow:#60a5fa55;--nc:#60a5fa}
+.node.lib.active-node{--glow:#34d39955;--nc:#34d399}
+.node.db.active-node{--glow:#f59e0b55;--nc:#f59e0b}
+.node.ext.active-node{--glow:#f8717155;--nc:#f87171}
+.legend{display:flex;gap:20px;padding:10px 24px;align-items:center;border-top:1px solid #1e2433;flex-wrap:wrap}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:0.72rem;color:#94a3b8}
+.leg-line{width:28px;height:3px;border-radius:2px}
+.leg-success{background:#22c55e}
+.leg-async{background:#f59e0b}
+.leg-error{background:#ef4444}
+.info-panel{margin:0 24px 16px;background:#111827;border:1px solid #1e2433;border-radius:8px;padding:14px 18px;min-height:90px}
+.info-panel h3{font-size:0.8rem;font-weight:600;color:#64748b;margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em}
+.info-panel .step-list{display:flex;flex-direction:column;gap:5px}
+.step-row{display:flex;align-items:flex-start;gap:10px;font-size:0.75rem;padding:5px 8px;border-radius:4px;cursor:pointer;transition:background .15s}
+.step-row:hover{background:#1e2433}
+.step-row.active-step{background:#1e2b42;border-left:2px solid #60a5fa}
+.step-num{font-weight:700;min-width:20px;color:#64748b}
+.step-route{font-weight:600;color:#e2e8f0;min-width:260px;font-family:monospace;font-size:0.72rem}
+.step-data{color:#94a3b8;flex:1}
+.step-type-badge{font-size:0.6rem;padding:2px 6px;border-radius:3px;font-weight:700;min-width:60px;text-align:center}
+.badge-success{background:#14532d;color:#4ade80}
+.badge-async{background:#451a03;color:#fbbf24}
+.badge-error{background:#450a0a;color:#f87171}
+.flow-title{font-size:0.95rem;font-weight:700;margin-bottom:8px}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>iTEKAD Mentor Portal — Architecture Flow Visualizer</h1>
+    <p>Select a flow to trace data through the system. Green = success/blocking · Orange = async/non-blocking · Red = error path</p>
+  </div>
+</div>
+
+<div class="flows" id="flowBtns"></div>
+
+<div class="canvas-area">
+  <div class="canvas-wrap" id="canvasWrap" style="height:620px">
+    <svg class="overlay" id="svgOverlay" width="1060" height="620"></svg>
+  </div>
+</div>
+
+<div class="legend">
+  <span style="font-size:0.72rem;color:#64748b;font-weight:600">LEGEND:</span>
+  <div class="legend-item"><div class="leg-line leg-success"></div>Blocking / Success path</div>
+  <div class="legend-item"><div class="leg-line leg-async" style="border-top:2px dashed #f59e0b;background:transparent"></div>Async / Non-blocking (fire-and-forget)</div>
+  <div class="legend-item"><div class="leg-line leg-error"></div>Error path</div>
+  <div class="legend-item" style="margin-left:16px">
+    <div style="width:12px;height:12px;border-radius:2px;background:#1a1a2e;border:1px solid #312e6e"></div>/pages (client)
+  </div>
+  <div class="legend-item">
+    <div style="width:12px;height:12px;border-radius:2px;background:#1a2035;border:1px solid #1e3a6e"></div>/api (server)
+  </div>
+  <div class="legend-item">
+    <div style="width:12px;height:12px;border-radius:2px;background:#0f2520;border:1px solid #14453a"></div>/lib
+  </div>
+  <div class="legend-item">
+    <div style="width:12px;height:12px;border-radius:2px;background:#221900;border:1px solid #4a3600"></div>Supabase DB
+  </div>
+  <div class="legend-item">
+    <div style="width:12px;height:12px;border-radius:2px;background:#2a1010;border:1px solid #5a2020"></div>External
+  </div>
+</div>
+
+<div class="info-panel" id="infoPanel">
+  <h3>Flow Steps</h3>
+  <div style="color:#475569;font-size:0.8rem">Click a flow button above to trace data through the system.</div>
+</div>
+
+<script>
+// ─── NODE DEFINITIONS ────────────────────────────────────────────────────────
+// Columns: pages(x=10,w=172) api(x=215,w=200) lib(x=450,w=150) db(x=635,w=182) ext(x=852,w=155)
+const N = {
+  // PAGES
+  'p-bangkit':  {x:10, y:90,  w:172,h:44,label:'laporan-bangkit.js',       sub:'/pages',cat:'page'},
+  'p-maju':     {x:10, y:145, w:172,h:44,label:'laporan-maju-um.js',        sub:'/pages',cat:'page'},
+  'p-verify':   {x:10, y:200, w:172,h:44,label:'admin/verification.js',     sub:'/pages',cat:'page'},
+  'p-mia':      {x:10, y:255, w:172,h:44,label:'admin/mia.js',              sub:'/pages',cat:'page'},
+  'p-mentors':  {x:10, y:310, w:172,h:44,label:'admin/mentors.js',          sub:'/pages',cat:'page'},
+  'p-reassign': {x:10, y:365, w:172,h:44,label:'admin/reassign-mentor.js',  sub:'/pages',cat:'page'},
+  'p-payment':  {x:10, y:420, w:172,h:44,label:'admin/payment-review.js',   sub:'/pages',cat:'page'},
+  'p-admin':    {x:10, y:475, w:172,h:44,label:'admin/index.js',            sub:'/pages',cat:'page'},
+
+  // API ROUTES
+  'a-upload':   {x:215,y:90,  w:200,h:44,label:'upload-image.js',                    sub:'/api',cat:'api'},
+  'a-bangkit':  {x:215,y:145, w:200,h:44,label:'submitReport.js',                     sub:'/api',cat:'api'},
+  'a-maju':     {x:215,y:200, w:200,h:44,label:'submitMajuReportum.js',               sub:'/api',cat:'api'},
+  'a-review':   {x:215,y:255, w:200,h:44,label:'admin/reports/[id]/review.js',        sub:'/api',cat:'api'},
+  'a-mia-upd':  {x:215,y:310, w:200,h:44,label:'admin/mia-requests/update.js',        sub:'/api',cat:'api'},
+  'a-mentors':  {x:215,y:365, w:200,h:44,label:'admin/mentors/index.js',              sub:'/api',cat:'api'},
+  'a-reassign': {x:215,y:420, w:200,h:44,label:'admin/reassign-mentor.js',            sub:'/api',cat:'api'},
+  'a-pay-batch':{x:215,y:475, w:200,h:44,label:'admin/payment/create-batch.js',       sub:'/api',cat:'api'},
+  'a-reminder': {x:215,y:530, w:200,h:44,label:'send-reminder.js ⚠️ planned',          sub:'/api',cat:'api',planned:true},
+
+  // LIB
+  'l-auth':     {x:450,y:90,  w:150,h:44,label:'lib/auth.js',            sub:'/lib',cat:'lib'},
+  'l-supa':     {x:450,y:145, w:150,h:44,label:'lib/supabaseAdmin.js',   sub:'/lib',cat:'lib'},
+  'l-sheets':   {x:450,y:200, w:150,h:44,label:'lib/googleSheets.js',    sub:'/lib',cat:'lib'},
+  'l-mia':      {x:450,y:255, w:150,h:44,label:'lib/mia.js',             sub:'/lib',cat:'lib'},
+  'l-cache':    {x:450,y:310, w:150,h:44,label:'lib/simple-cache.js',    sub:'/lib',cat:'lib'},
+
+  // SUPABASE DB
+  's-reports':  {x:635,y:90,  w:182,h:44,label:'reports',               sub:'Supabase DB',cat:'db'},
+  's-assign':   {x:635,y:145, w:182,h:44,label:'mentor_assignments',    sub:'Supabase DB',cat:'db'},
+  's-mia':      {x:635,y:200, w:182,h:44,label:'mia_requests',          sub:'Supabase DB',cat:'db'},
+  's-mentors':  {x:635,y:255, w:182,h:44,label:'mentors + user_roles',  sub:'Supabase DB',cat:'db'},
+  's-pay':      {x:635,y:310, w:182,h:44,label:'payment_batches',       sub:'Supabase DB',cat:'db'},
+  's-monitor':  {x:635,y:365, w:182,h:44,label:'dual_write_monitoring', sub:'Supabase DB',cat:'db'},
+  's-activity': {x:635,y:420, w:182,h:44,label:'activity_logs',         sub:'Supabase DB',cat:'db'},
+  's-entrep':   {x:635,y:475, w:182,h:44,label:'entrepreneurs',         sub:'Supabase DB',cat:'db'},
+
+  // EXTERNAL
+  'e-sheets':   {x:852,y:90,  w:155,h:44,label:'Google Sheets',     sub:'googleapis',    cat:'ext'},
+  'e-drive':    {x:852,y:145, w:155,h:44,label:'Google Drive',      sub:'googleapis',    cat:'ext'},
+  'e-gas':      {x:852,y:200, w:155,h:44,label:'Apps Script (GAS)', sub:'time-driven',   cat:'ext'},
+  'e-resend':   {x:852,y:255, w:155,h:44,label:'Resend API',        sub:'email service', cat:'ext'},
+};
+
+// ─── FLOW DEFINITIONS ─────────────────────────────────────────────────────────
+// type: 'success'=green blocking, 'async'=orange non-blocking, 'error'=red
+const FLOWS = {
+'submit-bangkit': {
+  label:'Submit Laporan Bangkit',
+  steps:[
+    {from:'p-bangkit', to:'a-upload',  type:'success',
+     data:'multipart/form-data: file, folderId',
+     note:'Mentor uploads session/premises/GW photos before submitting form'},
+    {from:'a-upload',  to:'e-drive',   type:'success',
+     data:'file buffer → Drive.files.create(parents:[folderId], supportsAllDrives:true)',
+     note:'Stored in shared Drive folder. Permissions set to reader:anyone'},
+    {from:'p-bangkit', to:'a-bangkit', type:'success',
+     data:'JSON: {programType:"bangkit", mentorEmail, namaMentor, usahawan, inisiatif[4], jualanTerkini[12], gwSkor[20], imageUrls, refleksi, premisDilawatChecked}',
+     note:'Main report payload sent to submitReport.js'},
+    {from:'a-bangkit', to:'e-sheets',  type:'success',
+     data:'91-col row → Bangkit tab: [timestamp, mentorEmail, status, sesiLaporan, tarikh, mod, usahawan, namaSyarikat, namaMentor, inisiatif, jualan[12], imageUrls, gwSkor…]',
+     note:'PRIMARY WRITE (blocking). Promise.race with 10s timeout. Gets back sheets_row_number'},
+    {from:'a-bangkit', to:'l-supa',    type:'async',
+     data:'email → SELECT id FROM mentors WHERE email=mentorEmail (resolve mentor_id)',
+     note:'⚠️ submitReport.js uses supabaseClient (public, not admin) — known bug. Should use supabaseAdmin'},
+    {from:'l-supa',    to:'s-reports', type:'async',
+     data:'INSERT reports {program:"Bangkit", mentor_id, status:"submitted", session_number, inisiatif:jsonb, gw_skor:jsonb, image_urls:jsonb, payment_status:"pending", sheets_row_number}',
+     note:'Non-blocking dual-write. Failure is logged but does NOT block the 200 response'},
+    {from:'l-supa',    to:'s-monitor', type:'async',
+     data:'INSERT dual_write_monitoring {source:"google_sheets", target:"supabase", status:"success"|"failed", sheets_row, record_id, mentor_email}',
+     note:'Audit log for every dual-write attempt (success or failure)'},
+    {from:'a-bangkit', to:'l-cache',   type:'success',
+     data:'cache.delete("mentor-stats:{email}") + cache.delete("mapping:bangkit") + cache.delete("mapping:maju")',
+     note:'Simple in-memory cache invalidated after successful submission'},
+    {from:'e-sheets',  to:'e-gas',     type:'async',
+     data:'Time-driven trigger (every 1 min) detects rows with empty Status column',
+     note:'Apps Script polls Sheets. Generates PDF from template, inserts GW chart + session photos'},
+    {from:'e-gas',     to:'e-drive',   type:'async',
+     data:'generateDoc(template) → insert images → save → get docUrl → update DOC_URL column in sheet',
+     note:'PDF document created in mentee\'s Drive folder. DOC_URL written back to column BB'},
+  ]
+},
+'submit-maju': {
+  label:'Submit Laporan Maju',
+  steps:[
+    {from:'p-maju',   to:'a-upload',  type:'success',
+     data:'multipart/form-data: file, folderId (Shared Drive folder)',
+     note:'Photos uploaded: session images, premises photos, GW360 chart'},
+    {from:'a-upload', to:'e-drive',   type:'success',
+     data:'file buffer, parents:[folderId], supportsAllDrives:true → returns {id, webViewLink}',
+     note:'File made publicly accessible (reader:anyone) for Apps Script to embed in PDF'},
+    {from:'p-maju',   to:'a-maju',   type:'success',
+     data:'JSON: {NAMA_MENTOR, EMAIL_MENTOR, NAMA_MENTEE, SESI_NUMBER, MOD_SESI, MIA_STATUS, MIA_REASON, UPWARD_MOBILITY_JSON, entrepreneur_id, Folder_ID, DATA_KEWANGAN_BULANAN_JSON, MENTORING_FINDINGS_JSON}',
+     note:'Maju payload includes Upward Mobility JSON blob and 2-tier entrepreneur_id resolution'},
+    {from:'a-maju',   to:'l-mia',    type:'async',
+     data:'prepareMIARequestPayload({mentorEmail, mentorName, menteeName, sessionNumber, batch, miaReason, proofWhatsappUrl, proofEmailUrl, proofCallUrl}, "maju")',
+     note:'Only runs when MIA_STATUS === "MIA". Builds mia_requests payload'},
+    {from:'l-mia',    to:'s-mia',    type:'async',
+     data:'INSERT mia_requests {mentor_id, mentee_id, program:"maju", batch, session_number, alasan, proof_whatsapp_url, proof_email_url, proof_call_url, status:"pending"}',
+     note:'MIA record created before sheet write so MIA request exists even if sheet write fails'},
+    {from:'a-maju',   to:'e-sheets', type:'success',
+     data:'67-col row → LaporanMajuUM tab: [timestamp, NAMA_MENTOR, EMAIL_MENTOR, NAMA_MENTEE, NAMA_BISNES, TARIKH_SESI, SESI_NUMBER, DATA_KEWANGAN_JSON, MENTORING_FINDINGS_JSON, URL_GAMBAR_*, Folder_ID, MIA_STATUS, UM fields cols 30-65, entrepreneur_id]',
+     note:'PRIMARY WRITE (blocking). 10s timeout. Returns sheets_row_number for LaporanMajuUM tab'},
+    {from:'a-maju',   to:'e-sheets', type:'async',
+     data:'72-col row → UM tab: cols A-K (basic session info) + cols AS-BT (28 UM-specific fields). Skipped if MIA_STATUS==="MIA" or no UPWARD_MOBILITY_JSON',
+     note:'SECONDARY Sheets write. Non-blocking. Upward Mobility standalone tracking sheet'},
+    {from:'a-maju',   to:'l-supa',   type:'async',
+     data:'2-tier lookup: (1) SELECT id FROM entrepreneurs WHERE id=entrepreneur_id, (2) fallback: WHERE email=emel. Also: SELECT id FROM mentors WHERE email=EMAIL_MENTOR',
+     note:'Resolves foreign keys before Supabase insert. Both mentor_id and entrepreneur_id are NOT NULL'},
+    {from:'l-supa',   to:'s-reports',type:'async',
+     data:'INSERT reports {program:"Maju", mentor_id, entrepreneur_id, status:"submitted", data_kewangan_bulanan:jsonb, mentoring_findings:jsonb, image_urls:jsonb, base_payment_amount:(session>=3?180:100)+(premis?+160:0)}',
+     note:'base_payment_amount auto-calculated: Sesi 1-2=RM100, Sesi 3-4=RM180, +RM160 if premises visited'},
+    {from:'l-supa',   to:'s-reports',type:'async',
+     data:'INSERT upward_mobility_reports {entrepreneur_id, mentor_id, sesi_mentoring, um_status, pendapatan_semasa, pekerja_semasa, bank_akaun_semasa, digital_semasa, marketing_semasa…}',
+     note:'Only inserted if NOT MIA and UPWARD_MOBILITY_JSON present and reports insert succeeded'},
+    {from:'l-supa',   to:'s-monitor',type:'async',
+     data:'INSERT dual_write_monitoring {table:"reports"|"upward_mobility_reports", status:"success"|"failed", record_id, metadata:{mentor_email, mentee_name, session_number}}',
+     note:'One monitoring entry per table write (reports + upward_mobility_reports tracked separately)'},
+  ]
+},
+'mia-approval': {
+  label:'MIA Approval',
+  steps:[
+    {from:'p-mia',     to:'a-mia-upd', type:'success',
+     data:'POST /api/admin/mia-requests/update {requestId: uuid, status: "approved"|"rejected"|"bimb_contacted", rejectionReason?: string}',
+     note:'Admin reviews MIA proof images (WhatsApp screenshot, email, call log) then submits decision'},
+    {from:'a-mia-upd', to:'l-auth',    type:'success',
+     data:'canAccessAdmin(adminEmail) — checks user_roles table for admin-tier roles',
+     note:'Returns 403 if user lacks system_admin / program_coordinator / report_admin / payment_admin role'},
+    {from:'l-auth',    to:'s-mentors', type:'success',
+     data:'SELECT role FROM user_roles WHERE email=adminEmail (via supabaseAdmin, bypasses RLS)',
+     note:'lib/auth.js queries user_roles with service role key. Returns array of roles'},
+    {from:'a-mia-upd', to:'s-mia',    type:'success',
+     data:'UPDATE mia_requests SET {status, admin_id:adminEmail, admin_name, updated_at, approved_at|bimb_contacted_at|rejection_reason} WHERE id=requestId',
+     note:'Status transitions: pending → approved | rejected | bimb_contacted. approved_at set only on approval'},
+    {from:'a-mia-upd', to:'s-mia',    type:'success',
+     data:'SELECT updated mia_request record (.select().single()) → returned to client',
+     note:'Returns full updated record. Client uses this to refresh the MIA list UI without page reload'},
+  ]
+},
+'email-reminder': {
+  label:'Email Reminder (Planned)',
+  steps:[
+    {from:'p-admin',   to:'a-reminder', type:'success',
+     data:'POST /api/send-reminder — triggered by admin clicking "Send Reminder Emails" button',
+     note:'⚠️ PLANNED — not yet built. Route: pages/api/send-reminder.js. Uses Resend API free tier'},
+    {from:'a-reminder', to:'l-auth',   type:'success',
+     data:'canAccessAdmin(email) — validates admin session via NextAuth + user_roles',
+     note:'Standard auth check. 401 if no session, 403 if not admin-tier role'},
+    {from:'a-reminder', to:'l-supa',   type:'success',
+     data:'Fetch all active mentor_assignments with batch_round details — status="active" AND is_active=true',
+     note:'Identifies which mentors have pending sessions. Must use BOTH status+is_active conditions'},
+    {from:'l-supa',    to:'s-assign',  type:'success',
+     data:'SELECT ma.*, e.name, e.email, e.program, br.round_number, br.end_date FROM mentor_assignments ma JOIN entrepreneurs e JOIN batch_rounds br WHERE ma.status="active" AND ma.is_active=true',
+     note:'Fetches all active assignments across ALL batches simultaneously (not just newest batch)'},
+    {from:'l-supa',    to:'s-reports', type:'success',
+     data:'SELECT mentor_id, entrepreneur_id, session_number, status FROM reports WHERE payment_status="pending" AND status="submitted"',
+     note:'Identifies already-submitted but not yet approved reports (to exclude from reminder)'},
+    {from:'a-reminder', to:'e-resend', type:'async',
+     data:'sendEmail({to: mentorEmail, subject: "Peringatan: Laporan Belum Dihantar", html: consolidated list of pending sessions with deeplinks: ?mentor_id=UUID&entrepreneur_id=UUID&batch_round_id=UUID})',
+     note:'One email per mentor, listing ALL pending mentees. Deep-link pre-fills the laporan form. Free tier: 3000 emails/month'},
+  ]
+},
+'mentor-import': {
+  label:'Mentor Assignment Import',
+  steps:[
+    {from:'p-mentors',  to:'a-mentors',  type:'success',
+     data:'POST /api/admin/mentors {name, email, phone, ic_number, address, state, bank_account, emergency_contact}',
+     note:'Admin adds mentor via mentors.js page. Validation: name+email required. Checks for duplicate email'},
+    {from:'a-mentors',  to:'l-auth',     type:'success',
+     data:'canAccessAdmin(session.user.email)',
+     note:'Requires system_admin / program_coordinator / report_admin / payment_admin'},
+    {from:'a-mentors',  to:'l-supa',     type:'success',
+     data:'SELECT id FROM mentors WHERE email=email (duplicate check)',
+     note:'Returns 400 "Mentor dengan email ini sudah wujud" if duplicate found'},
+    {from:'l-supa',     to:'s-mentors',  type:'success',
+     data:'INSERT mentors {name, email, phone, ic_number, address, state, status:"active", region:null, program:null} → INSERT user_roles {email, role:"mentor", assigned_by:adminEmail}',
+     note:'region and program are NULL — derived from mentor_assignments, not stored on mentor record'},
+    {from:'p-reassign', to:'a-reassign', type:'success',
+     data:'POST /api/admin/reassign-mentor {sourceMentorId: uuid, reassignments: [{assignmentId, entrepreneurId, batchId, newMentorId, newMentorEmail, newMentorName, menteeName, menteeEmail, folderId}]}',
+     note:'4-step wizard: select source mentor → select mentees → select new mentors → confirm'},
+    {from:'a-reassign', to:'l-supa',     type:'success',
+     data:'(1) UPDATE mentor_assignments SET status="transferred", is_active=false, transferred_to=newMentorUserId.id WHERE id=assignmentId — (2) INSERT mentor_assignments {mentor_id:newMentorId, entrepreneur_id, batch_id, status:"active", is_active:true}',
+     note:'Old assignment marked transferred (not deleted). New assignment created. History preserved'},
+    {from:'l-supa',     to:'s-assign',   type:'success',
+     data:'UPDATE + INSERT mentor_assignments. Looks up users.id by newMentorEmail (users table, not mentors table) to set transferred_to foreign key',
+     note:'Critical: transferred_to references users.id not mentors.id. Email → users lookup required'},
+    {from:'a-reassign', to:'e-sheets',   type:'async',
+     data:'updateMappingSheet(menteeName, menteeEmail, newMentorName, newMentorEmail) — finds row by mentee email (col K), updates col C (mentor name) + col D (mentor email)',
+     note:'Non-blocking fire-and-forget. Sheets is legacy. Failure logged but does not block API response'},
+    {from:'a-reassign', to:'s-activity', type:'async',
+     data:'INSERT activity_logs {action:"mentee_reassigned", table_name:"mentor_assignments", record_id:entrepreneurId, old_values:{mentor_id:sourceMentorId}, new_values:{mentor_id:newMentorId, mentor_name, mentor_email}}',
+     note:'Audit trail. One log entry per reassigned mentee'},
+  ]
+},
+'admin-verify': {
+  label:'Admin Verification',
+  steps:[
+    {from:'p-verify',  to:'a-review',  type:'success',
+     data:'POST /api/admin/reports/{id}/review {status:"approved"|"rejected", rejectionReason?: string}',
+     note:'Admin reviews report in verification.js. Can approve, reject (with reason), or request revision'},
+    {from:'a-review',  to:'l-auth',   type:'success',
+     data:'canAccessAdmin(session.user.email) via getServerSession(authOptions)',
+     note:'Uses getServerSession (not getSession) for server-side auth. Returns 403 if not admin-tier'},
+    {from:'a-review',  to:'l-supa',   type:'success',
+     data:'SELECT id, sheets_row_number, program, mentor_email, submission_date, base_payment_amount, entrepreneurs(batch) FROM reports WHERE id=:id',
+     note:'Fetches current report state before update. entrepreneurs(batch) used for Sheets tab targeting'},
+    {from:'l-supa',    to:'s-reports', type:'success',
+     data:'UPDATE reports SET {status:"approved"|"rejected", reviewed_at, reviewed_by:adminEmail, rejection_reason, payment_status:"approved_for_payment"|"rejected"|"pending", approved_at} WHERE id=:id',
+     note:'PRIMARY UPDATE (blocking). Source of truth. payment_status → "approved_for_payment" on approval'},
+    {from:'a-review',  to:'l-sheets', type:'async',
+     data:'writeVerificationToSheet(batch, report_id, {submission_date, approved_at, base_payment_amount}) — only on status="approved"',
+     note:'Writes to payment tracking sheet. Non-blocking. Returns true/false success flag'},
+    {from:'l-sheets',  to:'e-sheets', type:'async',
+     data:'sheets.spreadsheets.values.batchUpdate — payment tracking columns: submission_date, approved_at, payment_amount',
+     note:'lib/googleSheets.js wraps googleapis. Same service account credentials as report submission'},
+    {from:'a-review',  to:'l-sheets', type:'async',
+     data:'updateSheetStatus(program, sheets_row_number, status, rejectionReason) — legacy row status sync',
+     note:'Updates Status column (col BA) in original Bangkit/Maju report tab. Non-blocking legacy sync'},
+    {from:'a-review',  to:'l-supa',   type:'async',
+     data:'INSERT dual_write_logs {operation_type:"verify_approve", table_name:"reports", record_id, supabase_success:true, sheets_success:bool, program}',
+     note:'Audit log for every verification action. Tracks Sheets sync success/failure per report'},
+    {from:'a-review',  to:'e-gas',    type:'async',
+     data:'POST BANGKIT_GAS_URL|MAJU_GAS_URL {action:"regenerateDoc", rowNumber:sheets_row_number, programType} — ONLY if report.revision_count > 0',
+     note:'PDF regeneration triggered on approval of revised reports. GAS regenerates doc with updated data'},
+    {from:'e-gas',     to:'s-reports',type:'async',
+     data:'UPDATE reports SET doc_url=gasResult.docUrl WHERE id=:id (API receives docUrl from GAS response)',
+     note:'New PDF URL saved back to Supabase. INSERT dual_write_logs {operation:"pdf_regenerate"} logged'},
+  ]
+},
+};
+
+// ─── RENDERING ────────────────────────────────────────────────────────────────
+const CAT_COLORS = {
+  page:{stroke:'#7c3aed',fill:'#4c1d95'},
+  api: {stroke:'#2563eb',fill:'#1e3a8a'},
+  lib: {stroke:'#059669',fill:'#064e3b'},
+  db:  {stroke:'#d97706',fill:'#78350f'},
+  ext: {stroke:'#dc2626',fill:'#7f1d1d'},
+};
+const TYPE_COLOR = {success:'#22c55e', async:'#f59e0b', error:'#ef4444'};
+
+let activeFlow = null;
+let activeStepIdx = -1;
+
+function buildUI() {
+  // Flow buttons
+  const btns = document.getElementById('flowBtns');
+  for (const [id, f] of Object.entries(FLOWS)) {
+    const b = document.createElement('button');
+    b.className = 'flow-btn';
+    b.dataset.id = id;
+    b.textContent = f.label;
+    b.onclick = () => selectFlow(id);
+    btns.appendChild(b);
+  }
+
+  // Column headers
+  const wrap = document.getElementById('canvasWrap');
+  const headers = [
+    {x:10,  w:172, label:'Client / Pages', cls:'ch-page'},
+    {x:215, w:200, label:'API Routes (Server)', cls:'ch-api'},
+    {x:450, w:150, label:'Lib / Helpers', cls:'ch-lib'},
+    {x:635, w:182, label:'Supabase DB', cls:'ch-db'},
+    {x:852, w:155, label:'External Services', cls:'ch-ext'},
+  ];
+  for (const h of headers) {
+    const el = document.createElement('div');
+    el.className = `col-header ${h.cls}`;
+    el.style.left = h.x + 'px';
+    el.style.top = '8px';
+    el.style.width = h.w + 'px';
+    el.textContent = h.label;
+    wrap.appendChild(el);
+  }
+
+  // Nodes
+  for (const [id, n] of Object.entries(N)) {
+    const el = document.createElement('div');
+    el.className = `node ${n.cat}${n.planned?' planned':''}`;
+    el.id = 'node-' + id;
+    el.style.left = n.x + 'px';
+    el.style.top = n.y + 'px';
+    el.style.width = n.w + 'px';
+    el.style.height = n.h + 'px';
+    el.innerHTML = `<div class="label">${n.label}</div><div class="sub">${n.sub}</div>`;
+    wrap.appendChild(el);
+  }
+}
+
+function nodePt(id, side) {
+  const n = N[id];
+  const cy = n.y + n.h / 2;
+  if (side === 'r') return [n.x + n.w, cy];
+  if (side === 'l') return [n.x, cy];
+  if (side === 't') return [n.x + n.w / 2, n.y];
+  if (side === 'b') return [n.x + n.w / 2, n.y + n.h];
+  return [n.x + n.w / 2, cy];
+}
+
+function makePath(fromId, toId, idx) {
+  const f = N[fromId], t = N[toId];
+  const sameCol = Math.abs((f.x + f.w / 2) - (t.x + t.w / 2)) < 25;
+  const offset = (idx % 3 - 1) * 6;
+
+  if (sameCol) {
+    const going_down = t.y > f.y;
+    if (going_down) {
+      const sx = f.x + f.w / 2, sy = f.y + f.h;
+      const tx = t.x + t.w / 2, ty = t.y;
+      const arc = f.x + f.w + 35;
+      return [`M ${sx} ${sy} C ${arc} ${sy + 10}, ${arc} ${ty - 10}, ${tx} ${ty}`, [arc, (sy+ty)/2]];
+    } else {
+      const sx = f.x + f.w / 2, sy = f.y;
+      const tx = t.x + t.w / 2, ty = t.y + t.h;
+      const arc = f.x - 35;
+      return [`M ${sx} ${sy} C ${arc} ${sy - 10}, ${arc} ${ty + 10}, ${tx} ${ty}`, [arc, (sy+ty)/2]];
+    }
+  }
+
+  if (t.x > f.x) {
+    // Forward (left→right)
+    const [sx, sy] = nodePt(fromId, 'r');
+    const [tx, ty] = nodePt(toId, 'l');
+    const dx = tx - sx;
+    const oy = offset;
+    const mid = [(sx+tx)/2, (sy+ty)/2 + oy];
+    return [
+      `M ${sx} ${sy+oy} C ${sx+dx*0.45} ${sy+oy}, ${tx-dx*0.45} ${ty+oy}, ${tx} ${ty+oy}`,
+      mid
+    ];
+  } else {
+    // Backward (right→left) — route below
+    const [sx, sy] = nodePt(fromId, 'l');
+    const [tx, ty] = nodePt(toId, 'r');
+    const loopY = 590 + idx * 8;
+    const mid = [(sx+tx)/2, loopY];
+    return [
+      `M ${sx} ${sy} C ${sx-60} ${loopY}, ${tx+60} ${loopY}, ${tx} ${ty}`,
+      mid
+    ];
+  }
+}
+
+function selectFlow(id) {
+  activeFlow = id;
+  activeStepIdx = -1;
+
+  // Update button states
+  document.querySelectorAll('.flow-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.id === id);
+  });
+
+  // Reset node highlights
+  document.querySelectorAll('.node').forEach(n => n.classList.remove('active-node'));
+
+  // Clear SVG
+  const svg = document.getElementById('svgOverlay');
+  svg.innerHTML = '';
+
+  // Add defs for arrowheads
+  const defs = document.createElementNS('http://www.w3.org/2000/svg','defs');
+  for (const [type, color] of Object.entries(TYPE_COLOR)) {
+    defs.innerHTML += `
+      <marker id="arr-${type}" viewBox="0 0 10 10" refX="9" refY="5"
+        markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="${color}" opacity="0.9"/>
+      </marker>`;
+  }
+  svg.appendChild(defs);
+
+  const flow = FLOWS[id];
+  const stepNodes = new Set();
+
+  flow.steps.forEach((step, i) => {
+    stepNodes.add(step.from);
+    stepNodes.add(step.to);
+
+    const color = TYPE_COLOR[step.type];
+    const isDash = step.type === 'async';
+    const [pathD, midPt] = makePath(step.from, step.to, i);
+
+    // Arrow path
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d', pathD);
+    path.setAttribute('fill','none');
+    path.setAttribute('stroke', color);
+    path.setAttribute('stroke-width','2');
+    path.setAttribute('stroke-opacity','0.75');
+    path.setAttribute('marker-end', `url(#arr-${step.type})`);
+    if (isDash) path.setAttribute('stroke-dasharray','6 4');
+    path.style.cursor = 'pointer';
+    path.dataset.step = i;
+    path.addEventListener('mouseenter', () => highlightStep(i));
+    path.addEventListener('click', () => highlightStep(i));
+    svg.appendChild(path);
+
+    // Step number bubble
+    const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.style.cursor = 'pointer';
+    g.dataset.step = i;
+    g.addEventListener('click', () => highlightStep(i));
+
+    const circle = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    circle.setAttribute('cx', midPt[0]);
+    circle.setAttribute('cy', midPt[1]);
+    circle.setAttribute('r','10');
+    circle.setAttribute('fill', color);
+    circle.setAttribute('opacity','0.9');
+
+    const text = document.createElementNS('http://www.w3.org/2000/svg','text');
+    text.setAttribute('x', midPt[0]);
+    text.setAttribute('y', midPt[1] + 4);
+    text.setAttribute('text-anchor','middle');
+    text.setAttribute('fill','#000');
+    text.setAttribute('font-size','9');
+    text.setAttribute('font-weight','700');
+    text.textContent = i + 1;
+
+    g.appendChild(circle);
+    g.appendChild(text);
+    svg.appendChild(g);
+  });
+
+  // Highlight active nodes
+  stepNodes.forEach(nid => {
+    const el = document.getElementById('node-' + nid);
+    if (el) el.classList.add('active-node');
+  });
+
+  renderStepPanel(id);
+}
+
+function highlightStep(idx) {
+  activeStepIdx = idx;
+  document.querySelectorAll('.step-row').forEach((r,i) => {
+    r.classList.toggle('active-step', i === idx);
+  });
+  // Scroll step into view
+  const rows = document.querySelectorAll('.step-row');
+  if (rows[idx]) rows[idx].scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+
+function renderStepPanel(flowId) {
+  const flow = FLOWS[flowId];
+  const panel = document.getElementById('infoPanel');
+  const fc = {
+    'submit-bangkit':'#1d4ed8','submit-maju':'#6d28d9','mia-approval':'#b45309',
+    'email-reminder':'#047857','mentor-import':'#0e7490','admin-verify':'#b91c1c'
+  }[flowId] || '#334155';
+
+  let html = `<div class="flow-title" style="color:${fc}">${flow.label}</div>`;
+  html += '<div class="step-list">';
+
+  flow.steps.forEach((s, i) => {
+    const fromN = N[s.from], toN = N[s.to];
+    const badge = s.type === 'success' ? 'badge-success' : s.type === 'async' ? 'badge-async' : 'badge-error';
+    const label = s.type === 'success' ? 'BLOCKING' : s.type === 'async' ? 'ASYNC' : 'ERROR';
+    html += `
+      <div class="step-row" data-step="${i}" onclick="highlightStep(${i})">
+        <span class="step-num">${i+1}</span>
+        <span class="step-route">${fromN.label} → ${toN.label}</span>
+        <span class="step-data">${s.data.length > 80 ? s.data.slice(0,80)+'…' : s.data}</span>
+        <span class="step-type-badge ${badge}">${label}</span>
+      </div>`;
+  });
+  html += '</div>';
+  panel.innerHTML = html;
+}
+
+// Init
+buildUI();
+</script>
+</body>
+</html>
