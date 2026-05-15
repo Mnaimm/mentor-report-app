@@ -370,21 +370,6 @@ export default function HomePage() {
                 title="Laporan Sesi iTEKAD Maju"
                 description="Isi laporan kemajuan untuk usahawan anda."
               />
-              {(() => {
-                const isAdmin = session?.user?.email &&
-                  process.env.NEXT_PUBLIC_ADMIN_EMAILS
-                    ?.split(',')
-                    .map(e => e.trim())
-                    .includes(session.user.email);
-
-                return isAdmin ? (
-                  <ToolCard
-                    href="/upward-mobility"
-                    title="Borang UM Manual (Admin)"
-                    description="Untuk kes khas sahaja - manual UM entry."
-                  />
-                ) : null;
-              })()}
               <ToolCard
                 href="/growthwheel"
                 title="Penilaian GrowthWheel 360°"
