@@ -1,6 +1,6 @@
 // pages/api/submit-upward-mobility.js
 import { google } from 'googleapis';
-import { supabase } from '../../lib/supabaseClient';
+import { createAdminClient } from '../../lib/supabaseAdmin';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -78,41 +78,38 @@ export default async function handler(req, res) {
       '',                                    // Y: Pekerjaan (Sebelum) - BLANK
       umData.UM_PEKERJA_SEMASA || '',        // Z: Pekerjaan (Semasa/Selepas)
       umData.UM_ULASAN_PEKERJA || '',        // AA: Ulasan Pekerjaan
+      umData.UM_PEKERJA_PARTTIME_SEMASA || '', // AB: UM_PEKERJA_PARTTIME_SEMASA
+      umData.UM_ULASAN_PEKERJA_PARTTIME || '', // AC: UM_ULASAN_PEKERJA_PARTTIME
 
-      '',                                    // AB: Aset Bukan Tunai (Sebelum) - BLANK
-      umData.UM_ASET_BUKAN_TUNAI_SEMASA || '', // AC: Aset Bukan Tunai (Semasa/Selepas)
+      '',                                    // AD: Aset Bukan Tunai (Sebelum) - BLANK
+      umData.UM_ASET_BUKAN_TUNAI_SEMASA || '', // AE: Aset Bukan Tunai (Semasa/Selepas)
 
-      // Note: New utils have "Pekerja Part Time" and "Aset Tunai" handling slightly differently
-      // We will map 'Aset Tunai' if available or skip if not in main list. 
-      // Current utils has: UM_ASET_BUKAN_TUNAI_SEMASA only. No Tunai explicitly in new util?
-      // Wait, utils has: UM_SIMPANAN_SEMASA.
+      '',                                    // AF: Aset Tunai (Sebelum) - BLANK
+      '',                                    // AG: Aset Tunai (Semasa) - not collected in form
+      umData.UM_ULASAN_ASET_BUKAN_TUNAI || '', // AH: Ulasan Aset (General)
 
-      '',                                    // AD: Aset Tunai (Sebelum) - BLANK
-      '',                                    // AE: Aset Tunai (Semasa) - Utils might not have this specifically, leave blank
-      umData.UM_ULASAN_ASET_BUKAN_TUNAI || '', // AF: Ulasan Aset (General)
+      '',                                    // AI: Simpanan (Sebelum) - BLANK
+      umData.UM_SIMPANAN_SEMASA || '',       // AJ: Simpanan (Semasa/Selepas)
+      umData.UM_ULASAN_SIMPANAN || '',       // AK: Ulasan Simpanan
 
-      '',                                    // AG: Simpanan (Sebelum) - BLANK
-      umData.UM_SIMPANAN_SEMASA || '',       // AH: Simpanan (Semasa/Selepas)
-      umData.UM_ULASAN_SIMPANAN || '',       // AI: Ulasan Simpanan
-
-      '',                                    // AJ: Zakat (Sebelum) - BLANK
-      umData.UM_ZAKAT_SEMASA || '',          // AK: Zakat (Semasa/Selepas)
-      umData.UM_ULASAN_ZAKAT || '',          // AL: Ulasan Zakat
+      '',                                    // AL: Zakat (Sebelum) - BLANK
+      umData.UM_ZAKAT_SEMASA || '',          // AM: Zakat (Semasa/Selepas)
+      umData.UM_ULASAN_ZAKAT || '',          // AN: Ulasan Zakat
 
       // Section 4: Digital & Marketing
       // Utils returns array for checkboxes. Join them.
-      '',                                    // AM: Digital (Sebelum) - BLANK
-      Array.isArray(umData.UM_DIGITAL_SEMASA) ? umData.UM_DIGITAL_SEMASA.join(', ') : (umData.UM_DIGITAL_SEMASA || ''), // AN: Digital (Semasa)
-      umData.UM_ULASAN_DIGITAL || '',        // AO: Ulasan Digital
+      '',                                    // AO: Digital (Sebelum) - BLANK
+      Array.isArray(umData.UM_DIGITAL_SEMASA) ? umData.UM_DIGITAL_SEMASA.join(', ') : (umData.UM_DIGITAL_SEMASA || ''), // AP: Digital (Semasa)
+      umData.UM_ULASAN_DIGITAL || '',        // AQ: Ulasan Digital
 
-      '',                                    // AP: Marketing (Sebelum) - BLANK
-      Array.isArray(umData.UM_MARKETING_SEMASA) ? umData.UM_MARKETING_SEMASA.join(', ') : (umData.UM_MARKETING_SEMASA || ''), // AQ: Marketing (Semasa)
-      umData.UM_ULASAN_MARKETING || '',      // AR: Ulasan Marketing
+      '',                                    // AR: Marketing (Sebelum) - BLANK
+      Array.isArray(umData.UM_MARKETING_SEMASA) ? umData.UM_MARKETING_SEMASA.join(', ') : (umData.UM_MARKETING_SEMASA || ''), // AS: Marketing (Semasa)
+      umData.UM_ULASAN_MARKETING || '',      // AT: Ulasan Marketing
     ];
 
     // Append to Sheet
     const sheetName = process.env.RESPONSES_SHEET_NAME || 'UM';
-    const range = `${sheetName}!A2:AR`;
+    const range = `${sheetName}!A2:AT`;
 
     const appendResult = await sheets.spreadsheets.values.append({
       spreadsheetId: process.env.UPWARD_MOBILITY_SPREADSHEET_ID,
@@ -138,7 +135,7 @@ export default async function handler(req, res) {
       let entrepreneurId = null;
 
       if (entrepreneurEmail) {
-        const { data: entData } = await supabase
+        const { data: entData } = await createAdminClient()
           .from('entrepreneurs')
           .select('id')
           .eq('email', entrepreneurEmail.toLowerCase().trim())
@@ -151,7 +148,7 @@ export default async function handler(req, res) {
       const mentorEmail = formData.email; // Mentor's email is in formData.email from frontend
       let mentorId = null;
       if (mentorEmail) {
-        const { data: mData } = await supabase
+        const { data: mData } = await createAdminClient()
           .from('mentors')
           .select('id')
           .eq('email', mentorEmail) // exact match hopefully
@@ -247,20 +244,11 @@ export default async function handler(req, res) {
         // Ulasan columns (Schema Step 14)
         // `ulasan_aset_bukan_tunai`, `ulasan_aset_tunai` ...
         // `ulasan_marketing`, `ulasan_pekerja_parttime`
-        ulasan_pendapatan: null, // Schema doesn't list `ulasan_pendapatan` in the truncated view?
-        // Wait. Step 14 truncated.
-        // Let's assume they exist or check again?
-        // Step 14 showed `ulasan_aset_bukan_tunai`, `ulasan_aset_tunai`, `ulasan_marketing`, `ulasan_pekerja_parttime`.
-        // Does `ulasan_pendapatan` exist? 
-        // Likely yes, standard pattern. I will attempt to write it.
-        // If it fails, Supabase will throw error.
-        // Safe bet: write them. 
-        // Actually, let's verify `ulasan_pendapatan` existence quickly? 
-        // No, I'll trust the pattern. The error will tell us if I'm wrong.
-
-        // Wait, looking at `submitBangkit.js` again, it maps:
-        // `umSupabasePayload.ulasan_pendapatan = umData.UM_ULASAN_PENDAPATAN;`
-        // So it implies the column exists.
+        ulasan_pendapatan: umData.UM_ULASAN_PENDAPATAN,
+        ulasan_pekerja: umData.UM_ULASAN_PEKERJA,
+        ulasan_aset_bukan_tunai: umData.UM_ULASAN_ASET_BUKAN_TUNAI,
+        ulasan_simpanan: umData.UM_ULASAN_SIMPANAN,
+        ulasan_zakat: umData.UM_ULASAN_ZAKAT,
 
         // Digital & Marketing
         digital_semasa: Array.isArray(umData.UM_DIGITAL_SEMASA) ? umData.UM_DIGITAL_SEMASA.join(', ') : umData.UM_DIGITAL_SEMASA,
@@ -271,7 +259,7 @@ export default async function handler(req, res) {
 
       };
 
-      const { data, error } = await supabase
+      const { data, error } = await createAdminClient()
         .from('upward_mobility_reports')
         .insert(supabasePayload)
         .select();

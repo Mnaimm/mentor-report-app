@@ -191,7 +191,7 @@ const mapUMToUpwardMobilitySheetRow = (reportData, umData) => {
 
   // ✅ Columns AS-BT (44-71): UM-specific fields (28 columns)
   // Section 1: Engagement Status (3 fields)
-  row[44] = umData.UM_STATUS_PENGLIBATAN || '';         // AS UM_STATUS_PENGLIBATAN
+  row[44] = '';                                          // AS UM_STATUS_PENGLIBATAN - not captured in in-form submissions
   row[45] = umData.UM_STATUS || '';                     // AT UM_STATUS
   row[46] = umData.UM_KRITERIA_IMPROVEMENT || '';       // AU UM_KRITERIA_IMPROVEMENT
 
