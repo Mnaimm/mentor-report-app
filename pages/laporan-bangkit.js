@@ -528,8 +528,14 @@ export default function LaporanSesiPage() {
     const menteeData = allMentees.find((m) => m.Usahawan === menteeName);
     setSelectedMentee(menteeData);
     try {
-      const res = await fetch(`/api/menteeData?name=${encodeURIComponent(menteeName)}&programType=bangkit`);
+      const [res, umPrefillRes] = await Promise.all([
+        fetch(`/api/menteeData?name=${encodeURIComponent(menteeName)}&programType=bangkit`),
+        menteeData?.entrepreneur_id
+          ? fetch(`/api/mentee-um-prefill?entrepreneur_id=${encodeURIComponent(menteeData.entrepreneur_id)}`)
+          : Promise.resolve(null),
+      ]);
       const data = await res.json();
+      const umPrefill = umPrefillRes?.ok ? await umPrefillRes.json() : {};
 
       let fw = frameworkData;
       if (!fw || fw.length === 0) {
@@ -552,6 +558,12 @@ export default function LaporanSesiPage() {
           ...p.tambahan,
           jenisBisnes: menteeData?.Jenis_Bisnes || '',
           produkServis: menteeData?.Jenis_Bisnes || '',
+        },
+        upwardMobility: {
+          ...p.upwardMobility,
+          ...(umPrefill?.UM_TARIKH_LAWATAN_PREMIS
+            ? { UM_TARIKH_LAWATAN_PREMIS: umPrefill.UM_TARIKH_LAWATAN_PREMIS }
+            : {}),
         },
       }));
 

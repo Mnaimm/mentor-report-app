@@ -452,11 +452,18 @@ const LaporanMajuPage = () => {
     setMessageType('');
 
     try {
-      const response = await fetch(`/api/laporanMajuData?name=${encodeURIComponent(selectedMenteeName)}`);
+      const entrepreneurId = selectedMenteeData?.entrepreneur_id;
+      const [response, umPrefillRes] = await Promise.all([
+        fetch(`/api/laporanMajuData?name=${encodeURIComponent(selectedMenteeName)}`),
+        entrepreneurId
+          ? fetch(`/api/mentee-um-prefill?entrepreneur_id=${encodeURIComponent(entrepreneurId)}`)
+          : Promise.resolve(null),
+      ]);
       if (!response.ok) {
         throw new Error('Masalah sambungan. Sila semak internet dan cuba lagi.');
       }
       const sessionData = await response.json();
+      const umPrefill = umPrefillRes?.ok ? await umPrefillRes.json() : {};
 
       setFormData(prev => {
         const updatedFormData = { ...prev };
@@ -513,6 +520,13 @@ const LaporanMajuPage = () => {
         }
 
         setHasPremisPhotosUploaded(sessionData.hasPremisPhotos || false);
+
+        if (umPrefill?.UM_TARIKH_LAWATAN_PREMIS) {
+          updatedFormData.UPWARD_MOBILITY = {
+            ...updatedFormData.UPWARD_MOBILITY,
+            UM_TARIKH_LAWATAN_PREMIS: umPrefill.UM_TARIKH_LAWATAN_PREMIS,
+          };
+        }
 
         return updatedFormData;
       });
