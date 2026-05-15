@@ -184,7 +184,7 @@ const LaporanMajuPage = () => {
       try {
         const response = await fetch('/api/mapping?programType=maju');
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          throw new Error('Masalah sambungan. Sila semak internet dan cuba lagi.');
         }
         const data = await response.json();
         setAllMenteesMapping(data);
@@ -202,7 +202,7 @@ const LaporanMajuPage = () => {
         }
       } catch (error) {
         console.error('Error fetching mapping data:', error);
-        setMessage('Failed to load mentee mapping data.');
+        setMessage('Gagal memuatkan data mentee. Sila refresh halaman.');
         setMessageType('error');
       } finally {
         setLoading(false);
@@ -290,21 +290,21 @@ const LaporanMajuPage = () => {
           const response = await fetch(`/api/reports/${reportId}`);
 
           if (!response.ok) {
-            throw new Error('Failed to fetch report');
+            throw new Error('Masalah sambungan. Sila semak internet dan cuba lagi.');
           }
 
           const report = await response.json();
 
           // Security check
           if (report.mentor_email !== session.user.email) {
-            setMessage('Access denied - You can only revise your own reports');
+            setMessage('Akses ditolak - Anda hanya boleh kemaskini laporan anda sendiri.');
             setMessageType('error');
             return;
           }
 
           // Verify status
           if (report.status !== 'review_requested') {
-            setMessage('Only reports with status "review_requested" can be revised');
+            setMessage('Laporan ini tidak boleh dikemaskini pada masa ini. Sila hubungi admin.');
             setMessageType('error');
             return;
           }
@@ -317,7 +317,7 @@ const LaporanMajuPage = () => {
 
         } catch (err) {
           console.error('❌ Error fetching report for revision:', err);
-          setMessage('Failed to load report for revision: ' + err.message);
+          setMessage('Gagal memuatkan laporan. Sila cuba lagi atau hubungi admin.');
           setMessageType('error');
         }
       }
@@ -392,7 +392,7 @@ const LaporanMajuPage = () => {
 
     } catch (err) {
       console.error('❌ Error pre-filling Maju form:', err);
-      setMessage('Error loading report data: ' + err.message);
+      setMessage('Gagal memuatkan laporan. Sila cuba lagi atau hubungi admin.');
       setMessageType('error');
     }
   }, [revisionData, isRevisionMode, allMenteesMapping]);
@@ -454,7 +454,7 @@ const LaporanMajuPage = () => {
     try {
       const response = await fetch(`/api/laporanMajuData?name=${encodeURIComponent(selectedMenteeName)}`);
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error('Masalah sambungan. Sila semak internet dan cuba lagi.');
       }
       const sessionData = await response.json();
 
@@ -560,7 +560,7 @@ const LaporanMajuPage = () => {
 
     } catch (error) {
       console.error('Error fetching mentee session data:', error);
-      setMessage('Failed to load mentee data and session info. Please check console for details.');
+      setMessage('Gagal memuatkan data sesi. Sila refresh halaman atau hubungi admin.');
       setMessageType('error');
       setFormData(prev => ({
         ...initialFormState,
@@ -1119,9 +1119,9 @@ const LaporanMajuPage = () => {
           BATCH: formData.BATCH || '', // Added Batch
           PROGRAM: 'MAJU', // Added Program
           emel: formData.emel || '',
-          LOKASI_BISNES: '',
-          PRODUK_SERVIS: '',
-          NO_TELEFON: '',
+          LOKASI_BISNES: formData.LOKASI_BISNES,
+          PRODUK_SERVIS: formData.PRODUK_SERVIS,
+          NO_TELEFON: formData.NO_TELEFON,
           TARIKH_SESI: '',
           MOD_SESI: '',
           LOKASI_F2F: '',
@@ -1474,7 +1474,7 @@ const LaporanMajuPage = () => {
         detail: errorDetail
       });
 
-      setMessage(`Failed to submit Laporan: ${error.message}`);
+      setMessage('Gagal menghantar laporan. Sila cuba lagi atau hubungi admin.');
       setMessageType('error');
     } finally {
       setLoading(false);

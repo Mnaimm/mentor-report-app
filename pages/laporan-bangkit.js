@@ -331,20 +331,20 @@ export default function LaporanSesiPage() {
           const response = await fetch(`/api/reports/${reportId}`);
 
           if (!response.ok) {
-            throw new Error('Failed to fetch report');
+            throw new Error('Masalah sambungan. Sila semak internet dan cuba lagi.');
           }
 
           const report = await response.json();
 
           // Security check: verify report belongs to this mentor
           if (report.mentor_email !== session.user.email) {
-            setError('Access denied - You can only revise your own reports');
+            setError('Akses ditolak - Anda hanya boleh kemaskini laporan anda sendiri.');
             return;
           }
 
           // Verify status is review_requested
           if (report.status !== 'review_requested') {
-            setError('Only reports with status "review_requested" can be revised');
+            setError('Laporan ini tidak boleh dikemaskini pada masa ini. Sila hubungi admin.');
             return;
           }
 
@@ -360,7 +360,7 @@ export default function LaporanSesiPage() {
 
         } catch (err) {
           console.error('❌ Error fetching report for revision:', err);
-          setError('Failed to load report for revision: ' + err.message);
+          setError('Gagal memuatkan laporan. Sila cuba lagi atau hubungi admin.');
         }
       }
     };
@@ -439,7 +439,7 @@ export default function LaporanSesiPage() {
 
     } catch (err) {
       console.error('❌ Error pre-filling form:', err);
-      setError('Error loading report data: ' + err.message);
+      setError('Gagal memuatkan laporan. Sila cuba lagi atau hubungi admin.');
     }
   }, [revisionData, isRevisionMode, allMentees]);
 
@@ -548,6 +548,11 @@ export default function LaporanSesiPage() {
         ...p,
         jualanTerkini: data.previousSales || Array(12).fill(''),
         kemaskiniInisiatif: Array(prevInisiatif.length).fill(''),
+        tambahan: {
+          ...p.tambahan,
+          jenisBisnes: menteeData?.Jenis_Bisnes || '',
+          produkServis: menteeData?.Jenis_Bisnes || '',
+        },
       }));
 
       if (res.ok) {
