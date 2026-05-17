@@ -17,19 +17,21 @@ export default async function handler(req, res) {
   try {
     const supabase = createAdminClient();
     const { data, error } = await supabase
-      .from('reports')
-      .select('upward_mobility_data')
+      .from('upward_mobility_reports')
+      .select('tarikh_lawatan')
       .eq('entrepreneur_id', entrepreneur_id)
-      .in('status', ['submitted', 'approved'])
-      .order('session_number', { ascending: false })
-      .order('submission_date', { ascending: false })
+      .not('tarikh_lawatan', 'is', null)
+      .neq('tarikh_lawatan', '')
+      .neq('tarikh_lawatan', 'Belum dilawat')
+      .order('report_date', { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (error) throw error;
 
+    const tarikh = (data?.tarikh_lawatan ?? '').trim();
     return res.status(200).json({
-      UM_TARIKH_LAWATAN_PREMIS: data?.upward_mobility_data?.UM_TARIKH_LAWATAN_PREMIS ?? '',
+      UM_TARIKH_LAWATAN_PREMIS: tarikh,
     });
   } catch (error) {
     console.error('[mentee-um-prefill] ❌ Error:', error);

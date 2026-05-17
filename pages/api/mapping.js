@@ -1,8 +1,13 @@
 import { google } from 'googleapis';
 import cache from '../../lib/simple-cache';
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "./auth/[...nextauth]";
 
 export default async function handler(req, res) {
   try {
+    const session = await getServerSession(req, res, authOptions);
+    if (!session) return res.status(401).json({ error: 'Unauthorized' });
+
     const { programType } = req.query;
     const cacheKey = `mapping:${programType || 'all'}`;
 

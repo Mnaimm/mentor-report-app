@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "./auth/[...nextauth]";
 import cache from '../../lib/simple-cache';
 import { getEffectiveUserEmail, canImpersonate } from '../../lib/impersonation';
+import { createAdminClient } from '../../lib/supabaseAdmin';
 
 /**
  * Normalize round/session number for comparison
@@ -26,6 +27,328 @@ function normalizeRoundNumber(value) {
   // Convert to string and extract first number
   const match = String(value).match(/(\d+)/);
   return match ? match[1] : null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Supabase data-fetch path (used when SOURCE_MENTOR_STATS=supabase)
+// Returns null if mentor email not found in mentors table.
+// Returns { __empty: true } if mentor has no active assignments.
+// ─────────────────────────────────────────────────────────────────────────────
+async function fetchStatsFromSupabase(loginEmail, debugInfo) {
+  const supabase = createAdminClient();
+  const t0 = Date.now();
+
+  // 1. Resolve mentor by email (case-insensitive)
+  const { data: mentor, error: mentorError } = await supabase
+    .from('mentors')
+    .select('id, name')
+    .ilike('email', loginEmail)
+    .maybeSingle();
+
+  if (mentorError) throw new Error(`Mentor lookup failed: ${mentorError.message}`);
+  if (!mentor) return null;
+
+  console.log(`👤 [${debugInfo.requestId}] Supabase: resolved ${mentor.name} (${mentor.id})`);
+
+  // 2. Active assignments (both conditions required per CLAUDE.md)
+  const { data: assignments, error: assignError } = await supabase
+    .from('mentor_assignments')
+    .select('entrepreneur_id, batch_id')
+    .eq('mentor_id', mentor.id)
+    .eq('is_active', true)
+    .eq('status', 'active');
+
+  if (assignError) throw new Error(`Assignments query failed: ${assignError.message}`);
+
+  const entrepreneurIds = [
+    ...new Set((assignments || []).map(a => a.entrepreneur_id).filter(Boolean))
+  ];
+  const batchIds = [
+    ...new Set((assignments || []).map(a => a.batch_id).filter(Boolean))
+  ];
+
+  if (entrepreneurIds.length === 0) {
+    return { __empty: true };
+  }
+
+  // entrepreneur_id → batch_id lookup
+  const entrepreneurToBatchId = {};
+  (assignments || []).forEach(a => {
+    if (a.entrepreneur_id && a.batch_id) entrepreneurToBatchId[a.entrepreneur_id] = a.batch_id;
+  });
+
+  console.log(`📋 [${debugInfo.requestId}] Supabase: ${entrepreneurIds.length} mentees across ${batchIds.length} batches`);
+
+  // 3. Parallel fetch: entrepreneurs, batches, reports, batch_rounds
+  const [entrepreneursRes, batchesRes, reportsRes, batchRoundsRes] = await Promise.all([
+    supabase
+      .from('entrepreneurs')
+      .select('id, name, program, batch')
+      .in('id', entrepreneurIds),
+
+    batchIds.length > 0
+      ? supabase
+          .from('batches')
+          .select('id, batch_name, program, status')
+          .in('id', batchIds)
+      : Promise.resolve({ data: [], error: null }),
+
+    supabase
+      .from('reports')
+      .select('entrepreneur_id, session_number, submission_date, session_date, payment_status, status, premis_dilawat, mia_status')
+      .in('entrepreneur_id', entrepreneurIds),
+
+    // CLAUDE.md: always add WHERE batch_name IS NOT NULL to batch_rounds joins
+    // Older rows use start_date/end_date; active rows use start_month/end_month
+    batchIds.length > 0
+      ? supabase
+          .from('batch_rounds')
+          .select('id, batch_id, round_number, round_name, period_label, start_month, end_month, start_date, end_date, is_active')
+          .in('batch_id', batchIds)
+          .not('batch_name', 'is', null)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (entrepreneursRes.error) throw new Error(`Entrepreneurs query failed: ${entrepreneursRes.error.message}`);
+  if (reportsRes.error) throw new Error(`Reports query failed: ${reportsRes.error.message}`);
+
+  const entrepreneurs = entrepreneursRes.data || [];
+  const batches       = batchesRes.data || [];
+  const reports       = reportsRes.data || [];
+  const batchRounds   = batchRoundsRes.data || [];
+
+  console.log(`📊 [${debugInfo.requestId}] Supabase: ${entrepreneurs.length} entrepreneurs, ${reports.length} reports, ${batchRounds.length} batch_rounds`);
+
+  // Build lookup maps
+  const entrepreneurMap = {};
+  entrepreneurs.forEach(e => { entrepreneurMap[e.id] = e; });
+
+  const batchMap = {};
+  batches.forEach(b => { batchMap[b.id] = b; });
+
+  const entrepreneurToBatchName = {};
+  entrepreneurIds.forEach(eid => {
+    const batchId   = entrepreneurToBatchId[eid];
+    const batchInfo = batchMap[batchId];
+    const entInfo   = entrepreneurMap[eid];
+    entrepreneurToBatchName[eid] = batchInfo?.batch_name || entInfo?.batch || 'Unknown';
+  });
+
+  // 4. Current-period detection
+  // Prefer start_month/end_month (active rows), fall back to start_date/end_date (legacy rows),
+  // then is_active flag as last resort — per CLAUDE.md batch_rounds notes.
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const isInPeriod = (br) => {
+    const start = br.start_month || br.start_date;
+    const end   = br.end_month   || br.end_date;
+    if (!start) return br.is_active === true;
+    const s = new Date(start);
+    const e = new Date(end || start);
+    if (!end && br.start_month) {
+      // No end_month set: treat as end of the start month
+      e.setMonth(e.getMonth() + 1);
+      e.setDate(0);
+    }
+    return today >= s && today <= e;
+  };
+
+  const activeBatchInfos = [];
+  const activeBatchRoundNumbers = {}; // batchId → round_number for current period
+  let currentPeriodName = null;
+
+  for (const batchId of batchIds) {
+    const rounds      = batchRounds.filter(br => br.batch_id === batchId);
+    const activeRound = rounds.find(isInPeriod);
+
+    if (activeRound) {
+      const batchName = batchMap[batchId]?.batch_name || 'Unknown';
+      activeBatchInfos.push({
+        batch:       batchName,
+        period:      activeRound.period_label || activeRound.round_name,
+        roundLabel:  activeRound.round_name   || `Round ${activeRound.round_number}`,
+        roundNumber: activeRound.round_number,
+        batchId,
+      });
+      activeBatchRoundNumbers[batchId] = activeRound.round_number;
+      if (!currentPeriodName) currentPeriodName = activeRound.period_label || activeRound.round_name;
+    }
+  }
+
+  // Fallback: no active period found — use latest round per batch
+  if (activeBatchInfos.length === 0) {
+    console.warn(`⚠️ [${debugInfo.requestId}] Supabase: no active period, using latest round as fallback`);
+    for (const batchId of batchIds) {
+      const rounds = batchRounds
+        .filter(br => br.batch_id === batchId)
+        .sort((a, b) => b.round_number - a.round_number);
+      if (rounds.length > 0) {
+        const r        = rounds[0];
+        const batchName = batchMap[batchId]?.batch_name || 'Unknown';
+        activeBatchInfos.push({
+          batch:       batchName,
+          period:      r.period_label || r.round_name,
+          roundLabel:  r.round_name   || `Round ${r.round_number}`,
+          roundNumber: r.round_number,
+          batchId,
+        });
+        activeBatchRoundNumbers[batchId] = r.round_number;
+        if (!currentPeriodName) currentPeriodName = r.period_label || r.round_name;
+      }
+    }
+  }
+
+  const activeBatchIds = new Set(activeBatchInfos.map(b => b.batchId));
+
+  const currentPeriod = activeBatchInfos.length > 0
+    ? {
+        periodName: currentPeriodName,
+        label:      currentPeriodName || 'Current Period',
+        activeBatches: activeBatchInfos.map(b => ({ batch: b.batch, round: b.roundLabel })),
+      }
+    : null;
+
+  // 5. menteesByBatch
+  const menteesByBatch = {};
+  entrepreneurIds.forEach(eid => {
+    const ent       = entrepreneurMap[eid];
+    if (!ent) return;
+    const batchName = entrepreneurToBatchName[eid];
+    if (!menteesByBatch[batchName]) menteesByBatch[batchName] = [];
+    menteesByBatch[batchName].push(ent.name);
+  });
+
+  // 6. Process reports for all-time and current-round stats
+  // MIA signal: reports.mia_status IS NOT NULL and non-empty.
+  // reports has no batch_round_id FK; match round by session_number === activeBatchRoundNumbers[batchId].
+  let allTimeTotalReports = 0;
+  let allTimeMiaCount     = 0;
+  let currentRoundMiaCount = 0;
+
+  const allTimeReportedMentees  = new Set();
+  const menteesWithPremisVisit  = new Set();
+  const allTimeSessionsByEid    = {}; // eid → Set<sessionLabel>
+  const miaCountByEid           = {}; // eid → count
+
+  const currentRoundReportedMentees  = new Set();
+  const currentRoundSessionsByEid    = {}; // eid → Set<sessionLabel>
+
+  for (const report of reports) {
+    const eid = report.entrepreneur_id;
+    if (!entrepreneurMap[eid]) continue;
+
+    const batchId      = entrepreneurToBatchId[eid];
+    const isMia        = report.mia_status?.trim() === 'MIA';
+    const sessionLabel = `Session ${report.session_number}`;
+
+    allTimeTotalReports++;
+
+    if (report.premis_dilawat === true) menteesWithPremisVisit.add(eid);
+
+    if (isMia) {
+      allTimeMiaCount++;
+      miaCountByEid[eid] = (miaCountByEid[eid] || 0) + 1;
+      const expectedRound = activeBatchRoundNumbers[batchId];
+      if (expectedRound != null && report.session_number === expectedRound) {
+        currentRoundMiaCount++;
+      }
+    } else {
+      allTimeReportedMentees.add(eid);
+      if (!allTimeSessionsByEid[eid]) allTimeSessionsByEid[eid] = new Set();
+      allTimeSessionsByEid[eid].add(sessionLabel);
+
+      const expectedRound = activeBatchRoundNumbers[batchId];
+      if (expectedRound != null && report.session_number === expectedRound) {
+        currentRoundReportedMentees.add(eid);
+        if (!currentRoundSessionsByEid[eid]) currentRoundSessionsByEid[eid] = new Set();
+        currentRoundSessionsByEid[eid].add(sessionLabel);
+      }
+    }
+  }
+
+  // 7. sessionsByBatch and miaByBatch (keyed by mentee name, matching Sheets shape)
+  const sessionsByBatch = {};
+  const miaByBatch      = {};
+
+  entrepreneurIds.forEach(eid => {
+    const ent       = entrepreneurMap[eid];
+    if (!ent) return;
+    const batchName = entrepreneurToBatchName[eid];
+
+    if (!sessionsByBatch[batchName]) sessionsByBatch[batchName] = {};
+    sessionsByBatch[batchName][ent.name] = allTimeSessionsByEid[eid]?.size || 0;
+
+    const miaCount = miaCountByEid[eid] || 0;
+    if (miaCount > 0) {
+      if (!miaByBatch[batchName]) miaByBatch[batchName] = {};
+      miaByBatch[batchName][ent.name] = miaCount;
+    }
+  });
+
+  // 8. perMenteeSessions by name (matching Sheets response shape)
+  const allTimePerMenteeSessions      = {};
+  const currentRoundPerMenteeSessions = {};
+
+  entrepreneurIds.forEach(eid => {
+    const ent = entrepreneurMap[eid];
+    if (!ent) return;
+    allTimePerMenteeSessions[ent.name] = allTimeSessionsByEid[eid]?.size || 0;
+  });
+
+  Object.entries(currentRoundSessionsByEid).forEach(([eid, sessionSet]) => {
+    const ent = entrepreneurMap[eid];
+    if (ent) currentRoundPerMenteeSessions[ent.name] = sessionSet.size;
+  });
+
+  // 9. miaMentees list (grouped by mentee, sorted by batch then name)
+  const miaMenteesList = Object.entries(miaCountByEid)
+    .filter(([, count]) => count > 0)
+    .map(([eid, miaCount]) => ({
+      name:          entrepreneurMap[eid]?.name || 'Unknown',
+      batch:         entrepreneurToBatchName[eid] || 'Unknown',
+      miaCount,
+      totalSessions: allTimeSessionsByEid[eid]?.size || 0,
+    }))
+    .sort((a, b) => {
+      if (a.batch !== b.batch) return a.batch.localeCompare(b.batch);
+      return a.name.localeCompare(b.name);
+    });
+
+  // 10. Pending count: mentees in active batches who haven't reported this round
+  const menteesInActiveBatchCount = entrepreneurIds.filter(eid =>
+    activeBatchIds.has(entrepreneurToBatchId[eid])
+  ).length;
+
+  return {
+    mentorEmail:               loginEmail,
+    currentPeriod,
+    currentRound:              currentPeriod, // backward compat
+    totalMentees:              entrepreneurIds.length,
+    totalMenteesInCurrentPeriod: menteesInActiveBatchCount,
+    allTime: {
+      totalReports:        allTimeTotalReports,
+      uniqueMenteesReported: allTimeReportedMentees.size,
+      miaCount:            allTimeMiaCount,
+      premisVisitCount:    menteesWithPremisVisit.size,
+      perMenteeSessions:   allTimePerMenteeSessions,
+    },
+    currentRoundStats: {
+      reportedThisRound: currentRoundReportedMentees.size,
+      pendingThisRound:  Math.max(0, menteesInActiveBatchCount - currentRoundReportedMentees.size),
+      miaThisRound:      currentRoundMiaCount,
+      perMenteeSessions: currentRoundPerMenteeSessions,
+    },
+    menteesByBatch,
+    sessionsByBatch,
+    miaByBatch,
+    miaMentees: miaMenteesList,
+    source: {
+      activeBatchInfos,
+      totalMenteeRecords: (assignments || []).length,
+    },
+    __dbFetchTimeMs: Date.now() - t0, // stripped before response, used for debug
+  };
 }
 
 export default async function handler(req, res) {
@@ -59,6 +382,71 @@ export default async function handler(req, res) {
     }
 
     const loginEmail = effectiveUserEmail;
+
+    // ── Supabase path (SOURCE_MENTOR_STATS=supabase) ──────────────────────────
+    if (process.env.SOURCE_MENTOR_STATS === 'supabase') {
+      const cacheKey = `mentor-stats-db:${loginEmail}${isImpersonating ? ':impersonated' : ''}`;
+
+      const cachedData = cache.get(cacheKey);
+      if (cachedData) {
+        console.log(`⚡ [${debugInfo.requestId}] Supabase: returning cached data for ${loginEmail}`);
+        return res.json({
+          ...cachedData,
+          debug: {
+            ...debugInfo,
+            fromCache: true,
+            originalTimestamp: cachedData.debug?.timestamp,
+            cacheAge: Date.now() - new Date(cachedData.debug?.timestamp || 0).getTime(),
+            impersonation: { isImpersonating, realUser: realUserEmail, effectiveUser: effectiveUserEmail },
+          },
+        });
+      }
+
+      const result = await fetchStatsFromSupabase(loginEmail, debugInfo);
+
+      if (!result) {
+        console.log(`❌ [${debugInfo.requestId}] Supabase: mentor not found for ${loginEmail}`);
+        return res.status(404).json({
+          error: 'Mentor not found',
+          mentorEmail: loginEmail,
+          debug: { ...debugInfo, impersonation: { isImpersonating, realUser: realUserEmail, effectiveUser: effectiveUserEmail } },
+        });
+      }
+
+      if (result.__empty) {
+        console.log(`⚠️ [${debugInfo.requestId}] Supabase: no active mentees for ${loginEmail}`);
+        return res.json({
+          mentorEmail: loginEmail,
+          error: 'No mentees found for this mentor',
+          totalMentees: 0,
+          currentRound: null,
+          currentRoundStats: { reportedThisRound: 0, pendingThisRound: 0, miaThisRound: 0, perMenteeSessions: {} },
+          allTime: { totalReports: 0, uniqueMenteesReported: 0, miaCount: 0, premisVisitCount: 0, perMenteeSessions: {} },
+          menteesByBatch: {},
+          sessionsByBatch: {},
+          miaByBatch: {},
+          miaMentees: [],
+          debug: { ...debugInfo, impersonation: { isImpersonating, realUser: realUserEmail, effectiveUser: effectiveUserEmail } },
+        });
+      }
+
+      const { __dbFetchTimeMs, ...resultData } = result;
+      const responseData = {
+        ...resultData,
+        debug: {
+          ...debugInfo,
+          fromCache:    false,
+          totalTimeMs:  Date.now() - new Date(debugInfo.timestamp).getTime(),
+          dbFetchTimeMs: __dbFetchTimeMs,
+          impersonation: { isImpersonating, realUser: realUserEmail, effectiveUser: effectiveUserEmail },
+        },
+      };
+
+      cache.set(cacheKey, responseData, 10 * 60 * 1000);
+      console.log(`✅ [${debugInfo.requestId}] Supabase: returning fresh data for ${loginEmail} (${__dbFetchTimeMs}ms DB fetch)`);
+      return res.json(responseData);
+    }
+    // ── End Supabase path ─────────────────────────────────────────────────────
 
     // Cache key for this mentor's stats (include impersonation context)
     const cacheKey = `mentor-stats:${loginEmail}${isImpersonating ? ':impersonated' : ''}`;
