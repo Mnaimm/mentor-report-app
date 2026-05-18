@@ -137,7 +137,6 @@ const LaporanMajuPage = () => {
   const [selectedMentorEmail, setSelectedMentorEmail] = useState(session?.user?.email || '');
   const [currentSessionNumber, setCurrentSessionNumber] = useState(1);
   const [previousMentoringFindings, setPreviousMentoringFindings] = useState([]);
-  const [previousLatarBelakangUsahawan, setPreviousLatarBelakangUsahawan] = useState('');
   const [hasPremisPhotosUploaded, setHasPremisPhotosUploaded] = useState(false);
   const [lawatanPremisChecked, setLawatanPremisChecked] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -385,7 +384,6 @@ const LaporanMajuPage = () => {
       // Set previous data if needed for Sesi 2+
       if (revisionData.session_number > 1) {
         setPreviousMentoringFindings(revisionData.mentoring_findings || []);
-        setPreviousLatarBelakangUsahawan(revisionData.latarbelakang_usahawan || '');
       }
 
       console.log('✅ Maju form pre-filled successfully');
@@ -431,7 +429,6 @@ const LaporanMajuPage = () => {
 
     setCurrentSessionNumber(1);
     setPreviousMentoringFindings([]);
-    setPreviousLatarBelakangUsahawan('');
     setHasPremisPhotosUploaded(false);
     setLawatanPremisChecked(false);
     setIsMIA(false);
@@ -453,10 +450,13 @@ const LaporanMajuPage = () => {
 
     try {
       const entrepreneurId = selectedMenteeData?.entrepreneur_id;
-      const [response, umPrefillRes] = await Promise.all([
+      const [response, umPrefillRes, latarBelakangRes] = await Promise.all([
         fetch(`/api/laporanMajuData?name=${encodeURIComponent(selectedMenteeName)}`),
         entrepreneurId
           ? fetch(`/api/mentee-um-prefill?entrepreneur_id=${encodeURIComponent(entrepreneurId)}`)
+          : Promise.resolve(null),
+        entrepreneurId
+          ? fetch(`/api/prefill/maju-latarbelakang?entrepreneur_id=${encodeURIComponent(entrepreneurId)}`)
           : Promise.resolve(null),
       ]);
       if (!response.ok) {
@@ -464,6 +464,7 @@ const LaporanMajuPage = () => {
       }
       const sessionData = await response.json();
       const umPrefill = umPrefillRes?.ok ? await umPrefillRes.json() : {};
+      const latarBelakangPrefill = latarBelakangRes?.ok ? await latarBelakangRes.json() : {};
 
       setFormData(prev => {
         const updatedFormData = { ...prev };
@@ -512,12 +513,7 @@ const LaporanMajuPage = () => {
           updatedFormData.DATA_KEWANGAN_BULANAN_JSON = [];
         }
 
-        setPreviousLatarBelakangUsahawan(sessionData.latarBelakangUsahawanSesi1 || '');
-        if (sessionData.currentSession === 1 && sessionData.latarBelakangUsahawanSesi1) {
-          updatedFormData.LATARBELAKANG_USAHAWAN = sessionData.latarBelakangUsahawanSesi1;
-        } else {
-          updatedFormData.LATARBELAKANG_USAHAWAN = '';
-        }
+        updatedFormData.LATARBELAKANG_USAHAWAN = latarBelakangPrefill?.latarbelakang_usahawan || '';
 
         setHasPremisPhotosUploaded(sessionData.hasPremisPhotos || false);
 
@@ -585,7 +581,6 @@ const LaporanMajuPage = () => {
       }));
       setCurrentSessionNumber(1);
       setPreviousMentoringFindings([]);
-      setPreviousLatarBelakangUsahawan('');
       setHasPremisPhotosUploaded(false);
       setLawatanPremisChecked(false);
       setIsMIA(false);
@@ -793,7 +788,6 @@ const LaporanMajuPage = () => {
     });
     setCurrentSessionNumber(1);
     setPreviousMentoringFindings([]);
-    setPreviousLatarBelakangUsahawan('');
     setHasPremisPhotosUploaded(false);
     setLawatanPremisChecked(false);
     setMessage('');
@@ -1205,7 +1199,7 @@ const LaporanMajuPage = () => {
           LOKASI_F2F: formData.LOKASI_F2F,
           MASA_MULA: formData.MASA_MULA,
           MASA_TAMAT: formData.MASA_TAMAT,
-          LATARBELAKANG_USAHAWAN: currentSessionNumber === 1 ? formData.LATARBELAKANG_USAHAWAN : previousLatarBelakangUsahawan,
+          LATARBELAKANG_USAHAWAN: formData.LATARBELAKANG_USAHAWAN,
           DATA_KEWANGAN_BULANAN_JSON: formData.DATA_KEWANGAN_BULANAN_JSON,
           MENTORING_FINDINGS_JSON: buildCumulativeMentoringFindings(),
           URL_GAMBAR_PREMIS_JSON: imageUrls.premis,
@@ -1902,15 +1896,14 @@ const LaporanMajuPage = () => {
               {/* --- Enhanced Latar Belakang Section --- */}
               <div className="bg-white p-6 rounded-lg shadow-sm">
                 <Section title="Latar Belakang Usahawan & Situasi Bisnes *">
-                  {currentSessionNumber === 1 ? (
-                    <EnhancedTextArea
-                      label="Latar Belakang Usahawan"
-                      name="LATARBELAKANG_USAHAWAN"
-                      value={formData.LATARBELAKANG_USAHAWAN}
-                      onChange={handleChange}
-                      required={true}
-                      rows={8}
-                      helperText={`Panduan:
+                  <EnhancedTextArea
+                    label="Latar Belakang Usahawan"
+                    name="LATARBELAKANG_USAHAWAN"
+                    value={formData.LATARBELAKANG_USAHAWAN}
+                    onChange={handleChange}
+                    required={currentSessionNumber === 1}
+                    rows={8}
+                    helperText={`Panduan:
 Latarbelakang usahawan.
 Penerangan produk/perkhidmatan.
 Situasi bisnes ketika ini:
@@ -1926,17 +1919,7 @@ Kenalpasti bahagian yang boleh nampak peningkatan sebelum dan selepas setahun la
 - Penambahan pekerja
 - Adaptasi teknologi
 - Peningkatan skil/pengetahuan`}
-                    />
-                  ) : (
-                    <TextArea
-                      label="Latar Belakang Usahawan (Dari Sesi 1)"
-                      name="LATARBELAKANG_USAHAWAN"
-                      value={previousLatarBelakangUsahawan}
-                      disabled={true}
-                      rows={5}
-                      placeholder="Latar Belakang Usahawan can only be edited in Sesi 1. Displaying previous entry."
-                    />
-                  )}
+                  />
                 </Section>
               </div>
 

@@ -528,14 +528,18 @@ export default function LaporanSesiPage() {
     const menteeData = allMentees.find((m) => m.Usahawan === menteeName);
     setSelectedMentee(menteeData);
     try {
-      const [res, umPrefillRes] = await Promise.all([
+      const [res, umPrefillRes, pemerhatianRes] = await Promise.all([
         fetch(`/api/menteeData?name=${encodeURIComponent(menteeName)}&programType=bangkit`),
         menteeData?.entrepreneur_id
           ? fetch(`/api/mentee-um-prefill?entrepreneur_id=${encodeURIComponent(menteeData.entrepreneur_id)}`)
           : Promise.resolve(null),
+        menteeData?.entrepreneur_id
+          ? fetch(`/api/prefill/bangkit-pemerhatian?entrepreneur_id=${encodeURIComponent(menteeData.entrepreneur_id)}`)
+          : Promise.resolve(null),
       ]);
       const data = await res.json();
       const umPrefill = umPrefillRes?.ok ? await umPrefillRes.json() : {};
+      const pemerhatianPrefill = pemerhatianRes?.ok ? await pemerhatianRes.json() : {};
 
       let fw = frameworkData;
       if (!fw || fw.length === 0) {
@@ -554,6 +558,7 @@ export default function LaporanSesiPage() {
         ...p,
         jualanTerkini: data.previousSales || Array(12).fill(''),
         kemaskiniInisiatif: Array(prevInisiatif.length).fill(''),
+        pemerhatian: pemerhatianPrefill?.pemerhatian || '',
         tambahan: {
           ...p.tambahan,
           jenisBisnes: menteeData?.Jenis_Bisnes || '',
