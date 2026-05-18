@@ -256,6 +256,15 @@ export default function LaporanSesiPage() {
 
   const isAdmin = process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',').includes(session?.user?.email);
 
+  // Redirect is_khas mentors (non-coordinators) to laporan-khas
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    fetch('/api/khas/check-mentor')
+      .then(r => r.json())
+      .then(d => { if (d.isKhas && !d.isCoordinator) router.replace('/laporan-khas'); })
+      .catch(() => {});
+  }, [status]);
+
   const resetForm = () => {
     try {
       const k = getDraftKey(selectedMentee?.Usahawan, currentSession, session?.user?.email);

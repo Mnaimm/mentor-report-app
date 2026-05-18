@@ -84,6 +84,15 @@ const LaporanMajuPage = () => {
   const router = useRouter();
   const isAdmin = session?.user?.email && process.env.NEXT_PUBLIC_ADMIN_EMAILS?.includes(session.user.email);
 
+  // Redirect is_khas mentors (non-coordinators) to laporan-khas
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    fetch('/api/khas/check-mentor')
+      .then(r => r.json())
+      .then(d => { if (d.isKhas && !d.isCoordinator) router.replace('/laporan-khas'); })
+      .catch(() => {});
+  }, [status]);
+
   // REVISION MODE STATE
   const [isRevisionMode, setIsRevisionMode] = useState(false);
   const [existingReportId, setExistingReportId] = useState(null);

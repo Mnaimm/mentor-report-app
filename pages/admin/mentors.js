@@ -15,8 +15,36 @@ export default function DirektoriMentor({ userEmail, isReadOnlyUser, accessDenie
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [programFilter, setProgramFilter] = useState('Semua');
+  const [togglingId, setTogglingId] = useState(null);
 
   if (accessDenied) return <AccessDenied userEmail={userEmail} />;
+
+  const handleToggleKhas = async (mentorId, currentIsKhas) => {
+    if (isReadOnlyUser) return;
+    setTogglingId(mentorId);
+    try {
+      const res = await fetch('/api/admin/mentors/toggle-khas', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mentor_id: mentorId, is_khas: !currentIsKhas }),
+      });
+      if (!res.ok) throw new Error('Gagal kemaskini status Kes Khas.');
+      setData(prev => {
+        if (!prev) return prev;
+        const zones = prev.zones.map(zone => ({
+          ...zone,
+          mentors: zone.mentors.map(m =>
+            m.id === mentorId ? { ...m, is_khas: !currentIsKhas } : m
+          ),
+        }));
+        return { ...prev, zones };
+      });
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setTogglingId(null);
+    }
+  };
 
   useEffect(() => {
     fetch('/api/admin/mentors/directory')
@@ -148,7 +176,7 @@ export default function DirektoriMentor({ userEmail, isReadOnlyUser, accessDenie
                         </div>
 
                         {/* Stats */}
-                        <div className="flex justify-between text-sm">
+                        <div className="flex justify-between text-sm mb-3">
                           <div className="text-center">
                             <div className="font-bold text-gray-800">{mentor.total_mentees}</div>
                             <div className="text-xs text-gray-400">Usahawan</div>
@@ -157,6 +185,34 @@ export default function DirektoriMentor({ userEmail, isReadOnlyUser, accessDenie
                             <div className="font-bold text-gray-800">{mentor.total_sessions}</div>
                             <div className="text-xs text-gray-400">Sesi</div>
                           </div>
+                        </div>
+
+                        {/* Kes Khas Toggle */}
+                        <div className="border-t pt-3 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            {mentor.is_khas && (
+                              <span className="bg-purple-100 text-purple-700 text-xs font-semibold px-2 py-0.5 rounded-full">
+                                Kes Khas
+                              </span>
+                            )}
+                          </div>
+                          {!isReadOnlyUser && (
+                            <button
+                              onClick={() => handleToggleKhas(mentor.id, mentor.is_khas)}
+                              disabled={togglingId === mentor.id}
+                              className={`text-xs px-3 py-1 rounded-full border transition-colors ${
+                                mentor.is_khas
+                                  ? 'border-purple-400 text-purple-700 hover:bg-purple-50'
+                                  : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                              } disabled:opacity-50`}
+                            >
+                              {togglingId === mentor.id
+                                ? '...'
+                                : mentor.is_khas
+                                  ? 'Nyahaktif Kes Khas'
+                                  : 'Aktifkan Kes Khas'}
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}

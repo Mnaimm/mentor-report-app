@@ -19,7 +19,7 @@ export default async function handler(req, res) {
       { data: assignments, error: assignmentsError },
       { data: reportRows, error: reportsError },
     ] = await Promise.all([
-      supabase.from('mentors').select('id, name, email, phone').eq('status', 'active').order('name'),
+      supabase.from('mentors').select('id, name, email, phone, is_khas').eq('status', 'active').order('name'),
       supabase
         .from('mentor_assignments')
         .select('mentor_id, entrepreneur_id, entrepreneurs(zone, program)')
@@ -43,6 +43,7 @@ export default async function handler(req, res) {
     for (const m of mentors || []) {
       mentorMap[m.id] = {
         id: m.id, name: m.name, email: m.email, phone: m.phone,
+        is_khas: m.is_khas || false,
         zoneCounts: {},
         programSet: new Set(),
         total_mentees: 0,
@@ -84,6 +85,7 @@ export default async function handler(req, res) {
         name: mentor.name,
         email: mentor.email,
         phone: mentor.phone,
+        is_khas: mentor.is_khas,
         programs: [...mentor.programSet].sort(),
         total_mentees: mentor.total_mentees,
         total_sessions: sessions,
