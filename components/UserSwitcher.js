@@ -29,17 +29,9 @@ const UserSwitcher = ({ onImpersonationChange }) => {
   const fetchMentors = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/mapping?programType=bangkit');
+      const response = await fetch('/api/admin/mentor-list');
       const data = await response.json();
-
-      // Extract unique mentors
-      const uniqueMentors = [...new Set(data.map(item => ({
-        name: item.Mentor,
-        email: item.Mentor_Email
-      })).filter(mentor => mentor.email))]
-        .sort((a, b) => a.name.localeCompare(b.name));
-
-      setMentors(uniqueMentors);
+      setMentors(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to fetch mentors:', error);
     } finally {
