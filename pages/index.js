@@ -119,6 +119,8 @@ export default function HomePage() {
   const [stats, setStats] = useState(null);
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState(null);
+  const [pendingBanner, setPendingBanner] = useState(null);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
 
   useEffect(() => {
     if (status !== "authenticated") {
@@ -137,9 +139,13 @@ export default function HomePage() {
         const startTime = Date.now();
         console.log('🚀 Dashboard: Starting API call to /api/mentor-stats');
 
-        // Include impersonation headers if active
+        // Include impersonation — both header (existing) and query param (new DB-checked approach)
         const headers = ImpersonationManager.getHeaders();
-        const res = await fetch("/api/mentor-stats", { headers });
+        const impersonatedEmail = ImpersonationManager.getImpersonateUser();
+        const statsUrl = impersonatedEmail
+          ? `/api/mentor-stats?impersonate=${encodeURIComponent(impersonatedEmail)}`
+          : '/api/mentor-stats';
+        const res = await fetch(statsUrl, { headers });
         const fetchTime = Date.now() - startTime;
 
         console.log(`⏱️ Dashboard: API call completed in ${fetchTime}ms, status: ${res.status}`);
@@ -186,6 +192,19 @@ export default function HomePage() {
       cancelled = true;
       console.log('🚫 Dashboard: Stats loading cancelled (component unmounted)');
     };
+  }, [status]);
+
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    const impersonatedEmail = ImpersonationManager.getImpersonateUser();
+    const summaryUrl = impersonatedEmail
+      ? `/api/mentor/pending-summary?impersonate=${encodeURIComponent(impersonatedEmail)}`
+      : '/api/mentor/pending-summary';
+    const headers = ImpersonationManager.getHeaders();
+    fetch(summaryUrl, { headers })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setPendingBanner(data); })
+      .catch(() => {});
   }, [status]);
 
   if (status === "loading") {
@@ -438,6 +457,34 @@ export default function HomePage() {
         {/* Debug Panel - Only show for authenticated users */}
         {session && <DebugPanel />}
       </div>
+
+      {/* Overdue floating banner — shown past round midpoint with pending reports */}
+      {session && pendingBanner?.hasPending && !bannerDismissed && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-amber-50 border-t-2 border-amber-400 shadow-lg">
+          <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+            <p className="text-amber-800 text-sm font-medium">
+              ⚠️ Tindakan Diperlukan — Anda mempunyai{' '}
+              <strong>{pendingBanner.count}</strong> laporan belum dihantar untuk pusingan semasa. Sila hantar sebelum{' '}
+              <strong>{pendingBanner.endDate}</strong>.
+            </p>
+            <div className="flex items-center gap-3 shrink-0">
+              <a
+                href={pendingBanner.laporanUrl}
+                className="bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold px-4 py-2 rounded-lg transition-colors"
+              >
+                Hantar Sekarang
+              </a>
+              <button
+                onClick={() => setBannerDismissed(true)}
+                className="text-amber-600 hover:text-amber-800 text-lg font-bold leading-none"
+                aria-label="Tutup"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

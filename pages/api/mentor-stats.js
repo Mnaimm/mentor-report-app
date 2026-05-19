@@ -98,15 +98,14 @@ async function fetchStatsFromSupabase(loginEmail, debugInfo) {
       .select('entrepreneur_id, session_number, submission_date, session_date, payment_status, status, premis_dilawat, mia_status')
       .in('entrepreneur_id', entrepreneurIds),
 
-    // CLAUDE.md: always add WHERE batch_name IS NOT NULL to batch_rounds joins
-    // Older rows use start_date/end_date; active rows use start_month/end_month
-    batchIds.length > 0
-      ? supabase
-          .from('batch_rounds')
-          .select('id, batch_id, round_number, round_name, period_label, start_month, end_month, start_date, end_date, is_active')
-          .in('batch_id', batchIds)
-          .not('batch_name', 'is', null)
-      : Promise.resolve({ data: [], error: null }),
+    // Fetch ALL non-null batch_name rows (small table, ~50 rows).
+    // Cannot filter by batch_id alone — newer batches (e.g. Batch 6 MAJU, Batch 7/8 Bangkit)
+    // have batch_id=null in batch_rounds and are only linkable via batch_name.
+    // JS-level filtering against the mentor's batches happens after the parallel fetch.
+    supabase
+      .from('batch_rounds')
+      .select('id, batch_id, batch_name, round_number, round_name, period_label, start_month, end_month, start_date, end_date, is_active')
+      .not('batch_name', 'is', null),
   ]);
 
   if (entrepreneursRes.error) throw new Error(`Entrepreneurs query failed: ${entrepreneursRes.error.message}`);
@@ -126,6 +125,9 @@ async function fetchStatsFromSupabase(loginEmail, debugInfo) {
   const batchMap = {};
   batches.forEach(b => { batchMap[b.id] = b; });
 
+  const batchIdToName = {};
+  batches.forEach(b => { if (b.id) batchIdToName[b.id] = b.batch_name; });
+
   const entrepreneurToBatchName = {};
   entrepreneurIds.forEach(eid => {
     const batchId   = entrepreneurToBatchId[eid];
@@ -135,22 +137,19 @@ async function fetchStatsFromSupabase(loginEmail, debugInfo) {
   });
 
   // 4. Current-period detection
-  // Prefer start_month/end_month (active rows), fall back to start_date/end_date (legacy rows),
-  // then is_active flag as last resort — per CLAUDE.md batch_rounds notes.
+  // Prefer start_date/end_date (always accurate); fall back to start_month/end_month (older rows).
+  // end_month on newer rows stores "first of month", not last — end_date is the reliable bound.
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   const isInPeriod = (br) => {
-    const start = br.start_month || br.start_date;
-    const end   = br.end_month   || br.end_date;
+    // Prefer start_date/end_date (always accurate).
+    // end_month on newer rows is "first of month", not last — end_date is the reliable bound.
+    const start = br.start_date || br.start_month;
+    const end   = br.end_date   || br.end_month;
     if (!start) return br.is_active === true;
-    const s = new Date(start);
-    const e = new Date(end || start);
-    if (!end && br.start_month) {
-      // No end_month set: treat as end of the start month
-      e.setMonth(e.getMonth() + 1);
-      e.setDate(0);
-    }
+    const s = new Date(start); s.setHours(0, 0, 0, 0);
+    const e = new Date(end || start); e.setHours(23, 59, 59, 999);
     return today >= s && today <= e;
   };
 
@@ -159,13 +158,18 @@ async function fetchStatsFromSupabase(loginEmail, debugInfo) {
   let currentPeriodName = null;
 
   for (const batchId of batchIds) {
-    const rounds      = batchRounds.filter(br => br.batch_id === batchId);
+    const batchName = batchIdToName[batchId];
+    // Match by batch_id first; fall back to batch_name for rows where batch_id is null
+    const rounds    = batchRounds.filter(br =>
+      br.batch_id === batchId ||
+      (batchName && br.batch_name === batchName)
+    );
     const activeRound = rounds.find(isInPeriod);
 
     if (activeRound) {
-      const batchName = batchMap[batchId]?.batch_name || 'Unknown';
+      const resolvedBatchName = batchName || batchMap[batchId]?.batch_name || 'Unknown';
       activeBatchInfos.push({
-        batch:       batchName,
+        batch:       resolvedBatchName,
         period:      activeRound.period_label || activeRound.round_name,
         roundLabel:  activeRound.round_name   || `Round ${activeRound.round_number}`,
         roundNumber: activeRound.round_number,
@@ -180,14 +184,18 @@ async function fetchStatsFromSupabase(loginEmail, debugInfo) {
   if (activeBatchInfos.length === 0) {
     console.warn(`⚠️ [${debugInfo.requestId}] Supabase: no active period, using latest round as fallback`);
     for (const batchId of batchIds) {
+      const batchName = batchIdToName[batchId];
       const rounds = batchRounds
-        .filter(br => br.batch_id === batchId)
+        .filter(br =>
+          br.batch_id === batchId ||
+          (batchName && br.batch_name === batchName)
+        )
         .sort((a, b) => b.round_number - a.round_number);
       if (rounds.length > 0) {
-        const r        = rounds[0];
-        const batchName = batchMap[batchId]?.batch_name || 'Unknown';
+        const r                  = rounds[0];
+        const resolvedBatchName  = batchName || batchMap[batchId]?.batch_name || 'Unknown';
         activeBatchInfos.push({
-          batch:       batchName,
+          batch:       resolvedBatchName,
           period:      r.period_label || r.round_name,
           roundLabel:  r.round_name   || `Round ${r.round_number}`,
           roundNumber: r.round_number,
@@ -367,21 +375,43 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: "Unauthorized" });
     }
     const realUserEmail = session.user.email.toLowerCase().trim();
-    const effectiveUserEmail = getEffectiveUserEmail(req, session);
-    const isImpersonating = realUserEmail !== effectiveUserEmail;
 
-    console.log(`👤 [${debugInfo.requestId}] Processing request:`);
-    console.log(`  Real user: ${realUserEmail}`);
-    console.log(`  Effective user: ${effectiveUserEmail}`);
-    console.log(`  Impersonating: ${isImpersonating ? 'Yes' : 'No'}`);
+    // Resolve effective email: query param takes priority, then existing header mechanism.
+    // Query param impersonation requires system_admin role in DB (no env var dependency).
+    // Header impersonation uses the existing canImpersonate() env var check.
+    let loginEmail = realUserEmail;
+    let isImpersonating = false;
 
-    // Security check: only allow impersonation for super admin
-    if (isImpersonating && !canImpersonate(realUserEmail)) {
-      console.log(`❌ [${debugInfo.requestId}] Unauthorized impersonation attempt by: ${realUserEmail}`);
-      return res.status(403).json({ error: "Unauthorized impersonation attempt" });
+    const impersonateParam = req.query.impersonate?.toLowerCase().trim();
+    if (impersonateParam && impersonateParam !== realUserEmail) {
+      const adminCheck = await createAdminClient()
+        .from('user_roles')
+        .select('role')
+        .eq('email', realUserEmail)
+        .eq('role', 'system_admin')
+        .maybeSingle();
+      if (adminCheck.data) {
+        loginEmail = impersonateParam;
+        isImpersonating = true;
+        console.log(`🎭 [${debugInfo.requestId}] Query param impersonation: ${realUserEmail} → ${loginEmail}`);
+      } else {
+        console.log(`⚠️ [${debugInfo.requestId}] Impersonation denied (not system_admin): ${realUserEmail}`);
+      }
+    } else {
+      // Fall back to header-based impersonation (existing mechanism)
+      const headerEmail = getEffectiveUserEmail(req, session);
+      if (headerEmail !== realUserEmail) {
+        if (canImpersonate(realUserEmail)) {
+          loginEmail = headerEmail;
+          isImpersonating = true;
+          console.log(`🎭 [${debugInfo.requestId}] Header impersonation: ${realUserEmail} → ${loginEmail}`);
+        } else {
+          console.log(`⚠️ [${debugInfo.requestId}] Header impersonation denied (canImpersonate=false): ${realUserEmail}`);
+        }
+      }
     }
 
-    const loginEmail = effectiveUserEmail;
+    console.log(`👤 [${debugInfo.requestId}] Processing request: real=${realUserEmail} effective=${loginEmail} impersonating=${isImpersonating}`);
 
     // ── Supabase path (SOURCE_MENTOR_STATS=supabase) ──────────────────────────
     if (process.env.SOURCE_MENTOR_STATS === 'supabase') {
@@ -397,7 +427,7 @@ export default async function handler(req, res) {
             fromCache: true,
             originalTimestamp: cachedData.debug?.timestamp,
             cacheAge: Date.now() - new Date(cachedData.debug?.timestamp || 0).getTime(),
-            impersonation: { isImpersonating, realUser: realUserEmail, effectiveUser: effectiveUserEmail },
+            impersonation: { isImpersonating, realUser: realUserEmail, effectiveUser: loginEmail },
           },
         });
       }
@@ -409,7 +439,7 @@ export default async function handler(req, res) {
         return res.status(404).json({
           error: 'Mentor not found',
           mentorEmail: loginEmail,
-          debug: { ...debugInfo, impersonation: { isImpersonating, realUser: realUserEmail, effectiveUser: effectiveUserEmail } },
+          debug: { ...debugInfo, impersonation: { isImpersonating, realUser: realUserEmail, effectiveUser: loginEmail } },
         });
       }
 
@@ -426,7 +456,7 @@ export default async function handler(req, res) {
           sessionsByBatch: {},
           miaByBatch: {},
           miaMentees: [],
-          debug: { ...debugInfo, impersonation: { isImpersonating, realUser: realUserEmail, effectiveUser: effectiveUserEmail } },
+          debug: { ...debugInfo, impersonation: { isImpersonating, realUser: realUserEmail, effectiveUser: loginEmail } },
         });
       }
 
@@ -438,7 +468,7 @@ export default async function handler(req, res) {
           fromCache:    false,
           totalTimeMs:  Date.now() - new Date(debugInfo.timestamp).getTime(),
           dbFetchTimeMs: __dbFetchTimeMs,
-          impersonation: { isImpersonating, realUser: realUserEmail, effectiveUser: effectiveUserEmail },
+          impersonation: { isImpersonating, realUser: realUserEmail, effectiveUser: loginEmail },
         },
       };
 
@@ -465,7 +495,7 @@ export default async function handler(req, res) {
           impersonation: {
             isImpersonating,
             realUser: realUserEmail,
-            effectiveUser: effectiveUserEmail
+            effectiveUser: loginEmail
           }
         }
       });
@@ -1003,7 +1033,7 @@ export default async function handler(req, res) {
         impersonation: {
           isImpersonating,
           realUser: realUserEmail,
-          effectiveUser: effectiveUserEmail
+          effectiveUser: loginEmail
         }
       }
     };
