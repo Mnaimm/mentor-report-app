@@ -207,7 +207,7 @@ export default function LaporanSesiPage() {
     kemaskiniInisiatif: [],
     teknologi: [{ sistem: '', tujuan: '' }],
     jualanTahunSebelum: { tahun: new Date().getFullYear() - 1, setahun: '', bulananMin: '', bulananMaks: '' },
-    jualanTerkini: Array(12).fill(''),
+    data_kewangan_bulanan: [],
     pemerhatian: '',
     rumusan: '',
     rumusanSesi2Plus: '',
@@ -406,7 +406,9 @@ export default function LaporanSesiPage() {
         kemaskiniInisiatif: revisionData.kemaskini_inisiatif || [],
         teknologi: revisionData.teknologi || [{ sistem: '', tujuan: '' }],
         jualanTahunSebelum: revisionData.jualan_tahun_sebelum || { tahun: new Date().getFullYear() - 1, setahun: '', bulananMin: '', bulananMaks: '' },
-        jualanTerkini: revisionData.jualan_terkini || Array(12).fill(''),
+        data_kewangan_bulanan: Array.isArray(revisionData.data_kewangan_bulanan) && revisionData.data_kewangan_bulanan.length > 0
+          ? revisionData.data_kewangan_bulanan
+          : convertOldSalesToKewangan(revisionData.jualan_terkini),
         pemerhatian: revisionData.pemerhatian || '',
         rumusan: revisionData.rumusan || '',
         rumusanSesi2Plus: revisionData.rumusan || '',
@@ -503,6 +505,57 @@ export default function LaporanSesiPage() {
     );
   };
 
+  // --- Helpers: Bangkit sales (data_kewangan_bulanan) ---
+  const MALAY_MONTHS = ['Januari', 'Februari', 'Mac', 'April', 'Mei', 'Jun', 'Julai', 'Ogos', 'September', 'Oktober', 'November', 'Disember'];
+
+  const getNextBulan = (rows) => {
+    if (!rows.length) {
+      const now = new Date();
+      return `${MALAY_MONTHS[now.getMonth()]} ${now.getFullYear()}`;
+    }
+    const last = rows[rows.length - 1].bulan || '';
+    const parts = last.split(' ');
+    if (parts.length < 2) return '';
+    const monthName = parts[0];
+    const year = parseInt(parts[parts.length - 1], 10);
+    const monthIdx = MALAY_MONTHS.indexOf(monthName);
+    if (monthIdx === -1 || isNaN(year)) return '';
+    const nextIdx = (monthIdx + 1) % 12;
+    const nextYear = monthIdx === 11 ? year + 1 : year;
+    return `${MALAY_MONTHS[nextIdx]} ${nextYear}`;
+  };
+
+  const convertOldSalesToKewangan = (arr) => {
+    if (!Array.isArray(arr)) return [];
+    const year = new Date().getFullYear();
+    return arr
+      .map((v, i) => ({ bulan: `${MALAY_MONTHS[i]} ${year}`, jumlah: parseFloat(v) || 0 }))
+      .filter(e => e.jumlah > 0);
+  };
+
+  const addKewanganRow = () => {
+    setFormState(p => ({
+      ...p,
+      data_kewangan_bulanan: [...p.data_kewangan_bulanan, { bulan: getNextBulan(p.data_kewangan_bulanan), jumlah: '' }],
+    }));
+  };
+
+  const removeKewanganRow = (i) => {
+    setFormState(p => ({
+      ...p,
+      data_kewangan_bulanan: p.data_kewangan_bulanan.filter((_, idx) => idx !== i),
+    }));
+  };
+
+  const handleKewanganChange = (i, field, value) => {
+    setFormState(p => {
+      const rows = [...p.data_kewangan_bulanan];
+      rows[i] = { ...rows[i], [field]: value };
+      return { ...p, data_kewangan_bulanan: rows };
+    });
+  };
+  // --- End sales helpers ---
+
   // --- Helper: normalize previous inisiatif from backend to text labels
   const normalizePrevInisiatif = (raw, framework) => {
     const focusAreas = [...new Set(framework.map(f => f.Focus_Area))];
@@ -538,7 +591,7 @@ export default function LaporanSesiPage() {
     setSelectedMentee(menteeData);
     try {
       const [res, umPrefillRes, pemerhatianRes] = await Promise.all([
-        fetch(`/api/menteeData?name=${encodeURIComponent(menteeName)}&programType=bangkit`),
+        fetch(`/api/menteeData?name=${encodeURIComponent(menteeName)}&programType=bangkit${menteeData?.entrepreneur_id ? `&entrepreneur_id=${encodeURIComponent(menteeData.entrepreneur_id)}` : ''}`),
         menteeData?.entrepreneur_id
           ? fetch(`/api/mentee-um-prefill?entrepreneur_id=${encodeURIComponent(menteeData.entrepreneur_id)}`)
           : Promise.resolve(null),
@@ -565,7 +618,7 @@ export default function LaporanSesiPage() {
       });
       setFormState(p => ({
         ...p,
-        jualanTerkini: data.previousSales || Array(12).fill(''),
+        data_kewangan_bulanan: data.previousKewangan || [],
         kemaskiniInisiatif: Array(prevInisiatif.length).fill(''),
         pemerhatian: pemerhatianPrefill?.pemerhatian || '',
         tambahan: {
@@ -613,9 +666,9 @@ export default function LaporanSesiPage() {
               ...prev,
               ...parsed,
               // keep server's previousSales if draft has nothing/empty
-              jualanTerkini: (Array.isArray(parsed.jualanTerkini) && parsed.jualanTerkini.some(v => v))
-                ? parsed.jualanTerkini
-                : (data.previousSales || prev.jualanTerkini),
+              data_kewangan_bulanan: (Array.isArray(parsed.data_kewangan_bulanan) && parsed.data_kewangan_bulanan.length > 0)
+                ? parsed.data_kewangan_bulanan
+                : (data.previousKewangan || prev.data_kewangan_bulanan || []),
             }));
 
             // Re-apply preserved fields to selectedMentee after draft restoration
@@ -1423,11 +1476,48 @@ export default function LaporanSesiPage() {
           </div>
           <div className={`p-4 border rounded-lg mt-4 ${getFieldHighlightClass('Tiada data kewangan')}`}>
             <h3 className="font-semibold text-md mb-2">Jualan Bulanan Terkini</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {['Januari', 'Februari', 'Mac', 'April', 'Mei', 'Jun', 'Julai', 'Ogos', 'September', 'Oktober', 'November', 'Disember'].map((month, i) => (
-                <InputField key={month} label={month} type="number" value={formState.jualanTerkini?.[i] || ''} onChange={(e) => { const newSales = [...formState.jualanTerkini]; newSales[i] = e.target.value; setFormState((p) => ({ ...p, jualanTerkini: newSales })); }} />
+            <p className="text-xs text-gray-500 mb-3">Masukkan jumlah jualan setiap bulan. Klik &quot;+ Tambah Bulan&quot; untuk menambah entri.</p>
+            <div className="space-y-2">
+              {formState.data_kewangan_bulanan.map((row, i) => (
+                <div key={i} className="flex gap-3 items-end">
+                  <div className="flex-1">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Bulan</label>
+                    <input
+                      type="text"
+                      value={row.bulan}
+                      onChange={e => handleKewanganChange(i, 'bulan', e.target.value)}
+                      placeholder="cth: Januari 2026"
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Jumlah Jualan (RM)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={row.jumlah}
+                      onChange={e => handleKewanganChange(i, 'jumlah', e.target.value)}
+                      placeholder="0"
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeKewanganRow(i)}
+                    className="px-2 py-1.5 bg-red-50 text-red-500 border border-red-200 rounded text-xs hover:bg-red-100"
+                  >
+                    Padam
+                  </button>
+                </div>
               ))}
             </div>
+            <button
+              type="button"
+              onClick={addKewanganRow}
+              className="mt-3 px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-200 rounded text-sm hover:bg-blue-100"
+            >
+              + Tambah Bulan
+            </button>
           </div>
         </Section>
 
@@ -2069,11 +2159,48 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
         )}
 
         <Section title="Jualan Bulanan Terkini">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {['Januari', 'Februari', 'Mac', 'April', 'Mei', 'Jun', 'Julai', 'Ogos', 'September', 'Oktober', 'November', 'Disember'].map((month, i) => (
-              <InputField key={month} label={month} type="number" value={formState.jualanTerkini?.[i] || ''} onChange={(e) => { const newSales = [...formState.jualanTerkini]; newSales[i] = e.target.value; setFormState((p) => ({ ...p, jualanTerkini: newSales })); }} />
+          <p className="text-xs text-gray-500 mb-3">Masukkan jumlah jualan setiap bulan. Klik &quot;+ Tambah Bulan&quot; untuk menambah entri.</p>
+          <div className="space-y-2">
+            {formState.data_kewangan_bulanan.map((row, i) => (
+              <div key={i} className="flex gap-3 items-end">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Bulan</label>
+                  <input
+                    type="text"
+                    value={row.bulan}
+                    onChange={e => handleKewanganChange(i, 'bulan', e.target.value)}
+                    placeholder="cth: Januari 2026"
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Jumlah Jualan (RM)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={row.jumlah}
+                    onChange={e => handleKewanganChange(i, 'jumlah', e.target.value)}
+                    placeholder="0"
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeKewanganRow(i)}
+                  className="px-2 py-1.5 bg-red-50 text-red-500 border border-red-200 rounded text-xs hover:bg-red-100"
+                >
+                  Padam
+                </button>
+              </div>
             ))}
           </div>
+          <button
+            type="button"
+            onClick={addKewanganRow}
+            className="mt-3 px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-200 rounded text-sm hover:bg-blue-100"
+          >
+            + Tambah Bulan
+          </button>
         </Section>
 
         <Section title="Keputusan Mentee - Inisiatif yang mahu diambil Sesi Ini">

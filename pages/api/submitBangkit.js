@@ -18,8 +18,20 @@ function getRowNumberFromUpdatedRange(updatedRange) {
  * Columns BA-BB (52-53): Apps Script fills these
  * Columns BC-CB (54-81): Upward Mobility data (28 columns)
  */
+// Maps data_kewangan_bulanan JSON entries back to the 12 fixed month columns (backward compat)
+const BANGKIT_MONTHS = ['Januari','Februari','Mac','April','Mei','Jun','Julai','Ogos','September','Oktober','November','Disember'];
+function deriveLegacyJualanFromKewangan(kewangan) {
+  const result = Array(12).fill('0');
+  (kewangan || []).forEach(entry => {
+    const monthWord = (entry.bulan || '').split(' ')[0];
+    const idx = BANGKIT_MONTHS.findIndex(m => m.toLowerCase() === monthWord.toLowerCase());
+    if (idx >= 0) result[idx] = String(entry.jumlah ?? '0');
+  });
+  return result;
+}
+
 const mapBangkitDataToSheetRow = (data, miaRequestId = null) => {
-  const row = Array(92).fill(''); // Columns 0-91 (92 total) - extended for MIA enhancements + kemaskini maklumat + entrepreneur_id
+  const row = Array(93).fill(''); // Columns 0-92 (93 total) — index 92 = DATA_KEWANGAN_JSON
 
   // A–J (0-9): Basic session info
   row[0] = new Date().toISOString();                     // A  Timestamp
@@ -53,10 +65,12 @@ const mapBangkitDataToSheetRow = (data, miaRequestId = null) => {
     }
   }
 
-  // Y–AJ (24-35): Jualan 12 bulan
-  (data?.jualanTerkini || []).forEach((v, i) => {
-    if (i < 12) row[24 + i] = v ?? '0';
-  });
+  // Y–AJ (24-35): Jualan 12 bulan — derived from new JSON format for backward compat
+  const legacyJualan = deriveLegacyJualanFromKewangan(data?.data_kewangan_bulanan);
+  legacyJualan.forEach((v, i) => { row[24 + i] = v; });
+
+  // CO (92): DATA_KEWANGAN_JSON — new single-column JSON storage
+  row[92] = JSON.stringify(data?.data_kewangan_bulanan || []);
 
   // AK (36): Link Gambar
   row[36] = JSON.stringify(data?.imageUrls?.sesi || []);
@@ -447,8 +461,9 @@ export default async function handler(req, res) {
       inisiatif: reportData?.inisiatif || [],
       kemaskini_inisiatif: reportData?.kemaskiniInisiatif?.join('\n\n') || null,
 
-      // Sales data (JSONB - can be null or array)
-      jualan_terkini: reportData?.jualanTerkini || null,
+      // Sales data — new dynamic JSON format (jualan_terkini kept null to preserve old data)
+      data_kewangan_bulanan: reportData?.data_kewangan_bulanan || [],
+      jualan_terkini: null,
 
       // Observations & Summary
       pemerhatian: reportData?.pemerhatian || null,

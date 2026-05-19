@@ -67,7 +67,6 @@ const TextArea = ({ label, value, onChange, placeholder, rows = 4, required = fa
   </div>
 );
 
-const MONTHS = ['Jan', 'Feb', 'Mac', 'Apr', 'Mei', 'Jun', 'Jul', 'Ogos', 'Sep', 'Okt', 'Nov', 'Dis'];
 
 // ── Main Component ─────────────────────────────────────────────────────────
 export default function LaporanKhasPage() {
@@ -94,8 +93,7 @@ export default function LaporanKhasPage() {
     pemerhatian: '',
     rumusan: '',
     status_perniagaan: '',
-    jualan_terkini: Array(12).fill(''),
-    data_kewangan_bulanan: [{ bulan: '', jumlah: '', catatan: '' }],
+    data_kewangan_bulanan: [{ bulan: '', jumlah: '' }],
     upwardMobility: { ...INITIAL_UPWARD_MOBILITY_STATE },
   };
 
@@ -227,7 +225,7 @@ export default function LaporanKhasPage() {
   const addKewanganRow = () => {
     setForm(prev => ({
       ...prev,
-      data_kewangan_bulanan: [...prev.data_kewangan_bulanan, { bulan: '', jumlah: '', catatan: '' }],
+      data_kewangan_bulanan: [...prev.data_kewangan_bulanan, { bulan: '', jumlah: '' }],
     }));
   };
 
@@ -310,8 +308,8 @@ export default function LaporanKhasPage() {
       latarbelakang: isMaju ? form.pemerhatian : null,
       rumusan: form.rumusan,
       status_perniagaan: form.status_perniagaan || null,
-      jualan_terkini: isMaju ? null : form.jualan_terkini,
-      data_kewangan_bulanan: isMaju ? form.data_kewangan_bulanan : null,
+      jualan_terkini: null,
+      data_kewangan_bulanan: form.data_kewangan_bulanan,
       UPWARD_MOBILITY_JSON: umJSON,
     };
 
@@ -547,86 +545,54 @@ export default function LaporanKhasPage() {
               </Section>
 
               {/* Data Kewangan */}
-              {!isMaju ? (
-                <Section title="Data Jualan Bulanan" borderColor="border-indigo-500">
-                  <p className="text-xs text-gray-500">
-                    Masukkan jumlah jualan setiap bulan (RM). Tinggalkan kosong jika tiada data.
-                  </p>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                    {MONTHS.map((month, i) => (
-                      <div key={month}>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">{month}</label>
+              <Section title="Data Jualan Bulanan" borderColor="border-indigo-500">
+                <p className="text-xs text-gray-500 mb-3">
+                  Masukkan jumlah jualan setiap bulan. Klik &quot;+ Tambah Entri&quot; untuk menambah.
+                </p>
+                <div className="space-y-2">
+                  {form.data_kewangan_bulanan.map((row, i) => (
+                    <div key={i} className="flex gap-3 items-end bg-gray-50 p-2 rounded-lg">
+                      <div className="flex-1">
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Bulan</label>
+                        <input
+                          type="text"
+                          value={row.bulan}
+                          onChange={e => handleKewanganChange(i, 'bulan', e.target.value)}
+                          placeholder="cth: Mei 2026"
+                          className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Jumlah Jualan (RM)</label>
                         <input
                           type="number"
                           min="0"
-                          step="0.01"
-                          value={form.jualan_terkini[i]}
-                          onChange={e => {
-                            const updated = [...form.jualan_terkini];
-                            updated[i] = e.target.value;
-                            setForm(p => ({ ...p, jualan_terkini: updated }));
-                          }}
+                          value={row.jumlah}
+                          onChange={e => handleKewanganChange(i, 'jumlah', e.target.value)}
                           placeholder="0"
                           className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
                         />
                       </div>
-                    ))}
-                  </div>
-                </Section>
-              ) : (
-                <Section title="Data Kewangan Bulanan" borderColor="border-indigo-500">
-                  <p className="text-xs text-gray-500">
-                    Tambah entri kewangan bulanan mengikut keperluan.
-                  </p>
-                  <div className="space-y-3">
-                    {form.data_kewangan_bulanan.map((row, i) => (
-                      <div key={i} className="grid grid-cols-3 gap-3 items-end bg-gray-50 p-3 rounded-lg">
-                        <InputField
-                          label="Bulan"
-                          value={row.bulan}
-                          onChange={e => handleKewanganChange(i, 'bulan', e.target.value)}
-                          placeholder="Cth: Jan 2025"
-                        />
-                        <InputField
-                          label="Jumlah (RM)"
-                          type="number"
-                          value={row.jumlah}
-                          onChange={e => handleKewanganChange(i, 'jumlah', e.target.value)}
-                          placeholder="0.00"
-                        />
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Catatan</label>
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              value={row.catatan}
-                              onChange={e => handleKewanganChange(i, 'catatan', e.target.value)}
-                              placeholder="Opsional"
-                              className="flex-1 p-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
-                            />
-                            {form.data_kewangan_bulanan.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() => removeKewanganRow(i)}
-                                className="px-2 py-2 text-red-500 hover:text-red-700 text-sm"
-                              >
-                                ✕
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={addKewanganRow}
-                    className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-                  >
-                    + Tambah Entri
-                  </button>
-                </Section>
-              )}
+                      {form.data_kewangan_bulanan.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeKewanganRow(i)}
+                          className="px-2 py-2 text-red-500 hover:text-red-700 text-sm"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={addKewanganRow}
+                  className="mt-3 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  + Tambah Entri
+                </button>
+              </Section>
 
               {/* Upward Mobility — Section 3: Status */}
               <div className="bg-white p-6 rounded-lg shadow-sm border-l-4 border-orange-500">

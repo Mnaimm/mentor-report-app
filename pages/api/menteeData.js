@@ -1,9 +1,12 @@
 // pages/api/menteeData.js
 import { google } from 'googleapis';
+import { createAdminClient } from '../../lib/supabaseAdmin';
+
+const MALAY_MONTHS_FULL = ['Januari', 'Februari', 'Mac', 'April', 'Mei', 'Jun', 'Julai', 'Ogos', 'September', 'Oktober', 'November', 'Disember'];
 
 export default async function handler(req, res) {
   try {
-    const { name, programType } = req.query; // Destructure programType from query
+    const { name, programType, entrepreneur_id } = req.query; // Destructure programType from query
     if (!name) return res.status(400).json({ error: 'Mentee name is required' });
     if (!programType) return res.status(400).json({ error: 'Program type is required' }); // New check
 
@@ -111,9 +114,9 @@ export default async function handler(req, res) {
         previousSales: Array(12).fill(''),
         previousInisiatif: [],
         previousPremisDilawat: false,
-        // Add other Maju-specific defaults if needed
         previousDataKewangan: [],
         previousMentoringFindings: [],
+        previousKewangan: [],
       });
     }
 
@@ -234,6 +237,40 @@ export default async function handler(req, res) {
       }
     }
 
+    // ── Supabase: fetch previousKewangan for Bangkit (new JSON format) ──
+    let previousKewangan = [];
+    if (programType === 'bangkit') {
+      try {
+        const supabase = createAdminClient();
+        const query = supabase
+          .from('reports')
+          .select('data_kewangan_bulanan, jualan_terkini')
+          .eq('program', 'Bangkit')
+          .order('session_number', { ascending: false })
+          .limit(1);
+
+        if (entrepreneur_id) {
+          query.eq('entrepreneur_id', entrepreneur_id);
+        } else {
+          query.ilike('nama_mentee', name.trim());
+        }
+
+        const { data: latestReport } = await query.maybeSingle();
+        if (latestReport) {
+          if (Array.isArray(latestReport.data_kewangan_bulanan) && latestReport.data_kewangan_bulanan.length > 0) {
+            previousKewangan = latestReport.data_kewangan_bulanan;
+          } else if (Array.isArray(latestReport.jualan_terkini)) {
+            const year = new Date().getFullYear();
+            previousKewangan = latestReport.jualan_terkini
+              .map((v, i) => ({ bulan: `${MALAY_MONTHS_FULL[i]} ${year}`, jumlah: parseFloat(v) || 0 }))
+              .filter(e => e.jumlah > 0);
+          }
+        }
+      } catch (supErr) {
+        console.warn('[menteeData] Supabase previousKewangan fetch failed (non-blocking):', supErr.message);
+      }
+    }
+
     return res.status(200).json({
       lastSession,
       status,
@@ -242,6 +279,7 @@ export default async function handler(req, res) {
       previousPremisDilawat,
       previousDataKewangan, // For Maju
       previousMentoringFindings, // For Maju
+      previousKewangan, // For Bangkit new format
     });
   } catch (error) {
     console.error('❌ /api/menteeData error:', error);

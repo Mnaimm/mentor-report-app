@@ -76,9 +76,9 @@ export default async function handler(req, res) {
       rumusan_langkah_kehadapan: isMaju ? (data.rumusan || null) : null,
       status_perniagaan: data.status_perniagaan || null,
 
-      // Financial data
-      jualan_terkini: isMaju ? null : (data.jualan_terkini || null),
-      data_kewangan_bulanan: isMaju ? (data.data_kewangan_bulanan || []) : null,
+      // Financial data — both programs now use data_kewangan_bulanan
+      jualan_terkini: null,
+      data_kewangan_bulanan: data.data_kewangan_bulanan || [],
 
       // No images for khas form
       image_urls: { sesi: [], premis: [], growthwheel: '', profil: '' },
