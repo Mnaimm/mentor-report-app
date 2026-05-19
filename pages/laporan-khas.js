@@ -82,6 +82,9 @@ export default function LaporanKhasPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [isAdminMode, setIsAdminMode] = useState(false);
+  const [mentorKhasList, setMentorKhasList] = useState([]);
+  const [selectedMentorKhas, setSelectedMentorKhas] = useState('');
 
   const initialForm = {
     session_date: new Date().toISOString().split('T')[0],
@@ -98,21 +101,20 @@ export default function LaporanKhasPage() {
 
   const [form, setForm] = useState(initialForm);
 
-  // ── Guard: redirect coordinator to full form ──
+  // ── Detect admin/coordinator mode (no redirect — show monitoring banner) ──
   useEffect(() => {
     if (status !== 'authenticated') return;
     fetch('/api/khas/check-mentor')
       .then(r => r.json())
       .then(d => {
-        if (d.isCoordinator) {
-          // Coordinators always use full form — redirect to dashboard
-          router.replace('/');
+        if (d.isCoordinator || d.isAdmin) {
+          setIsAdminMode(true);
         }
       })
       .catch(() => {});
   }, [status]);
 
-  // ── Load mentor's mentees from Supabase assignments ──
+  // ── Load mentor's mentees (non-admin path only) ──
   useEffect(() => {
     if (status !== 'authenticated') return;
     fetch('/api/khas/my-mentees')
@@ -123,6 +125,35 @@ export default function LaporanKhasPage() {
       .catch(() => setMentees([]))
       .finally(() => setIsLoading(false));
   }, [status]);
+
+  // ── Load all khas mentors when in admin mode ──
+  useEffect(() => {
+    if (!isAdminMode) return;
+    fetch('/api/khas/mentors-list')
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setMentorKhasList(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, [isAdminMode]);
+
+  const handleMentorKhasChange = async (e) => {
+    const mentorId = e.target.value;
+    setSelectedMentorKhas(mentorId);
+    setSelectedMentee(null);
+    setMentees([]);
+    setForm(initialForm);
+    setNextSession(1);
+    setError('');
+
+    if (!mentorId) return;
+
+    try {
+      const res = await fetch(`/api/khas/mentee-list?mentor_id=${encodeURIComponent(mentorId)}`);
+      const data = await res.json();
+      setMentees(Array.isArray(data) ? data : []);
+    } catch {
+      setMentees([]);
+    }
+  };
 
   const handleMenteeChange = async (e) => {
     const entrepreneur_id = e.target.value;
@@ -357,6 +388,16 @@ export default function LaporanKhasPage() {
           </div>
         </div>
 
+        {/* Admin/Coordinator monitoring banner */}
+        {isAdminMode && (
+          <div className="bg-blue-50 border border-blue-300 text-blue-800 rounded-lg p-4 mb-4 flex items-start gap-3">
+            <span className="text-xl">🔍</span>
+            <p className="text-sm font-medium">
+              Anda melayari borang ini sebagai <strong>Admin/Koordinator</strong>. Borang ini hanya untuk kegunaan mentor Kes Khas.
+            </p>
+          </div>
+        )}
+
         {/* Alerts */}
         {error && (
           <div className="bg-red-50 border border-red-300 text-red-800 rounded-lg p-4 mb-4 whitespace-pre-line">
@@ -372,10 +413,36 @@ export default function LaporanKhasPage() {
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Mentee Selector */}
           <Section title="Pilih Usahawan">
-            {mentees.length === 0 ? (
+            {/* Admin: mentor khas filter */}
+            {isAdminMode && (
+              <div>
+                <SelectField
+                  label="Mentor Kes Khas"
+                  onChange={handleMentorKhasChange}
+                  value={selectedMentorKhas}
+                >
+                  <option value="">-- Pilih Mentor --</option>
+                  {mentorKhasList.map(m => (
+                    <option key={m.id} value={m.id}>{m.name} ({m.email})</option>
+                  ))}
+                </SelectField>
+                {mentorKhasList.length === 0 && (
+                  <p className="text-xs text-gray-400 mt-1">Tiada mentor kes khas aktif ditemui.</p>
+                )}
+              </div>
+            )}
+
+            {/* Mentee dropdown — disabled for admin until mentor selected */}
+            {!isAdminMode && mentees.length === 0 ? (
               <p className="text-gray-500 text-sm">Tiada usahawan aktif ditemui untuk akaun anda.</p>
             ) : (
-              <SelectField label="Usahawan" required onChange={handleMenteeChange} value={selectedMentee?.entrepreneur_id || ''}>
+              <SelectField
+                label="Usahawan"
+                required
+                onChange={handleMenteeChange}
+                value={selectedMentee?.entrepreneur_id || ''}
+                disabled={isAdminMode && !selectedMentorKhas}
+              >
                 <option value="">-- Pilih Usahawan --</option>
                 {mentees.map(m => (
                   <option key={m.entrepreneur_id} value={m.entrepreneur_id}>

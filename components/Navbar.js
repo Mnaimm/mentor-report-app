@@ -2,15 +2,26 @@
 import Link from 'next/link';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { useRouter } from 'next/router';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function Navbar() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const isAuthenticated = status === 'authenticated';
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [khasInfo, setKhasInfo] = useState({ isKhas: false, isCoordinator: false, isAdmin: false });
   const isAdmin = isAuthenticated && session?.user?.email &&
     process.env.NEXT_PUBLIC_ADMIN_EMAILS?.split(',').includes(session.user.email);
+
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    fetch('/api/khas/check-mentor')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setKhasInfo({ isKhas: d.isKhas || false, isCoordinator: d.isCoordinator || false, isAdmin: d.isAdmin || false }); })
+      .catch(() => {});
+  }, [status]);
+
+  const showLaporanKhas = isAdmin || khasInfo.isKhas || khasInfo.isCoordinator || khasInfo.isAdmin;
 
   // Helper to check if a path is the current page
   const isCurrentPage = (path) => router.asPath.split('?')[0] === path;
@@ -94,6 +105,15 @@ export default function Navbar() {
                     >
                       Laporan MAJU/UM
                     </Link>
+                    {showLaporanKhas && (
+                      <Link
+                        href="/laporan-khas"
+                        className={`block px-4 py-2 text-sm ${isCurrentPage('/laporan-khas') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:bg-blue-50'}`}
+                        onClick={(e) => isCurrentPage('/laporan-khas') && e.preventDefault()}
+                      >
+                        Laporan Kes Khas
+                      </Link>
+                    )}
                   </div>
                 </div>
 
@@ -296,6 +316,21 @@ export default function Navbar() {
                     >
                       Laporan MAJU/UM
                     </Link>
+                    {showLaporanKhas && (
+                      <Link
+                        href="/laporan-khas"
+                        className={`block px-3 py-2 rounded-md text-sm transition-colors ${isCurrentPage('/laporan-khas') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
+                        onClick={(e) => {
+                          if (isCurrentPage('/laporan-khas')) {
+                            e.preventDefault();
+                          } else {
+                            setMobileMenuOpen(false);
+                          }
+                        }}
+                      >
+                        Laporan Kes Khas
+                      </Link>
+                    )}
                   </div>
                 </div>
 

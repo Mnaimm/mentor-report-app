@@ -8,30 +8,21 @@ export default async function handler(req, res) {
   const session = await getServerSession(req, res, authOptions);
   if (!session) return res.status(401).json({ error: 'Unauthorized' });
 
-  const { entrepreneur_id, program } = req.query;
-  if (!entrepreneur_id || !program) {
-    return res.status(400).json({ error: 'entrepreneur_id and program are required' });
-  }
-
   const supabase = createAdminClient();
 
   try {
     const { data, error } = await supabase
-      .from('reports')
-      .select('session_number')
-      .eq('entrepreneur_id', entrepreneur_id)
-      .order('session_number', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .from('mentors')
+      .select('id, name, email')
+      .eq('is_khas', true)
+      .eq('status', 'active')
+      .order('name', { ascending: true });
 
     if (error) throw error;
 
-    const lastSession = data?.session_number || 0;
-    const nextSession = Math.min(lastSession + 1, 4);
-
-    return res.status(200).json({ lastSession, nextSession });
+    return res.status(200).json(data || []);
   } catch (err) {
-    console.error('[khas/mentee-session] ❌', err);
+    console.error('[khas/mentors-list] ❌', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }

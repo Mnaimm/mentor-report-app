@@ -23,6 +23,7 @@ export default async function handler(req, res) {
       const {
         name,
         email,
+        status,
         phone,
         ic_number,
         address,
@@ -65,19 +66,22 @@ export default async function handler(req, res) {
       }
 
       // Update mentor (region and program are NOT updated - derived from assignments)
+      const updatePayload = {
+        name,
+        email,
+        phone: phone || null,
+        ic_number: ic_number || null,
+        address: address || null,
+        state: state || null,
+        bank_account: bank_account || null,
+        emergency_contact: emergency_contact || null,
+        updated_at: new Date().toISOString(),
+      };
+      if (status) updatePayload.status = status;
+
       const { data: updatedMentor, error: updateError } = await supabaseAdmin
         .from('mentors')
-        .update({
-          name,
-          email,
-          phone: phone || null,
-          ic_number: ic_number || null,
-          address: address || null,
-          state: state || null,
-          bank_account: bank_account || null,
-          emergency_contact: emergency_contact || null,
-          updated_at: new Date().toISOString()
-        })
+        .update(updatePayload)
         .eq('id', id)
         .select()
         .single();

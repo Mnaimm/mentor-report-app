@@ -25,10 +25,12 @@ export default async function handler(req, res) {
     ]);
 
     const isCoordinator = (roles || []).some(r => r.role === 'program_coordinator');
+    const isAdmin = (roles || []).some(r => r.role === 'system_admin');
 
     return res.status(200).json({
       isKhas: mentor?.is_khas === true,
       isCoordinator,
+      isAdmin,
       mentorId: mentor?.id || null,
     });
   } catch (err) {

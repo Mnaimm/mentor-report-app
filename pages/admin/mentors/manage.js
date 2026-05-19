@@ -19,6 +19,7 @@ export default function MentorManagement({ userEmail, isReadOnlyUser, accessDeni
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    status: 'active',
     phone: '',
     ic_number: '',
     address: '',
@@ -124,6 +125,7 @@ export default function MentorManagement({ userEmail, isReadOnlyUser, accessDeni
     setFormData({
       name: mentor.name || '',
       email: mentor.email || '',
+      status: mentor.status || 'active',
       phone: mentor.phone || '',
       ic_number: mentor.ic_number || '',
       address: mentor.address || '',
@@ -138,6 +140,7 @@ export default function MentorManagement({ userEmail, isReadOnlyUser, accessDeni
     setFormData({
       name: '',
       email: '',
+      status: 'active',
       phone: '',
       ic_number: '',
       address: '',
@@ -395,6 +398,14 @@ export default function MentorManagement({ userEmail, isReadOnlyUser, accessDeni
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
                     <input type="email" name="email" value={formData.email} onChange={handleInputChange} required className="w-full px-3 py-2 border border-gray-300 rounded-md" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select name="status" value={formData.status} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md">
+                      <option value="active">Aktif</option>
+                      <option value="rehat">Rehat</option>
+                      <option value="inactive">Tamat</option>
+                    </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Telefon</label>
