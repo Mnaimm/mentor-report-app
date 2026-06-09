@@ -81,8 +81,12 @@ export default async function handler(req, res) {
       jualan_terkini: null,
       data_kewangan_bulanan: data.data_kewangan_bulanan || [],
 
-      // No images for khas form
-      image_urls: { sesi: [], premis: [], growthwheel: '', profil: '' },
+      image_urls: {
+        sesi: Array.isArray(data.url_gambar_json) ? data.url_gambar_json : [],
+        premis: [],
+        growthwheel: '',
+        profil: '',
+      },
       premis_dilawat: false,
 
       // MIA always not applicable for khas form
@@ -184,6 +188,7 @@ export default async function handler(req, res) {
           '',                                                         // AV DOC_URL (Apps Script fills)
           entrepreneur.folder_id || '',                              // AW Folder_ID
           reportId,                                                   // AX report_id
+          JSON.stringify(Array.isArray(data.url_gambar_json) ? data.url_gambar_json : []), // AY URL_GAMBAR_JSON
         ];
 
         const appendRes = await sheets.spreadsheets.values.append({

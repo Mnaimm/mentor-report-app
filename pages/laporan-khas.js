@@ -67,6 +67,33 @@ const TextArea = ({ label, value, onChange, placeholder, rows = 4, required = fa
   </div>
 );
 
+const FileInput = ({ label, multiple = false, onChange }) => {
+  const [warning, setWarning] = React.useState('');
+  const handleChange = (e) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const valid = ['image/jpeg', 'image/jpg', 'image/png'];
+      const invalid = Array.from(files).some(f => !valid.includes(f.type));
+      setWarning(invalid ? '⚠️ Fail bukan gambar dikesan. Sila muat naik gambar (JPG / PNG) sahaja.' : '');
+    }
+    if (onChange) onChange(e);
+  };
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      <input
+        type="file"
+        multiple={multiple}
+        onChange={handleChange}
+        accept="image/jpeg,image/png"
+        className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+      />
+      <p className="mt-1 text-xs text-gray-500">Format dibenarkan: JPG, PNG sahaja</p>
+      {warning && <div className="mt-2 p-2 bg-yellow-50 border border-yellow-300 rounded text-sm text-yellow-800">{warning}</div>}
+    </div>
+  );
+};
+
 
 // ── Main Component ─────────────────────────────────────────────────────────
 export default function LaporanKhasPage() {
@@ -84,6 +111,7 @@ export default function LaporanKhasPage() {
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [mentorKhasList, setMentorKhasList] = useState([]);
   const [selectedMentorKhas, setSelectedMentorKhas] = useState('');
+  const [gambarFiles, setGambarFiles] = useState([]);
 
   const initialForm = {
     session_date: new Date().toISOString().split('T')[0],
@@ -264,6 +292,35 @@ export default function LaporanKhasPage() {
     setIsSubmitting(true);
     setError('');
 
+    // Upload images first (non-blocking on submit, blocking here to get URLs)
+    let urlGambarJson = [];
+    if (gambarFiles.length > 0) {
+      const folderId = selectedMentee.Folder_ID;
+      if (!folderId) {
+        setError('Folder ID tidak ditemui untuk usahawan ini. Sila hubungi admin untuk menambah Folder ID.');
+        setIsSubmitting(false);
+        return;
+      }
+      try {
+        urlGambarJson = await Promise.all(
+          gambarFiles.map(async (file) => {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('folderId', folderId);
+            const uploadRes = await fetch('/api/upload-image', { method: 'POST', body: formData });
+            if (!uploadRes.ok) throw new Error(`Upload gagal: ${uploadRes.status}`);
+            const uploadResult = await uploadRes.json();
+            if (uploadResult.error) throw new Error(uploadResult.error);
+            return uploadResult.url;
+          })
+        );
+      } catch (uploadErr) {
+        setError(`Gagal memuat naik gambar: ${uploadErr.message}`);
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
     const umJSON = JSON.stringify({
       UM_STATUS: form.upwardMobility.UM_STATUS || '',
       UM_KRITERIA_IMPROVEMENT: form.upwardMobility.UM_KRITERIA_IMPROVEMENT || '',
@@ -311,6 +368,7 @@ export default function LaporanKhasPage() {
       jualan_terkini: null,
       data_kewangan_bulanan: form.data_kewangan_bulanan,
       UPWARD_MOBILITY_JSON: umJSON,
+      url_gambar_json: urlGambarJson,
     };
 
     try {
@@ -325,6 +383,7 @@ export default function LaporanKhasPage() {
 
       setSuccess(`✅ Laporan Sesi ${nextSession} untuk ${selectedMentee.Usahawan} berjaya dihantar!`);
       setSelectedMentee(null);
+      setGambarFiles([]);
       setForm(initialForm);
       setNextSession(1);
       window.scrollTo(0, 0);
@@ -860,6 +919,23 @@ export default function LaporanKhasPage() {
                 </div>
               )}
 
+              {/* Gambar Sesi/Premis */}
+              <Section title="Gambar Sesi/Premis (Tidak Wajib)" borderColor="border-gray-400">
+                <p className="text-xs text-gray-500">
+                  Muat naik gambar sesi atau premis perniagaan. Tidak wajib — boleh muat naik lebih daripada satu gambar.
+                </p>
+                <FileInput
+                  label="Pilih Gambar"
+                  multiple
+                  onChange={e => setGambarFiles(Array.from(e.target.files || []))}
+                />
+                {gambarFiles.length > 0 && (
+                  <p className="text-xs text-green-600 font-medium">
+                    {gambarFiles.length} gambar dipilih
+                  </p>
+                )}
+              </Section>
+
               {/* Submit */}
               <div className="mt-6 pt-4 border-t text-center">
                 <button
@@ -867,7 +943,9 @@ export default function LaporanKhasPage() {
                   disabled={isSubmitting}
                   className="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-12 rounded-lg disabled:bg-gray-400 transition-colors"
                 >
-                  {isSubmitting ? '📤 Menghantar...' : `Hantar Laporan Sesi ${nextSession}`}
+                  {isSubmitting
+                    ? (gambarFiles.length > 0 ? '📤 Memuat naik gambar...' : '📤 Menghantar...')
+                    : `Hantar Laporan Sesi ${nextSession}`}
                 </button>
               </div>
             </>
