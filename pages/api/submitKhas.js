@@ -2,6 +2,7 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from './auth/[...nextauth]';
 import { createAdminClient } from '../../lib/supabaseAdmin';
+import { google } from 'googleapis';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -32,7 +33,7 @@ export default async function handler(req, res) {
     // ── Resolve entrepreneur ──
     const { data: entrepreneur, error: entErr } = await supabase
       .from('entrepreneurs')
-      .select('id, name, business_name, phone, address, program')
+      .select('id, name, business_name, phone, address, program, batch, zone, email, folder_id')
       .eq('id', data.entrepreneur_id)
       .maybeSingle();
 
@@ -108,6 +109,118 @@ export default async function handler(req, res) {
     const reportId = inserted.id;
     console.log(`✅ [submitKhas] Supabase write successful. ID: ${reportId}`);
 
+    // ── SECONDARY WRITE: Google Sheets + GAS doc generation (non-blocking) ──
+    setImmediate(async () => {
+      try {
+        const khasSheetId = process.env.KHAS_SPREADSHEET_ID;
+        if (!khasSheetId) {
+          console.warn('⚠️ [submitKhas] KHAS_SPREADSHEET_ID not set — skipping Sheets write');
+          return;
+        }
+
+        const credentialsJson = Buffer.from(process.env.GOOGLE_CREDENTIALS_BASE64, 'base64').toString('ascii');
+        const credentials = JSON.parse(credentialsJson);
+        const auth = new google.auth.GoogleAuth({
+          credentials,
+          scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+        });
+        const sheets = google.sheets({ version: 'v4', auth });
+        const khasTab = process.env.KHAS_SHEET_TAB || 'KES KHAS';
+
+        let umData = {};
+        if (data.UPWARD_MOBILITY_JSON) {
+          try { umData = JSON.parse(data.UPWARD_MOBILITY_JSON); } catch {}
+        }
+
+        const timestamp = new Date().toLocaleString('en-MY', { timeZone: 'Asia/Kuala_Lumpur' });
+        const rowData = [
+          timestamp,                                                  // A  Timestamp
+          mentorRecord.name || '',                                    // B  Nama Mentor
+          mentorEmail,                                                // C  Email Mentor
+          normalizedProgram,                                          // D  Program
+          entrepreneur.batch || '',                                   // E  Batch
+          entrepreneur.zone || '',                                    // F  Zon
+          entrepreneur.name || '',                                    // G  Nama Usahawan
+          entrepreneur.business_name || '',                           // H  Nama Syarikat
+          entrepreneur.phone || '',                                   // I  No Telefon
+          entrepreneur.address || '',                                 // J  Alamat Perniagaan
+          sessionNum,                                                 // K  Sesi Ke
+          data.session_date || '',                                    // L  Tarikh Sesi
+          data.masa_mula || '',                                       // M  Waktu Bermula
+          data.mod_sesi || '',                                        // N  Mod Sesi
+          data.lokasi_f2f || '',                                      // O  Lokasi Sesi F2F
+          data.pemerhatian || data.latarbelakang || '',               // P  Pemerhatian / Latar Belakang
+          data.status_perniagaan || '',                               // Q  Status Perniagaan
+          data.rumusan || '',                                         // R  Rumusan Sesi
+          JSON.stringify(data.data_kewangan_bulanan || []),           // S  DATA_KEWANGAN_JSON
+          umData.UM_STATUS || '',                                     // T  UM_STATUS
+          umData.UM_KRITERIA_IMPROVEMENT || '',                       // U  UM_KRITERIA_IMPROVEMENT
+          umData.UM_AKAUN_BIMB || '',                                // V  UM_AKAUN_BIMB
+          umData.UM_BIMB_BIZ || '',                                  // W  UM_BIMB_BIZ
+          umData.UM_AL_AWFAR || '',                                  // X  UM_AL_AWFAR
+          umData.UM_MERCHANT_TERMINAL || '',                          // Y  UM_MERCHANT_TERMINAL
+          umData.UM_FASILITI_LAIN || '',                             // Z  UM_FASILITI_LAIN
+          umData.UM_MESINKIRA || '',                                 // AA UM_MESINKIRA
+          umData.UM_PENDAPATAN_SEMASA || '',                         // AB UM_PENDAPATAN_SEMASA
+          umData.UM_ULASAN_PENDAPATAN || '',                         // AC UM_ULASAN_PENDAPATAN
+          umData.UM_PEKERJA_SEMASA || '',                            // AD UM_PEKERJA_SEMASA
+          umData.UM_ULASAN_PEKERJA || '',                            // AE UM_ULASAN_PEKERJA
+          umData.UM_PEKERJA_PARTTIME_SEMASA || '',                   // AF UM_PEKERJA_PARTTIME_SEMASA
+          umData.UM_ULASAN_PEKERJA_PARTTIME || '',                   // AG UM_ULASAN_PEKERJA_PARTTIME
+          umData.UM_ASET_BUKAN_TUNAI_SEMASA || '',                  // AH UM_ASET_BUKAN_TUNAI_SEMASA
+          umData.UM_ULASAN_ASET_BUKAN_TUNAI || '',                  // AI UM_ULASAN_ASET_BUKAN_TUNAI
+          umData.UM_SIMPANAN_SEMASA || '',                           // AJ UM_SIMPANAN_SEMASA
+          umData.UM_ULASAN_SIMPANAN || '',                           // AK UM_ULASAN_SIMPANAN
+          umData.UM_ZAKAT_SEMASA || '',                              // AL UM_ZAKAT_SEMASA
+          umData.UM_ULASAN_ZAKAT || '',                              // AM UM_ULASAN_ZAKAT
+          umData.UM_DIGITAL_SEMASA || '',                            // AN UM_DIGITAL_SEMASA
+          umData.UM_ULASAN_DIGITAL || '',                            // AO UM_ULASAN_DIGITAL
+          umData.UM_MARKETING_SEMASA || '',                          // AP UM_MARKETING_SEMASA
+          umData.UM_ULASAN_MARKETING || '',                          // AQ UM_ULASAN_MARKETING
+          umData.UM_TARIKH_LAWATAN_PREMIS || '',                     // AR UM_TARIKH_LAWATAN_PREMIS
+          supabasePayload.base_payment_amount || '',                 // AS base_payment_amount
+          'pending',                                                  // AT payment_status
+          '',                                                         // AU Status (Apps Script fills)
+          '',                                                         // AV DOC_URL (Apps Script fills)
+          entrepreneur.folder_id || '',                              // AW Folder_ID
+          reportId,                                                   // AX report_id
+        ];
+
+        const appendRes = await sheets.spreadsheets.values.append({
+          spreadsheetId: khasSheetId,
+          range: `${khasTab}!A1`,
+          valueInputOption: 'USER_ENTERED',
+          insertDataOption: 'INSERT_ROWS',
+          requestBody: { values: [rowData] },
+        });
+
+        const updatedRange = appendRes.data?.updates?.updatedRange || '';
+        const newRowNumber = updatedRange.match(/!A(\d+):/)?.[1];
+        console.log(`✅ [submitKhas] Sheets write successful. Row: ${newRowNumber}`);
+
+        // Call GAS to trigger doc generation
+        const gasUrl = process.env.GAS_KHAS_URL;
+        if (newRowNumber && gasUrl) {
+          try {
+            const gasRes = await fetch(gasUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'processRow', rowNumber: parseInt(newRowNumber, 10) }),
+            });
+            const gasJson = await gasRes.json();
+            console.log(`✅ [submitKhas] GAS call successful. Result:`, gasJson?.result?.success);
+          } catch (gasErr) {
+            console.error('⚠️ [submitKhas] GAS call failed (non-blocking):', gasErr.message);
+          }
+        } else if (!gasUrl) {
+          console.warn('⚠️ [submitKhas] GAS_KHAS_URL not set — doc generation skipped');
+        }
+
+      } catch (sheetsErr) {
+        console.error('⚠️ [submitKhas] Sheets write failed (non-blocking):', sheetsErr.message);
+      }
+    });
+
     // ── SECONDARY WRITE: Upward Mobility (non-blocking) ──
     if (data.UPWARD_MOBILITY_JSON) {
       setImmediate(async () => {
@@ -118,6 +231,7 @@ export default async function handler(req, res) {
             mentor_id: mentorRecord.id,
             sesi_mentoring: `Sesi ${sessionNum}`,
             program: normalizedProgram.toUpperCase(),
+            batch: entrepreneur.batch || null,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           };
