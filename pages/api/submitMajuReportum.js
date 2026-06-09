@@ -176,8 +176,28 @@ export default async function handler(req, res) {
           throw new Error('Missing UPWARD_MOBILITY_SPREADSHEET_ID environment variable');
         }
 
+        // Fetch entrepreneur.batch for correct batch label in Sheets (reportData.BATCH is not sent by form)
+        let entrepreneurBatchForUM = '';
+        if (reportData.entrepreneur_id) {
+          const { data: _eById } = await supabaseAdmin
+            .from('entrepreneurs')
+            .select('batch')
+            .eq('id', reportData.entrepreneur_id)
+            .maybeSingle();
+          if (_eById?.batch) entrepreneurBatchForUM = _eById.batch;
+        }
+        if (!entrepreneurBatchForUM && reportData.emel) {
+          const { data: _eByEmail } = await supabaseAdmin
+            .from('entrepreneurs')
+            .select('batch')
+            .eq('email', reportData.emel.toLowerCase().trim())
+            .maybeSingle();
+          if (_eByEmail?.batch) entrepreneurBatchForUM = _eByEmail.batch;
+        }
+        console.log('📊 Entrepreneur batch for UM sheet:', entrepreneurBatchForUM);
+
         // Map data to UM sheet row (using exact Bangkit column structure)
-        const umRowData = mapUMDataToSheetRow(reportData, umData);
+        const umRowData = mapUMDataToSheetRow(reportData, umData, entrepreneurBatchForUM);
 
         // Append to UM sheet with 8s timeout
         const umAppendRes = await Promise.race([
@@ -506,7 +526,7 @@ export default async function handler(req, res) {
         if (entrepreneurIdFromPayload2) {
           const { data: byId } = await supabaseAdmin
             .from('entrepreneurs')
-            .select('id')
+            .select('id, batch')
             .eq('id', entrepreneurIdFromPayload2)
             .maybeSingle();
 
@@ -527,7 +547,7 @@ export default async function handler(req, res) {
 
           const { data: byEmail, error: entrepreneurError } = await supabaseAdmin
             .from('entrepreneurs')
-            .select('id')
+            .select('id, batch')
             .eq('email', normalizedEmail)
             .maybeSingle();
 
@@ -548,6 +568,9 @@ export default async function handler(req, res) {
         // Required foreign keys
         umSupabasePayload.entrepreneur_id = entrepreneurForUM.id;
         umSupabasePayload.mentor_id = mentorData.id;
+
+        // Batch from entrepreneur record (not from form payload — form doesn't send BATCH)
+        if (entrepreneurForUM.batch) umSupabasePayload.batch = entrepreneurForUM.batch;
 
         // Program & Session
         if (reportData.SESI_NUMBER) umSupabasePayload.sesi_mentoring = `Sesi ${reportData.SESI_NUMBER}`;
@@ -884,14 +907,14 @@ function mapMajuDataToSheetRow(data) {
  * Columns L-AR (11-43): Legacy fields (leave empty - 33 columns)
  * Columns AS-BT (44-71): UM-specific fields (28 columns)
  */
-function mapUMDataToSheetRow(reportData, umData) {
+function mapUMDataToSheetRow(reportData, umData, entrepreneurBatch = '') {
   const row = Array(72).fill(''); // Columns 0-71 (A-BT: 72 total)
 
   // ✅ Columns A-K (0-10): Basic session info
   row[0] = new Date().toISOString();                     // A  Timestamp
   row[1] = reportData.EMAIL_MENTOR || '';                // B  Email Address
   row[2] = 'MAJU';                                       // C  Program
-  row[3] = reportData.BATCH || '';                       // D  Batch (if applicable)
+  row[3] = entrepreneurBatch || '';                      // D  Batch (from entrepreneur record)
   row[4] = `Sesi ${reportData.SESI_NUMBER ?? ''}`;       // E  Sesi Mentoring
   row[5] = reportData.NAMA_MENTOR || '';                 // F  Nama Mentor
   row[6] = reportData.NAMA_MENTEE || '';                 // G  Nama Penuh Usahawan
