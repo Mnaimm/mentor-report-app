@@ -4,7 +4,7 @@ import { canAccessAdmin } from '../../../lib/auth';
 import { createAdminClient } from '../../../lib/supabaseAdmin';
 import { Resend } from 'resend';
 
-const TEST_EMAIL = 'naemmukhtar@gmail.com';
+const TEST_EMAIL = 'mentor@startlah.my'; // Resend free tier only delivers to the registered account email
 
 const MALAY_MONTHS = [
   'Januari', 'Februari', 'Mac', 'April', 'Mei', 'Jun',
@@ -78,11 +78,12 @@ function buildReminderEmail(mentorName, rows, originalEmail = null) {
 }
 
 // ── Shared: build pending-mentor data from DB ─────────────────────────────────
-async function buildPendingData(supabase) {
+// batchNameFilter: if provided, only process that batch; otherwise process all active batches.
+async function buildPendingData(supabase, batchNameFilter = null) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // 1. Active batch_rounds
+  // 1. All batch_rounds — tagged as current (today in range) or overdue (past end_date)
   const { data: allRounds, error: roundsError } = await supabase
     .from('batch_rounds')
     .select('id, batch_id, batch_name, round_number, start_date, end_date, start_month, end_month')
@@ -90,17 +91,31 @@ async function buildPendingData(supabase) {
 
   if (roundsError) throw roundsError;
 
-  const activeRounds = (allRounds || []).filter(br => {
-    const start = new Date(br.start_date || br.start_month); start.setHours(0, 0, 0, 0);
-    const end   = new Date(br.end_date   || br.end_month);   end.setHours(23, 59, 59, 999);
-    return today >= start && today <= end;
-  });
+  const allRelevantRounds = (allRounds || [])
+    .map(br => {
+      const startD = new Date(br.start_date || br.start_month); startD.setHours(0, 0, 0, 0);
+      const endD   = new Date(br.end_date   || br.end_month);   endD.setHours(23, 59, 59, 999);
+      const isCurrent = today >= startD && today <= endD;
+      const isOverdue = today > endD;
+      return { ...br, is_overdue: isOverdue, _isCurrent: isCurrent };
+    })
+    .filter(br => br._isCurrent || br.is_overdue);
 
-  if (activeRounds.length === 0) return { empty: true, message: 'Tiada pusingan aktif hari ini.' };
+  // Apply optional batch_name filter
+  const relevantRounds = batchNameFilter
+    ? allRelevantRounds.filter(r => r.batch_name === batchNameFilter)
+    : allRelevantRounds;
+
+  if (relevantRounds.length === 0) {
+    const msg = batchNameFilter
+      ? `Tiada pusingan aktif atau tertunggak untuk ${batchNameFilter}.`
+      : 'Tiada pusingan aktif atau tertunggak hari ini.';
+    return { empty: true, message: msg };
+  }
 
   // 2. Resolve batch IDs
-  const directBatchIds     = new Set(activeRounds.map(r => r.batch_id).filter(Boolean));
-  const activeRoundBatchNames = new Set(activeRounds.map(r => r.batch_name).filter(Boolean));
+  const directBatchIds        = new Set(relevantRounds.map(r => r.batch_id).filter(Boolean));
+  const activeRoundBatchNames = new Set(relevantRounds.map(r => r.batch_name).filter(Boolean));
 
   const { data: batches, error: batchesError } = await supabase
     .from('batches')
@@ -108,8 +123,8 @@ async function buildPendingData(supabase) {
 
   if (batchesError) throw batchesError;
 
-  const batchNameToId  = {};
-  const batchIdToName  = {};
+  const batchNameToId    = {};
+  const batchIdToName    = {};
   const batchIdToProgram = {};
   (batches || []).forEach(b => {
     batchNameToId[b.batch_name] = b.id;
@@ -117,6 +132,7 @@ async function buildPendingData(supabase) {
     batchIdToProgram[b.id]      = b.program;
   });
 
+  // Add IDs for rounds where batch_id is null (matched by name)
   activeRoundBatchNames.forEach(name => {
     const id = batchNameToId[name];
     if (id) directBatchIds.add(id);
@@ -125,16 +141,17 @@ async function buildPendingData(supabase) {
   const batchIdList = [...directBatchIds];
   if (batchIdList.length === 0) return { empty: true, message: 'Batch IDs tidak dapat diselesaikan.' };
 
-  const batchIdToActiveRound = {};
+  // Map batch_id → all relevant rounds (may include both overdue and current)
+  const batchIdToRounds = {};
   batchIdList.forEach(bId => {
     const batchName = batchIdToName[bId];
-    const round = activeRounds.find(r =>
+    const rounds = relevantRounds.filter(r =>
       r.batch_id === bId || (batchName && r.batch_name === batchName)
     );
-    if (round) batchIdToActiveRound[bId] = round;
+    if (rounds.length > 0) batchIdToRounds[bId] = rounds;
   });
 
-  // 3. Active assignments
+  // 3. Active assignments in relevant batches
   const { data: assignments, error: assignError } = await supabase
     .from('mentor_assignments')
     .select('mentor_id, entrepreneur_id, batch_id')
@@ -164,15 +181,45 @@ async function buildPendingData(supabase) {
     }
   });
 
-  // 5. Build pending list per mentor
+  // 5. Build pending list per mentor across all relevant rounds (current + overdue)
   const pendingByMentor = {};
   for (const { mentor_id, entrepreneur_id, batch_id } of (assignments || [])) {
-    const activeRound = batchIdToActiveRound[batch_id];
-    if (!activeRound) continue;
-    if (submitted.has(`${entrepreneur_id}:${activeRound.round_number}`)) continue;
+    const rounds = batchIdToRounds[batch_id];
+    if (!rounds?.length) continue;
 
-    if (!pendingByMentor[mentor_id]) pendingByMentor[mentor_id] = [];
-    pendingByMentor[mentor_id].push({ entrepreneur_id, activeRound, batch_id });
+    for (const round of rounds) {
+      if (submitted.has(`${entrepreneur_id}:${round.round_number}`)) continue;
+      if (!pendingByMentor[mentor_id]) pendingByMentor[mentor_id] = [];
+      pendingByMentor[mentor_id].push({ entrepreneur_id, activeRound: round, batch_id });
+    }
+  }
+
+  // 5b. Per mentor: keep only the most urgent round (earliest end_date).
+  // Prevents mixed due dates in one email when multiple rounds are active.
+  for (const mentorId of Object.keys(pendingByMentor)) {
+    const items = pendingByMentor[mentorId];
+
+    const byRound = new Map();
+    for (const item of items) {
+      const rid = item.activeRound.id;
+      if (!byRound.has(rid)) byRound.set(rid, { round: item.activeRound, items: [] });
+      byRound.get(rid).items.push(item);
+    }
+
+    const sorted = [...byRound.values()].sort((a, b) => {
+      const aOd = a.round.is_overdue;
+      const bOd = b.round.is_overdue;
+      // Overdue rounds take priority over current
+      if (aOd !== bOd) return aOd ? -1 : 1;
+      // Among overdue: highest round_number first (most recent missed round)
+      if (aOd && bOd) return b.round.round_number - a.round.round_number;
+      // Among current: earliest end_date first (most urgent deadline)
+      const eA = new Date(a.round.end_date || a.round.end_month).getTime();
+      const eB = new Date(b.round.end_date || b.round.end_month).getTime();
+      return eA - eB;
+    });
+
+    pendingByMentor[mentorId] = sorted[0].items;
   }
 
   const pendingMentorIds = Object.keys(pendingByMentor);
@@ -219,13 +266,78 @@ export default async function handler(req, res) {
   const hasAccess = await canAccessAdmin(session.user.email);
   if (!hasAccess) return res.status(403).json({ error: 'Forbidden' });
 
-  const isPreview  = req.method === 'GET'  && req.query.preview === 'true';
-  const isTestMode = req.method === 'POST' && req.query.test    === 'true';
-
   const supabase = createAdminClient();
 
+  // ── list_batches: return active batch names for the selector UI ───────────
+  if (req.method === 'GET' && req.query.list_batches === 'true') {
+    try {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+
+      const { data: allRounds, error } = await supabase
+        .from('batch_rounds')
+        .select('batch_name, round_number, start_date, end_date, start_month, end_month')
+        .not('batch_name', 'is', null)
+        .eq('is_active', true);
+
+      if (error) throw error;
+
+      // Tag each round as current, overdue, or irrelevant
+      const tagged = (allRounds || [])
+        .filter(br => br.batch_name)
+        .map(br => {
+          const startD = new Date(br.start_date || br.start_month); startD.setHours(0, 0, 0, 0);
+          const endD   = new Date(br.end_date   || br.end_month);   endD.setHours(23, 59, 59, 999);
+          const isCurrent = today >= startD && today <= endD;
+          const isOverdue = today > endD;
+          const daysOverdue = isOverdue
+            ? Math.ceil((today - endD) / (1000 * 60 * 60 * 24))
+            : null;
+          return { ...br, is_overdue: isOverdue, _isCurrent: isCurrent, _daysOverdue: daysOverdue };
+        })
+        .filter(br => br._isCurrent || br.is_overdue);
+
+      // Deduplicate by batch_name — overdue takes priority over current;
+      // among overdue: highest round_number first (most recent missed round);
+      // among current: earliest end_date first (most urgent deadline).
+      tagged.sort((a, b) => {
+        if (a.is_overdue !== b.is_overdue) return a.is_overdue ? -1 : 1;
+        if (a.is_overdue && b.is_overdue) return b.round_number - a.round_number;
+        const eA = new Date(a.end_date || a.end_month).getTime();
+        const eB = new Date(b.end_date || b.end_month).getTime();
+        return eA - eB;
+      });
+
+      const seenBatchNames  = new Set();
+      const activeBatchRounds = [];
+      for (const br of tagged) {
+        if (!seenBatchNames.has(br.batch_name)) {
+          seenBatchNames.add(br.batch_name);
+          activeBatchRounds.push({
+            batch_name:   br.batch_name,
+            round_number: br.round_number,
+            start_date:   br.start_date || br.start_month || null,
+            end_date:     br.end_date   || br.end_month   || null,
+            is_overdue:   br.is_overdue,
+            days_overdue: br._daysOverdue,
+          });
+        }
+      }
+
+      activeBatchRounds.sort((a, b) => a.batch_name.localeCompare(b.batch_name));
+
+      return res.status(200).json({ batches: activeBatchRounds });
+    } catch (err) {
+      console.error('❌ [list_batches] error:', err);
+      return res.status(500).json({ error: 'Internal server error', details: err.message });
+    }
+  }
+
+  const isPreview       = req.method === 'GET'  && req.query.preview === 'true';
+  const isTestMode      = req.method === 'POST' && req.query.test    === 'true';
+  const batchNameFilter = req.query.batch_name  || null;
+
   try {
-    const data = await buildPendingData(supabase);
+    const data = await buildPendingData(supabase, batchNameFilter);
 
     if (data.empty) {
       if (isPreview) {
@@ -236,15 +348,13 @@ export default async function handler(req, res) {
 
     const { pendingByMentor, pendingMentorIds, skipped, mentorById, entrepreneurById, batchIdToName } = data;
 
-    // ── PREVIEW: return mentor list without sending ───────────────────────────
+    // ── PREVIEW ───────────────────────────────────────────────────────────────
     if (isPreview) {
       const mentors = pendingMentorIds.map(mentorId => {
         const mentor      = mentorById[mentorId] || {};
         const pendingList = pendingByMentor[mentorId];
         const distinctBatches = [...new Set(
-          pendingList
-            .map(({ batch_id }) => batchIdToName[batch_id])
-            .filter(Boolean)
+          pendingList.map(({ activeRound }) => activeRound.batch_name).filter(Boolean)
         )];
         return {
           name:         mentor.name  || '-',
@@ -257,7 +367,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ preview: true, mentors, totalMentors: mentors.length });
     }
 
-    // ── SEND ─────────────────────────────────────────────────────────────────
+    // ── SEND ──────────────────────────────────────────────────────────────────
     const resend = new Resend(process.env.RESEND_API_KEY);
     let sent = 0;
     const errors = [];
@@ -270,28 +380,29 @@ export default async function handler(req, res) {
       }
 
       const rows = pendingList.map(({ entrepreneur_id, activeRound }) => {
-        const ent     = entrepreneurById[entrepreneur_id] || {};
-        const isMaju  = (ent.program || '').toLowerCase().includes('maju');
-        const path    = isMaju ? '/laporan-maju-um' : '/laporan-bangkit';
+        const ent    = entrepreneurById[entrepreneur_id] || {};
+        const isMaju = (ent.program || '').toLowerCase().includes('maju');
+        const path   = isMaju ? '/laporan-maju-um' : '/laporan-bangkit';
         const formUrl = `https://mentor.startlah.my${path}?mentor_id=${mentorId}&entrepreneur_id=${entrepreneur_id}&batch_round_id=${activeRound.id}`;
         return {
           entName:     ent.name  || '-',
-          entBatch:    ent.batch || '-',
+          entBatch:    activeRound.batch_name || '-',
           roundNumber: activeRound.round_number,
           endDate:     formatDate(activeRound.end_date || activeRound.end_month),
           formUrl,
         };
       });
 
-      const recipientEmail = isTestMode ? TEST_EMAIL     : mentor.email;
+      const recipientEmail = isTestMode ? TEST_EMAIL : mentor.email;
       const subject        = isTestMode
         ? `[TEST] Peringatan — Laporan Mentoring Belum Dihantar`
         : 'Peringatan — Laporan Mentoring Belum Dihantar';
       const html = buildReminderEmail(mentor.name, rows, isTestMode ? mentor.email : null);
 
       try {
+        // TODO: Change back to 'noreply@mentor.startlah.my' after DNS verified
         await resend.emails.send({
-          from: 'iTEKAD Portal <noreply@startlah.my>',
+          from: 'onboarding@resend.dev',
           to:   recipientEmail,
           subject,
           html,

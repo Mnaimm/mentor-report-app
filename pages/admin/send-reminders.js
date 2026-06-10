@@ -1,18 +1,67 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { getSession } from 'next-auth/react';
 import Link from 'next/link';
 import { canAccessAdmin } from '../../lib/auth';
 
+const MALAY_MONTHS = [
+  'Jan', 'Feb', 'Mac', 'Apr', 'Mei', 'Jun',
+  'Julai', 'Ogos', 'Sept', 'Okt', 'Nov', 'Dis',
+];
+
+function formatDateShort(dateStr) {
+  if (!dateStr) return '-';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '-';
+  return `${d.getDate()} ${MALAY_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  const end   = new Date(dateStr); end.setHours(23, 59, 59, 999);
+  const today = new Date();        today.setHours(0, 0, 0, 0);
+  return Math.ceil((end - today) / (1000 * 60 * 60 * 24));
+}
+
 export default function SendRemindersPage({ userEmail }) {
+  // ── Step 0: batch selector ─────────────────────────────────────────────────
+  const [activeBatches, setActiveBatches]   = useState(null); // null = loading, [] = empty/error
+  const [batchesLoading, setBatchesLoading] = useState(true);
+  const [selectedBatch, setSelectedBatch]   = useState(''); // '' = Semua Batch
+
+  // ── Step 1: preview ────────────────────────────────────────────────────────
   const [previewLoading, setPreviewLoading] = useState(false);
-  const [previewData, setPreviewData]       = useState(null); // { mentors[], totalMentors }
+  const [previewData, setPreviewData]       = useState(null);
   const [previewError, setPreviewError]     = useState(null);
 
-  const [testMode, setTestMode] = useState(false);
+  // ── Step 2: test mode + send ───────────────────────────────────────────────
+  const [testMode, setTestMode]     = useState(false);
+  const [sending, setSending]       = useState(false);
+  const [result, setResult]         = useState(null);
+  const [sendError, setSendError]   = useState(null);
 
-  const [sending, setSending]   = useState(false);
-  const [result, setResult]     = useState(null);
-  const [sendError, setSendError] = useState(null);
+  // Load active batches on mount
+  useEffect(() => {
+    async function fetchBatches() {
+      try {
+        const res  = await fetch('/api/admin/send-reminders?list_batches=true');
+        const data = await res.json();
+        setActiveBatches(data.batches || []);
+      } catch {
+        setActiveBatches([]);
+      } finally {
+        setBatchesLoading(false);
+      }
+    }
+    fetchBatches();
+  }, []);
+
+  // Reset preview when batch selection changes
+  function handleBatchSelect(batch) {
+    setSelectedBatch(batch);
+    setPreviewData(null);
+    setPreviewError(null);
+    setSendError(null);
+  }
 
   // ── Preview ────────────────────────────────────────────────────────────────
   async function handlePreview() {
@@ -23,7 +72,10 @@ export default function SendRemindersPage({ userEmail }) {
     setSendError(null);
 
     try {
-      const res  = await fetch('/api/admin/send-reminders?preview=true');
+      const params = new URLSearchParams({ preview: 'true' });
+      if (selectedBatch) params.set('batch_name', selectedBatch);
+
+      const res  = await fetch(`/api/admin/send-reminders?${params}`);
       const data = await res.json();
       if (!res.ok) {
         setPreviewError(data.error || 'Ralat semasa memuatkan senarai.');
@@ -39,10 +91,11 @@ export default function SendRemindersPage({ userEmail }) {
 
   // ── Send ───────────────────────────────────────────────────────────────────
   async function handleSend() {
-    const count = previewData?.totalMentors;
-    const msg   = count != null
-      ? `Anda akan menghantar emel kepada ${count} mentor. Teruskan?`
-      : 'Anda akan menghantar emel peringatan kepada semua mentor yang belum submit laporan pusingan semasa. Teruskan?';
+    const count      = previewData?.totalMentors;
+    const batchLabel = selectedBatch || 'Semua Batch';
+    const msg = count != null
+      ? `Anda akan menghantar emel kepada ${count} mentor (${batchLabel}). Teruskan?`
+      : `Anda akan menghantar emel peringatan — ${batchLabel}. Teruskan?`;
 
     if (!confirm(msg)) return;
 
@@ -51,14 +104,19 @@ export default function SendRemindersPage({ userEmail }) {
     setSendError(null);
 
     try {
-      const url  = testMode ? '/api/admin/send-reminders?test=true' : '/api/admin/send-reminders';
+      const params = new URLSearchParams();
+      if (testMode)      params.set('test', 'true');
+      if (selectedBatch) params.set('batch_name', selectedBatch);
+      const qs  = params.toString();
+      const url = `/api/admin/send-reminders${qs ? `?${qs}` : ''}`;
+
       const res  = await fetch(url, { method: 'POST' });
       const data = await res.json();
       if (!res.ok) {
         setSendError(data.error || 'Ralat tidak dijangka berlaku.');
       } else {
         setResult(data);
-        setPreviewData(null); // clear preview after send
+        setPreviewData(null);
       }
     } catch (err) {
       setSendError('Ralat sambungan: ' + err.message);
@@ -75,7 +133,8 @@ export default function SendRemindersPage({ userEmail }) {
     setTestMode(false);
   }
 
-  const busy = previewLoading || sending;
+  const busy       = previewLoading || sending;
+  const batchLabel = selectedBatch || 'Semua Batch';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -94,7 +153,7 @@ export default function SendRemindersPage({ userEmail }) {
 
       <div className="max-w-3xl mx-auto px-6 py-10 space-y-6">
 
-        {/* ── Result panel (shown after send) ─────────────────────────────── */}
+        {/* ── Result panel ─────────────────────────────────────────────────── */}
         {result && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="bg-green-50 border-b border-green-100 px-6 py-4 flex items-center justify-between">
@@ -141,54 +200,142 @@ export default function SendRemindersPage({ userEmail }) {
           </div>
         )}
 
-        {/* ── Main action card (hidden after result) ───────────────────────── */}
+        {/* ── Main action card ─────────────────────────────────────────────── */}
         {!result && (
           <>
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
-              <div className="flex items-start gap-4 mb-6">
-                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <svg className="w-6 h-6 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900">Peringatan Pusingan Semasa</h2>
-                  <p className="text-gray-500 text-sm mt-1">
-                    Semak senarai mentor yang belum hantar laporan, kemudian sahkan sebelum menghantar emel.
-                  </p>
-                </div>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 space-y-6">
+
+              {/* Step 0 — Batch selector */}
+              <div>
+                <p className="text-sm font-semibold text-gray-700 mb-3">Pilih Batch</p>
+                {batchesLoading ? (
+                  <div className="flex gap-2">
+                    {[1, 2, 3].map(i => (
+                      <div key={i} className="h-9 w-28 bg-gray-100 rounded-full animate-pulse" />
+                    ))}
+                  </div>
+                ) : (
+                  <>
+                  <div className="flex flex-wrap gap-2">
+                    {/* "Semua Batch" pill */}
+                    <button
+                      onClick={() => handleBatchSelect('')}
+                      disabled={busy}
+                      className={`px-4 py-2 rounded-full text-sm font-semibold border transition-colors ${
+                        selectedBatch === ''
+                          ? 'bg-blue-700 text-white border-blue-700'
+                          : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400 hover:text-blue-600'
+                      } ${busy ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      Semua Batch
+                    </button>
+
+                    {(activeBatches || []).map(batch => (
+                      <button
+                        key={batch.batch_name}
+                        onClick={() => handleBatchSelect(batch.batch_name)}
+                        disabled={busy}
+                        className={`px-4 py-2 rounded-full text-sm font-semibold border transition-colors ${
+                          selectedBatch === batch.batch_name
+                            ? 'bg-blue-700 text-white border-blue-700'
+                            : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400 hover:text-blue-600'
+                        } ${busy ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        {batch.batch_name}
+                      </button>
+                    ))}
+
+                    {!batchesLoading && activeBatches?.length === 0 && (
+                      <span className="text-sm text-gray-400 italic">Tiada batch aktif ditemui</span>
+                    )}
+                  </div>
+
+                  {/* Active round info bar — shown only when a specific batch is selected */}
+                  {(() => {
+                    if (!selectedBatch || !activeBatches?.length) return null;
+                    const info = activeBatches.find(b => b.batch_name === selectedBatch);
+                    if (!info) return null;
+
+                    if (info.is_overdue) {
+                      return (
+                        <div className="mt-3 flex flex-wrap items-center gap-1.5 text-sm bg-red-50 border border-red-200 rounded-lg px-4 py-2.5">
+                          <span>🚨</span>
+                          <span className="font-semibold text-red-700">Overdue:</span>
+                          <span className="text-red-700">Pusingan {info.round_number}</span>
+                          <span className="text-red-300 mx-1">|</span>
+                          <span className="font-medium text-red-600">Tempoh:</span>
+                          <span className="text-red-700">{formatDateShort(info.start_date)} – {formatDateShort(info.end_date)}</span>
+                          {info.days_overdue != null && (
+                            <>
+                              <span className="text-red-300 mx-1">|</span>
+                              <span className="text-red-700 font-semibold">Tertunggak {info.days_overdue} hari</span>
+                            </>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    const days = daysUntil(info.end_date);
+                    const daysColor = days == null
+                      ? 'text-gray-500'
+                      : days < 7
+                      ? 'text-red-600 font-semibold'
+                      : days < 14
+                      ? 'text-amber-600 font-semibold'
+                      : 'text-gray-500';
+                    return (
+                      <div className="mt-3 flex flex-wrap items-center gap-1.5 text-sm text-gray-600 bg-blue-50 border border-blue-100 rounded-lg px-4 py-2.5">
+                        <span>🗓</span>
+                        <span className="font-semibold text-blue-800">Pusingan Aktif:</span>
+                        <span>Pusingan {info.round_number}</span>
+                        <span className="text-gray-400 mx-1">|</span>
+                        <span className="font-medium text-gray-600">Tempoh:</span>
+                        <span>{formatDateShort(info.start_date)} – {formatDateShort(info.end_date)}</span>
+                        {days != null && (
+                          <>
+                            <span className="text-gray-400 mx-1">|</span>
+                            <span className={daysColor}>Due dalam {days} hari</span>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })()}
+                  </>
+                )}
               </div>
 
               {/* Step 1 — Preview button */}
-              <button
-                onClick={handlePreview}
-                disabled={busy}
-                className={`w-full py-3 px-6 rounded-lg font-semibold border-2 transition-colors ${
-                  busy
-                    ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
-                    : previewData
-                    ? 'border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100'
-                    : 'border-blue-700 text-blue-700 bg-white hover:bg-blue-50'
-                }`}
-              >
-                {previewLoading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                    Memuatkan senarai...
-                  </span>
-                ) : previewData ? (
-                  '↻ Semak Semula'
-                ) : (
-                  'Semak Senarai Dulu'
-                )}
-              </button>
+              <div>
+                <button
+                  onClick={handlePreview}
+                  disabled={busy}
+                  className={`w-full py-3 px-6 rounded-lg font-semibold border-2 transition-colors ${
+                    busy
+                      ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
+                      : previewData
+                      ? 'border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100'
+                      : 'border-blue-700 text-blue-700 bg-white hover:bg-blue-50'
+                  }`}
+                >
+                  {previewLoading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Memuatkan senarai...
+                    </span>
+                  ) : previewData ? (
+                    `↻ Semak Semula — ${batchLabel}`
+                  ) : (
+                    `Semak Senarai Dulu — ${batchLabel}`
+                  )}
+                </button>
+              </div>
 
               {/* Step 2 — Test mode + Confirm & Send (only after preview) */}
               {previewData && (
-                <div className="mt-4 pt-4 border-t border-gray-100 space-y-4">
+                <div className="pt-4 border-t border-gray-100 space-y-4">
                   {/* Test mode toggle */}
                   <label className="flex items-center gap-3 cursor-pointer select-none w-fit">
                     <div className="relative">
@@ -205,7 +352,7 @@ export default function SendRemindersPage({ userEmail }) {
                       <span className="text-sm font-semibold text-gray-700">Mod Ujian</span>
                       {testMode && (
                         <p className="text-xs text-amber-600 mt-0.5">
-                          Semua emel akan dihantar ke naemmukhtar@gmail.com sahaja
+                          Semua emel akan dihantar ke mentor@startlah.my sahaja
                         </p>
                       )}
                     </div>
@@ -234,16 +381,16 @@ export default function SendRemindersPage({ userEmail }) {
                     ) : previewData.totalMentors === 0 ? (
                       'Tiada emel untuk dihantar'
                     ) : testMode ? (
-                      `[TEST] Hantar kepada naemmukhtar@gmail.com (${previewData.totalMentors} mentor)`
+                      `[TEST] Hantar kepada mentor@startlah.my (${previewData.totalMentors} mentor)`
                     ) : (
-                      `Confirm & Hantar (${previewData.totalMentors} mentor)`
+                      `Hantar Peringatan — ${batchLabel} (${previewData.totalMentors} mentor)`
                     )}
                   </button>
                 </div>
               )}
             </div>
 
-            {/* ── Preview error ──────────────────────────────────────────────── */}
+            {/* ── Preview error ────────────────────────────────────────────── */}
             {previewError && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-1">
@@ -256,7 +403,7 @@ export default function SendRemindersPage({ userEmail }) {
               </div>
             )}
 
-            {/* ── Send error ─────────────────────────────────────────────────── */}
+            {/* ── Send error ───────────────────────────────────────────────── */}
             {sendError && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-1">
@@ -269,7 +416,7 @@ export default function SendRemindersPage({ userEmail }) {
               </div>
             )}
 
-            {/* ── Preview table ──────────────────────────────────────────────── */}
+            {/* ── Preview table ─────────────────────────────────────────────── */}
             {previewData && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
@@ -277,7 +424,7 @@ export default function SendRemindersPage({ userEmail }) {
                     <h3 className="font-semibold text-gray-800">Senarai Mentor Tertunggak</h3>
                     <p className="text-sm text-gray-500 mt-0.5">
                       {previewData.totalMentors === 0
-                        ? 'Tiada mentor dengan laporan tertunggak.'
+                        ? `Tiada laporan tertunggak — ${batchLabel}.`
                         : `${previewData.totalMentors} mentor akan menerima emel peringatan`}
                     </p>
                   </div>
@@ -316,9 +463,7 @@ export default function SendRemindersPage({ userEmail }) {
                               </span>
                             </td>
                             <td className="px-6 py-3 text-gray-500">
-                              {mentor.batches.length > 0
-                                ? mentor.batches.join(', ')
-                                : '-'}
+                              {mentor.batches.length > 0 ? mentor.batches.join(', ') : '-'}
                             </td>
                           </tr>
                         ))}
