@@ -1,5 +1,5 @@
 // pages/laporan-maju.js
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSession, signIn } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Section from '../components/Section';
@@ -170,6 +170,9 @@ const LaporanMajuPage = () => {
   // Receipt Modal State
   const [submissionResult, setSubmissionResult] = useState(null);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
+
+  const [prefillBatchRoundId, setPrefillBatchRoundId] = useState(null);
+  const urlPrefillApplied = useRef(false);
 
   // --- Draft/Autosave functionality ---
   const getDraftKey = (menteeName, sessionNo, mentorEmail) =>
@@ -403,6 +406,61 @@ const LaporanMajuPage = () => {
       setMessageType('error');
     }
   }, [revisionData, isRevisionMode, allMenteesMapping]);
+
+  // --- URL QUERY PARAM PREFILL ---
+  useEffect(() => {
+    if (urlPrefillApplied.current) return;
+    if (!router.isReady) return;
+    if (router.query.mode === 'revision') return;
+    const { mentor_id, entrepreneur_id, batch_round_id } = router.query;
+    if (!mentor_id && !entrepreneur_id && !batch_round_id) return;
+    if (allMenteesMapping.length === 0) return; // wait for mentorList (allMenteesMapping) to populate
+    if (status !== 'authenticated') return;
+
+    urlPrefillApplied.current = true;
+
+    if (batch_round_id) setPrefillBatchRoundId(batch_round_id);
+
+    let mentorEmailSelected = null;
+
+    // mentor_id: match against Mentor_Email in mapping data (admin-only dropdown)
+    if (isAdmin && mentor_id) {
+      const mentorEntry = allMenteesMapping.find(m => m.Mentor_Email === mentor_id);
+      if (mentorEntry) {
+        mentorEmailSelected = mentorEntry.Mentor_Email;
+        setSelectedMentorEmail(mentorEntry.Mentor_Email);
+        const mentorMentees = allMenteesMapping.filter(m => m.Mentor_Email === mentorEntry.Mentor_Email);
+        setFilteredMenteesForDropdown(mentorMentees);
+
+        if (entrepreneur_id) {
+          const menteeRecord = mentorMentees.find(m => m.entrepreneur_id === entrepreneur_id);
+          if (menteeRecord) {
+            // handleMenteeSelect has stale filteredMenteesForDropdown closure; fix entrepreneur_id after
+            handleMenteeSelect({ target: { value: menteeRecord.Usahawan } });
+            setFormData(prev => ({ ...prev, entrepreneur_id: menteeRecord.entrepreneur_id || null }));
+          }
+        }
+        return;
+      }
+      // mentor_id not found in mapping (e.g. raw UUID) → ignored silently, fall through
+    }
+
+    // entrepreneur_id: derive mentor from mapping entry when mentor not already selected
+    if (entrepreneur_id) {
+      const mappingEntry = allMenteesMapping.find(m => m.entrepreneur_id === entrepreneur_id);
+      if (!mappingEntry) return; // invalid entrepreneur_id → ignore silently
+
+      if (isAdmin && !mentorEmailSelected) {
+        setSelectedMentorEmail(mappingEntry.Mentor_Email);
+        const mentorMentees = allMenteesMapping.filter(m => m.Mentor_Email === mappingEntry.Mentor_Email);
+        setFilteredMenteesForDropdown(mentorMentees);
+      }
+
+      // handleMenteeSelect has stale filteredMenteesForDropdown closure; fix entrepreneur_id after
+      handleMenteeSelect({ target: { value: mappingEntry.Usahawan } });
+      setFormData(prev => ({ ...prev, entrepreneur_id: mappingEntry.entrepreneur_id || null }));
+    }
+  }, [router.query, allMenteesMapping]);
 
   // Handle Mentee Selection & Load Session Data
   const handleMenteeSelect = useCallback(async (e) => {
@@ -1158,6 +1216,7 @@ const LaporanMajuPage = () => {
           MIA_REASON: miaReason,
           MIA_PROOF_URL: '', // Legacy field - not used, individual URLs sent via imageUrls.mia
           imageUrls: imageUrls, // ✅ MIA proof URLs (whatsapp, email, call)
+          batch_round_id: prefillBatchRoundId || null,
           // UPWARD MOBILITY - Allow partial data for MIA submissions
           UPWARD_MOBILITY_JSON: JSON.stringify({
             UM_STATUS: formData.UPWARD_MOBILITY.UM_STATUS || '',
@@ -1223,6 +1282,7 @@ const LaporanMajuPage = () => {
           MIA_PROOF_URL: '', // Empty string for non-MIA reports (not the object)
           // KEMASKINI MAKLUMAT - Updated contact information
           KEMASKINI_MAKLUMAT: maklumatBerubah ? formData.KEMASKINI_MAKLUMAT : null,
+          batch_round_id: prefillBatchRoundId || null,
           // UPWARD MOBILITY - Store as JSON for MAJU AppScript
           UPWARD_MOBILITY_JSON: JSON.stringify({
             UM_STATUS: formData.UPWARD_MOBILITY.UM_STATUS || '',

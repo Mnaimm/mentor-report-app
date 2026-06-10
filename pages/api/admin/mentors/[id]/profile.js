@@ -75,7 +75,7 @@ export default async function handler(req, res) {
       const ent = a.entrepreneurs;
       if (!ent) continue;
 
-      const rawBatch = a.batches?.batch_name || ent.batch;
+      const rawBatch = a.batches?.batch_name;
       const batchName = normalizeBatchName(rawBatch) || 'Tiada Batch';
       const rawProgram = String(a.batches?.program || ent.program || '').toLowerCase();
       const program = rawProgram.includes('maju') ? 'Maju' : 'Bangkit';

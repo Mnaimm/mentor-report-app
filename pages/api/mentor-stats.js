@@ -133,7 +133,7 @@ async function fetchStatsFromSupabase(loginEmail, debugInfo) {
     const batchId   = entrepreneurToBatchId[eid];
     const batchInfo = batchMap[batchId];
     const entInfo   = entrepreneurMap[eid];
-    entrepreneurToBatchName[eid] = batchInfo?.batch_name || entInfo?.batch || 'Unknown';
+    entrepreneurToBatchName[eid] = batchInfo?.batch_name || 'Unknown';
   });
 
   // 4. Current-period detection

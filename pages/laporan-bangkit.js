@@ -1,5 +1,5 @@
 // pages/laporan-sesi.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSession, signIn } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
@@ -241,6 +241,9 @@ export default function LaporanSesiPage() {
   const [submissionResult, setSubmissionResult] = useState(null);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
 
+  const [prefillBatchRoundId, setPrefillBatchRoundId] = useState(null);
+  const urlPrefillApplied = useRef(false);
+
   // --- Non-blocking toast (yellow notice) ---
   const [toast, setToast] = useState({ show: false, message: '' });
   const showToast = (message) => {
@@ -453,6 +456,53 @@ export default function LaporanSesiPage() {
       setError('Gagal memuatkan laporan. Sila cuba lagi atau hubungi admin.');
     }
   }, [revisionData, isRevisionMode, allMentees]);
+
+  // --- URL QUERY PARAM PREFILL ---
+  useEffect(() => {
+    if (urlPrefillApplied.current) return;
+    if (!router.isReady) return;
+    if (router.query.mode === 'revision') return;
+    const { mentor_id, entrepreneur_id, batch_round_id } = router.query;
+    if (!mentor_id && !entrepreneur_id && !batch_round_id) return;
+    if (allMentees.length === 0) return; // wait for mentorList (allMentees) to populate
+    if (status !== 'authenticated') return;
+
+    urlPrefillApplied.current = true;
+
+    if (batch_round_id) setPrefillBatchRoundId(batch_round_id);
+
+    let mentorSelected = false;
+
+    // mentor_id: match against Mentor_Email in mapping data (admin-only dropdown)
+    if (isAdmin && mentor_id) {
+      const mentorEntry = allMentees.find(m => m.Mentor_Email === mentor_id);
+      if (mentorEntry) {
+        handleAdminMentorChange(mentorEntry.Mentor);
+        mentorSelected = true;
+
+        if (entrepreneur_id) {
+          const mentorMentees = allMentees.filter(m => m.Mentor === mentorEntry.Mentor);
+          const menteeRecord = mentorMentees.find(m => m.entrepreneur_id === entrepreneur_id);
+          if (menteeRecord) handleMenteeChange(menteeRecord.Usahawan);
+        }
+        return;
+      }
+      // mentor_id not found in mapping (e.g. raw UUID) → ignored silently, fall through
+    }
+
+    // entrepreneur_id: derive mentor from mapping entry when mentor not already selected
+    if (entrepreneur_id) {
+      const mappingEntry = allMentees.find(m => m.entrepreneur_id === entrepreneur_id);
+      if (!mappingEntry) return; // invalid entrepreneur_id → ignore silently
+
+      if (isAdmin && !mentorSelected) {
+        handleAdminMentorChange(mappingEntry.Mentor);
+        handleMenteeChange(mappingEntry.Usahawan);
+      } else if (!isAdmin && mappingEntry.Mentor_Email === session?.user?.email) {
+        handleMenteeChange(mappingEntry.Usahawan);
+      }
+    }
+  }, [router.query, allMentees]);
 
   // --- Autosave effect: save to localStorage on changes ---
   useEffect(() => {
@@ -1198,6 +1248,7 @@ export default function LaporanSesiPage() {
         alamatPerniagaan: selectedMentee?.Alamat || '',
         noTelefon: selectedMentee?.No_Tel || '',
         kemaskiniMaklumat: maklumatBerubah ? formState.kemaskiniMaklumat : null,
+        batch_round_id: prefillBatchRoundId || null,
       };
 
       // UPWARD MOBILITY - Only include for non-MIA submissions
