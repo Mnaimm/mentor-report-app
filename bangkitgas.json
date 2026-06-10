@@ -217,9 +217,21 @@ function doPost(e) {
       // UPLOAD PATH: Handle file upload to Google Drive
       return handleFileUpload(data);
     }
+    else if (data.action === 'regenerateDoc' && data.rowNumber) {
+      // REGENERATION PATH: Regenerate PDF for revised report
+      console.log('Regenerating document for row:', data.rowNumber);
+      const result = regenerateDocument(Number(data.rowNumber));
+      return ContentService.createTextOutput(JSON.stringify({
+        success: true,
+        docId: result.docId,
+        docUrl: result.docUrl,
+        message: 'Document regenerated successfully'
+      }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
     else {
       // Unknown action
-      throw new Error('Invalid action. Use "processRow" or "uploadImage"');
+      throw new Error('Invalid action. Use "processRow", "uploadImage", or "regenerateDoc"');
     }
 
   } catch (err) {
@@ -1581,9 +1593,14 @@ function processUnprocessedRows() {
     for (let r = 2; r <= lastRow; r++) {
       const docUrl = sheet.getRange(r, idx[H.DocUrl]).getValue();
       const status = sheet.getRange(r, idx[H.Status]).getValue();
+      const namaUsahawan = String(sheet.getRange(r, idx[H.NamaUsahawan]).getValue() || '').trim();
 
-      // Skip if already processed
-      if (docUrl || (status && String(status).toUpperCase().startsWith('DONE'))) {
+      if (!namaUsahawan) {
+        continue;
+      }
+
+      const statusUpper = String(status || '').toUpperCase();
+      if (docUrl || statusUpper.startsWith('DONE') || statusUpper.startsWith('ERROR')) {
         continue;
       }
 
@@ -1611,6 +1628,66 @@ function processUnprocessedRows() {
   }
 }
 
+/**
+ * Regenerates document for a specific row (for revised reports)
+ * Clears existing DOC_URL and Status, then calls processSingleRow
+ *
+ * @param {number} rowNumber - Row number to regenerate (1-indexed)
+ * @returns {Object} Result with docId and docUrl
+ */
+function regenerateDocument(rowNumber) {
+  console.log(`=== REGENERATING DOCUMENT FOR ROW ${rowNumber} ===`);
+
+  const lock = LockService.getScriptLock();
+  const lockAcquired = lock.tryLock(30000);
+
+  if (!lockAcquired) {
+    throw new Error('Could not acquire lock - another process is running');
+  }
+
+  try {
+    // Open sheet and get column indices
+    const { sheet, headers, idx } = openBangkitSheet_();
+
+    // Clear existing DOC_URL (column BB, index 52)
+    sheet.getRange(rowNumber, idx[H.DocUrl]).clearContent();
+    console.log(`Cleared DOC_URL for row ${rowNumber}`);
+
+    // Clear existing Status (column BA, index 52)
+    sheet.getRange(rowNumber, idx[H.Status]).clearContent();
+    console.log(`Cleared Status for row ${rowNumber}`);
+
+    // Now regenerate the document using existing logic
+    processRowByIndex_(sheet, headers, idx, rowNumber);
+
+    // Read back the new DOC_URL and Status
+    const newDocUrl = sheet.getRange(rowNumber, idx[H.DocUrl]).getValue();
+    const newStatus = sheet.getRange(rowNumber, idx[H.Status]).getValue();
+
+    // Extract docId from URL
+    const docIdMatch = String(newDocUrl).match(/\/document\/d\/([a-zA-Z0-9_-]+)/);
+    const docId = docIdMatch ? docIdMatch[1] : '';
+
+    console.log(`Document regenerated successfully`);
+    console.log(`New Doc ID: ${docId}`);
+    console.log(`New Doc URL: ${newDocUrl}`);
+
+    return {
+      success: true,
+      docId: docId,
+      docUrl: newDocUrl,
+      status: newStatus,
+      rowNumber: rowNumber
+    };
+
+  } catch (err) {
+    console.error('Regeneration error:', err.toString());
+    throw err;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 /***** ================== TESTING FUNCTIONS ================== *****/
 
 /**
@@ -1619,7 +1696,7 @@ function processUnprocessedRows() {
  */
 function testProcessSingleRow(rowNumber) {
   console.log('=== TESTING ROW', rowNumber, '===');
-  const result = processSingleRow(rowNumber || 155);
+  const result = processSingleRow(rowNumber || 212);
   console.log('Result:', JSON.stringify(result, null, 2));
   return result;
 }
@@ -1730,3 +1807,9 @@ function testDoPostProcessRow() {
   const result = JSON.parse(response.getContent());
   console.log('doPost result:', JSON.stringify(result, null, 2));
 }
+
+  function testRegenerateDoc() {
+    const testRowNumber = 179; // Change to your test row
+    const result = regenerateDocument(testRowNumber);
+    Logger.log('Result:', JSON.stringify(result, null, 2));
+  }

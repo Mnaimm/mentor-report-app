@@ -36,7 +36,7 @@ export default async function handler(req, res) {
         // 1. Fetch current report to get all necessary fields
         const { data: report, error: fetchError } = await supabase
             .from('reports')
-            .select('id, sheets_row_number, program, mentor_email, submission_date, verification_nota, base_payment_amount')
+            .select('id, sheets_row_number, program, mentor_email, submission_date, verification_nota, base_payment_amount, entrepreneurs(batch)')
             .eq('id', id)
             .single();
 
@@ -76,12 +76,12 @@ export default async function handler(req, res) {
 
                 const verificationData = {
                     submission_date: report.submission_date,
-                    verification_nota: report.verification_nota,
+                    approved_at: new Date().toISOString(),
                     base_payment_amount: report.base_payment_amount
                 };
 
                 const sheetsWritten = await writeVerificationToSheet(
-                    report.program,
+                    report.entrepreneurs?.batch,
                     report.id,
                     verificationData
                 );

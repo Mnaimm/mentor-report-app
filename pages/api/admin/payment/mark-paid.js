@@ -80,7 +80,7 @@ export default async function handler(req, res) {
 
         const { data: reports, error: reportsError } = await supabase
             .from('reports')
-            .select('id, program')
+            .select('id, program, entrepreneurs(batch)')
             .in('id', reportIds);
 
         if (reportsError) throw reportsError;
@@ -110,12 +110,12 @@ export default async function handler(req, res) {
                 console.log(`🔄 Writing payment data for report ${report.id}...`);
 
                 const paymentData = {
-                    approved_by: batch.approved_by || 'Unknown',
+                    approved_by: session.user.email,
                     paid_date: paidDate
                 };
 
                 const sheetsWritten = await writePaymentToSheet(
-                    report.program,
+                    report.entrepreneurs?.batch,
                     report.id,
                     paymentData
                 );

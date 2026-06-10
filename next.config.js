@@ -10,8 +10,8 @@ const csp = [
   // Allow Auth.js provider logos + LogRocket assets
   "img-src 'self' data: blob: https://authjs.dev https://*.logrocket.io https://*.lr-in.com",
   "font-src 'self' data:",
-  // Allow OAuth/API calls during auth + your existing Apps Script usage + LogRocket (comprehensive) + Vercel feedback
-  "connect-src 'self' https://script.google.com https://script.googleusercontent.com https://*.googleapis.com https://accounts.google.com https://www.googleapis.com https://*.logrocket.io https://*.lr-in.com https://*.lr-intake.com https://*.lr-ingest.com https://*.logrocket.com https://r.lr-in.com https://r.lr-intake.com https://cdn.logr-in.com https://vercel.live wss://vercel.live ws://localhost:* wss://localhost:*",
+  // Allow OAuth/API calls during auth + your existing Apps Script usage + LogRocket (comprehensive) + Vercel feedback + Supabase
+  "connect-src 'self' https://script.google.com https://script.googleusercontent.com https://*.googleapis.com https://accounts.google.com https://www.googleapis.com https://*.supabase.co https://*.logrocket.io https://*.lr-in.com https://*.lr-intake.com https://*.lr-ingest.com https://*.logrocket.com https://r.lr-in.com https://r.lr-intake.com https://cdn.logr-in.com https://vercel.live wss://vercel.live ws://localhost:* wss://localhost:*",
   // Allow Google OAuth pages + Google Docs/Drive preview in frames + Vercel feedback widget
   "frame-src 'self' https://accounts.google.com https://docs.google.com https://drive.google.com https://vercel.live",
   "object-src 'none'",

@@ -53,7 +53,7 @@ function doGet() {
  * @param {GoogleAppsScript.Events.DoPost} e The event object from the web app request.
  */
 function doPost(e) {
-  const executionId = Utilities.getUuid().substring(0, 8); // Unique ID for this execution
+  const executionId = Utilities.getUuid().substring(0, 8);
   let logData = {
     executionId: executionId,
     timestamp: new Date().toISOString(),
@@ -75,8 +75,6 @@ function doPost(e) {
 
     const requestPayload = JSON.parse(e.postData.contents);
     Logger.log(`[${executionId}] Received payload action: ${requestPayload.action}`);
-    Logger.log(`[${executionId}] Full payload: ${JSON.stringify(requestPayload)}`);
-    Logger.log(`[${executionId}] Validation check - action: ${requestPayload.action}, rowNumber: ${requestPayload.rowNumber}, programType: ${requestPayload.programType}`);
 
     // Handle image upload action
     if (requestPayload.action === 'uploadImage') {
@@ -93,20 +91,11 @@ function doPost(e) {
       logData.rowNumber = rowNumber;
 
       Logger.log(`[${executionId}] Processing existing row: ${rowNumber}`);
-      logData.step = 'process_existing_row';
-
-      // Call the main processing function
-      const result = processMajuRow(rowNumber, executionId); // Pass executionId
+      const result = processMajuRow(rowNumber, executionId);
 
       logData.success = result.processed || result.skipped;
       logData.docId = result.docId || '';
-      logData.mentee = result.mentee || '';
-      logData.sesi = result.sesi || '';
-      logData.step = 'completed_processing';
-      logData.details = `Row: ${rowNumber}, Action: ${requestPayload.action}, Program: ${requestPayload.programType}`;
-      Logger.log(`[${executionId}] SUCCESS - Doc ID: ${logData.docId}`);
-      
-      // Try to save log but don't let it break the success response
+
       try {
         saveExecutionLog(logData);
       } catch (logError) {
@@ -120,25 +109,38 @@ function doPost(e) {
         executionId: executionId,
         row: rowNumber
       })).setMimeType(ContentService.MimeType.JSON);
+    }
 
-    } else {
-      // If it's not a processRow for 'maju' or an unknown action
-      Logger.log(`[${executionId}] Invalid payload. Action: ${requestPayload.action}, ProgramType: ${requestPayload.programType}, RowNumber: ${requestPayload.rowNumber}`);
-      Logger.log(`[${executionId}] Full received payload: ${JSON.stringify(requestPayload)}`);
+    // Handle regenerateDoc action for 'maju' programType
+    else if (requestPayload.action === 'regenerateDoc' && requestPayload.rowNumber) {
+      const rowNumber = parseInt(requestPayload.rowNumber, 10);
+      if (isNaN(rowNumber) || rowNumber < 2) {
+        throw new Error('Invalid rowNumber received for regeneration.');
+      }
 
-      const errorDetails = `Received: action="${requestPayload.action}", rowNumber="${requestPayload.rowNumber}", programType="${requestPayload.programType}"`;
-      logData.error = `Invalid payload. Expected action: processRow with programType: "maju". ${errorDetails}`;
+      Logger.log(`[${executionId}] Regenerating document for row: ${rowNumber}`);
+      const result = regenerateMajuDocument(rowNumber, executionId);
+
+      return ContentService.createTextOutput(JSON.stringify({
+        success: true,
+        docId: result.docId,
+        message: 'Maju document regenerated successfully',
+        executionId: executionId,
+        row: rowNumber
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    else {
+      Logger.log(`[${executionId}] Invalid payload. Action: ${requestPayload.action}`);
+      const errorDetails = `Received: action="${requestPayload.action}", rowNumber="${requestPayload.rowNumber}"`;
+      logData.error = `Invalid payload. ${errorDetails}`;
       throw new Error(logData.error);
     }
 
   } catch (err) {
     Logger.log(`[${executionId}] doPost ERROR: ${err.message}`);
-    Logger.log(`[${executionId}] Error stack: ${err.stack}`);
-
     logData.success = false;
     logData.error = err.message;
-    // Keep stack trace to a reasonable length for logs
-    logData.errorStack = err.stack ? String(err.stack).substring(0, 500) : 'No stack trace';
 
     return ContentService.createTextOutput(JSON.stringify({
       success: false,
@@ -146,12 +148,10 @@ function doPost(e) {
       executionId: executionId
     })).setMimeType(ContentService.MimeType.JSON);
   } finally {
-    // Always try to save the log at the end, but don't let it break anything
     try {
       saveExecutionLog(logData);
     } catch (logError) {
       Logger.log(`[${logData.executionId}] ⚠️ Final log save failed: ${logError.message}`);
-      console.error(`Execution log save failed for ${logData.executionId}:`, logError);
     }
   }
 }
@@ -2397,7 +2397,61 @@ function testProcessMajuRow() {
     Logger.log('Manual test finished.');
   }
 }
+/**
+ * Regenerates Maju document for a specific row (for revised reports)
+ * Clears existing Laporan_Maju_Doc_ID, then calls processMajuRow
+ *
+ * @param {number} rowNumber - Row number to regenerate (1-indexed)
+ * @param {string} executionId - Unique execution ID for logging
+ * @returns {Object} Result with docId
+ */
+function regenerateMajuDocument(rowNumber, executionId) {
+  Logger.log(`[${executionId}] === REGENERATING MAJU DOCUMENT FOR ROW ${rowNumber} ===`);
 
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) {
+    throw new Error('Could not acquire lock - another process is running');
+  }
+
+  try {
+    // Open sheet and get headers
+    const result = getLaporanMajuSheetAndHeaders();
+    const sheet = result.sheet;
+    const headers = result.headers;
+
+    if (!headers || headers.length === 0) {
+      throw new Error('Headers are invalid from getLaporanMajuSheetAndHeaders');
+    }
+
+    // Find Laporan_Maju_Doc_ID column
+    const docIdColIndex = headers.indexOf('Laporan_Maju_Doc_ID');
+    if (docIdColIndex === -1) {
+      throw new Error('Laporan_Maju_Doc_ID column not found in sheet');
+    }
+
+    // Clear existing Laporan_Maju_Doc_ID
+    sheet.getRange(rowNumber, docIdColIndex + 1).clearContent();
+    Logger.log(`[${executionId}] Cleared Laporan_Maju_Doc_ID for row ${rowNumber}`);
+
+    // Regenerate document using existing logic
+    const processResult = processMajuRow(rowNumber, executionId);
+
+    Logger.log(`[${executionId}] Maju document regenerated successfully`);
+    Logger.log(`[${executionId}] New Doc ID: ${processResult.docId}`);
+
+    return {
+      success: true,
+      docId: processResult.docId,
+      rowNumber: rowNumber
+    };
+
+  } catch (err) {
+    Logger.log(`[${executionId}] Regeneration error: ${err.message}`);
+    throw err;
+  } finally {
+    lock.releaseLock();
+  }
+}
 
 // === EXECUTION LOGGING (for doPost) ===
 // This part helps in debugging web app calls directly from Google Apps Script logs.

@@ -15,7 +15,15 @@
       "Bash(node scripts/count-supabase-records.js:*)",
       "Bash(git add:*)",
       "Bash(node check-user-role.js:*)",
-      "Bash(node -e:*)"
+      "Bash(node -e:*)",
+      "mcp__claude_ai_Supabase__execute_sql",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\USER\\\\Downloads\\\\mentor-report\\\\pages\" -Name | Where-Object {$_ -notmatch \"^api\"} | Sort-Object)",
+      "PowerShell(Get-Item *)",
+      "Bash(Get-ChildItem \"C:\\\\Users\\\\USER\\\\Downloads\\\\mentor-report\\\\pages\\\\laporan-bangkit.js\",\"C:\\\\Users\\\\USER\\\\Downloads\\\\mentor-report\\\\pages\\\\laporan-maju-um.js\")",
+      "Bash(Select Name, Length)",
+      "mcp__claude_ai_Supabase__apply_migration",
+      "Bash(git commit -m ' *)",
+      "Bash(npx next *)"
     ],
     "deny": [],
     "ask": []

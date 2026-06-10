@@ -19,6 +19,7 @@ export default async function handler(req, res) {
 
   try {
     const mentorEmail = session.user.email?.toLowerCase().trim();
+    console.log(`[submitKhas][ENTRY] mentor=${mentorEmail} entrepreneur=${data.entrepreneur_id} program=${data.program} sesi=${data.session_number}`);
 
     // ── Resolve mentor_id ──
     const { data: mentorRecord, error: mentorErr } = await supabase
@@ -111,7 +112,7 @@ export default async function handler(req, res) {
     if (insertErr) throw new Error(`Supabase insert failed: ${insertErr.message}`);
 
     const reportId = inserted.id;
-    console.log(`✅ [submitKhas] Supabase write successful. ID: ${reportId}`);
+    console.log(`[submitKhas][DB_OK] report_id=${reportId.slice(0, 8)} status=submitted`);
 
     // ── SECONDARY WRITE: Google Sheets + GAS doc generation (non-blocking) ──
     setImmediate(async () => {
@@ -191,6 +192,7 @@ export default async function handler(req, res) {
           JSON.stringify(Array.isArray(data.url_gambar_json) ? data.url_gambar_json : []), // AY URL_GAMBAR_JSON
         ];
 
+        console.log(`[submitKhas][SHEETS_START] sheet=${khasSheetId.slice(0, 6)}... tab=${khasTab} cols=${rowData.length}`);
         const appendRes = await sheets.spreadsheets.values.append({
           spreadsheetId: khasSheetId,
           range: `${khasTab}!A1`,
@@ -201,28 +203,30 @@ export default async function handler(req, res) {
 
         const updatedRange = appendRes.data?.updates?.updatedRange || '';
         const newRowNumber = updatedRange.match(/!A(\d+):/)?.[1];
-        console.log(`✅ [submitKhas] Sheets write successful. Row: ${newRowNumber}`);
+        console.log(`[submitKhas][SHEETS_OK] row=${newRowNumber} range=${updatedRange}`);
 
         // Call GAS to trigger doc generation
         const gasUrl = process.env.GAS_KHAS_URL;
         if (newRowNumber && gasUrl) {
           try {
+            const maskedGasUrl = gasUrl.length > 20 ? ('...' + gasUrl.slice(-20)) : gasUrl;
+            console.log(`[submitKhas][GAS_START] url=${maskedGasUrl} row=${newRowNumber}`);
             const gasRes = await fetch(gasUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ action: 'processRow', rowNumber: parseInt(newRowNumber, 10) }),
             });
             const gasJson = await gasRes.json();
-            console.log(`✅ [submitKhas] GAS call successful. Result:`, gasJson?.result?.success);
+            console.log(`[submitKhas][GAS_OK] status=${gasRes.status} success=${gasJson?.result?.success}`);
           } catch (gasErr) {
-            console.error('⚠️ [submitKhas] GAS call failed (non-blocking):', gasErr.message);
+            console.error(`[submitKhas][ERROR_GAS] ${gasErr.message}`);
           }
         } else if (!gasUrl) {
           console.warn('⚠️ [submitKhas] GAS_KHAS_URL not set — doc generation skipped');
         }
 
       } catch (sheetsErr) {
-        console.error('⚠️ [submitKhas] Sheets write failed (non-blocking):', sheetsErr.message);
+        console.error(`[submitKhas][ERROR_SHEETS] ${sheetsErr.message}`);
       }
     });
 
@@ -286,12 +290,89 @@ export default async function handler(req, res) {
             .insert(umPayload);
 
           if (umErr) {
-            console.error('⚠️ [submitKhas] UM write failed (non-blocking):', umErr.message);
+            console.error(`[submitKhas][ERROR_UM] ${umErr.message}`);
           } else {
-            console.log(`✅ [submitKhas] UM write successful`);
+            console.log(`[submitKhas][UM_OK] um_insert=success`);
+
+            // Fire-and-forget: mirror UM data to shared Upward Mobility sheet
+            try {
+              const umSheetId = process.env.GOOGLE_SHEET_ID_UM || process.env.UPWARD_MOBILITY_SPREADSHEET_ID;
+              if (!umSheetId) {
+                console.warn('[submitKhas][UM_SHEETS] GOOGLE_SHEET_ID_UM not set — skipping UM sheet write');
+              } else {
+                const umCredentialsJson = Buffer.from(process.env.GOOGLE_CREDENTIALS_BASE64, 'base64').toString('ascii');
+                const umCreds = JSON.parse(umCredentialsJson);
+                const umAuth = new google.auth.GoogleAuth({
+                  credentials: umCreds,
+                  scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+                });
+                const umSheets = google.sheets({ version: 'v4', auth: umAuth });
+
+                // 72-column row (A-BT) — identical structure used by Bangkit & Maju UM
+                const umRow = Array(72).fill('');
+
+                // A-K (0-10): Basic session info
+                umRow[0] = new Date().toISOString();           // A  Timestamp
+                umRow[1] = mentorEmail;                        // B  Email Mentor
+                umRow[2] = normalizedProgram;                  // C  Program
+                umRow[3] = entrepreneur.batch || '';           // D  Batch
+                umRow[4] = `Sesi ${sessionNum}`;               // E  Sesi Mentoring
+                umRow[5] = mentorRecord.name || '';            // F  Nama Mentor
+                umRow[6] = entrepreneur.name || '';            // G  Nama Usahawan
+                umRow[7] = entrepreneur.business_name || '';   // H  Nama Perniagaan
+                umRow[8] = '';                                 // I  Produk/Servis (not captured in khas form)
+                umRow[9] = entrepreneur.address || '';         // J  Alamat Perniagaan
+                umRow[10] = entrepreneur.phone || '';          // K  Nombor Telefon
+
+                // L-AR (11-43): Legacy fields — leave empty
+
+                // AS-BT (44-71): UM-specific fields (28 columns)
+                umRow[44] = umData.UM_STATUS_PENGLIBATAN || '';       // AS UM_STATUS_PENGLIBATAN
+                umRow[45] = umData.UM_STATUS || '';                    // AT UM_STATUS
+                umRow[46] = umData.UM_KRITERIA_IMPROVEMENT || '';      // AU UM_KRITERIA_IMPROVEMENT
+                umRow[47] = umData.UM_AKAUN_BIMB || '';               // AV UM_AKAUN_BIMB
+                umRow[48] = umData.UM_BIMB_BIZ || '';                 // AW UM_BIMB_BIZ
+                umRow[49] = umData.UM_AL_AWFAR || '';                 // AX UM_AL_AWFAR
+                umRow[50] = umData.UM_MERCHANT_TERMINAL || '';        // AY UM_MERCHANT_TERMINAL
+                umRow[51] = umData.UM_FASILITI_LAIN || '';            // AZ UM_FASILITI_LAIN
+                umRow[52] = umData.UM_MESINKIRA || '';                // BA UM_MESINKIRA
+                umRow[53] = umData.UM_PENDAPATAN_SEMASA || '';        // BB UM_PENDAPATAN_SEMASA
+                umRow[54] = umData.UM_ULASAN_PENDAPATAN || '';        // BC UM_ULASAN_PENDAPATAN
+                umRow[55] = umData.UM_PEKERJA_SEMASA || '';           // BD UM_PEKERJA_SEMASA
+                umRow[56] = umData.UM_ULASAN_PEKERJA || '';           // BE UM_ULASAN_PEKERJA
+                umRow[57] = umData.UM_ASET_BUKAN_TUNAI_SEMASA || ''; // BF UM_ASET_BUKAN_TUNAI_SEMASA
+                umRow[58] = umData.UM_PEKERJA_PARTTIME_SEMASA || ''; // BG UM_PEKERJA_PARTTIME_SEMASA
+                umRow[59] = umData.UM_ULASAN_PEKERJA_PARTTIME || ''; // BH UM_ULASAN_PEKERJA_PARTTIME
+                umRow[60] = umData.UM_ULASAN_ASET_BUKAN_TUNAI || ''; // BI UM_ULASAN_ASET_BUKAN_TUNAI
+                umRow[61] = umData.UM_SIMPANAN_SEMASA || '';          // BJ UM_SIMPANAN_SEMASA
+                umRow[62] = umData.UM_ULASAN_SIMPANAN || '';          // BK UM_ULASAN_SIMPANAN
+                umRow[63] = umData.UM_ZAKAT_SEMASA || '';             // BL UM_ZAKAT_SEMASA
+                umRow[64] = umData.UM_ULASAN_ZAKAT || '';             // BM UM_ULASAN_ZAKAT
+                umRow[65] = umData.UM_DIGITAL_SEMASA || '';           // BN UM_DIGITAL_SEMASA
+                umRow[66] = umData.UM_ULASAN_DIGITAL || '';           // BO UM_ULASAN_DIGITAL
+                umRow[67] = umData.UM_MARKETING_SEMASA || '';         // BP UM_MARKETING_SEMASA
+                umRow[68] = umData.UM_ULASAN_MARKETING || '';         // BQ UM_ULASAN_MARKETING
+                umRow[69] = umData.UM_TARIKH_LAWATAN_PREMIS || '';    // BR UM_TARIKH_LAWATAN_PREMIS
+                // BS-BT (70-71): reserved — leave empty
+
+                const umAppendRes = await umSheets.spreadsheets.values.append({
+                  spreadsheetId: umSheetId,
+                  range: 'UM!A1',
+                  valueInputOption: 'USER_ENTERED',
+                  insertDataOption: 'INSERT_ROWS',
+                  requestBody: { values: [umRow] },
+                });
+
+                const umUpdatedRange = umAppendRes.data?.updates?.updatedRange || '';
+                const umNewRow = umUpdatedRange.match(/!A(\d+):/)?.[1];
+                console.log(`[submitKhas][UM_SHEETS_OK] row=${umNewRow} range=${umUpdatedRange}`);
+              }
+            } catch (umSheetsErr) {
+              console.error(`[submitKhas][ERROR_UM_SHEETS] ${umSheetsErr.message}`);
+            }
           }
         } catch (err) {
-          console.error('⚠️ [submitKhas] UM write exception (non-blocking):', err.message);
+          console.error(`[submitKhas][ERROR_UM] ${err.message}`);
         }
       });
     }
@@ -325,7 +406,7 @@ export default async function handler(req, res) {
     });
 
   } catch (err) {
-    console.error('[submitKhas] ❌', err);
+    console.error(`[submitKhas][ERROR] ${err.message}`);
     return res.status(500).json({ error: err.message || 'Internal server error' });
   }
 }
