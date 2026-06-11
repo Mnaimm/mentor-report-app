@@ -174,6 +174,11 @@ const LaporanMajuPage = () => {
   const [prefillBatchRoundId, setPrefillBatchRoundId] = useState(null);
   const urlPrefillApplied = useRef(false);
 
+  // UM carry-forward state
+  const [praisiDari, setPraisiDari] = useState(null);
+  const [lockedSections, setLockedSections] = useState({ bank: false, aset: false, digital: false });
+  const [prefillBannerDismissed, setPrefillBannerDismissed] = useState(false);
+
   // --- Draft/Autosave functionality ---
   const getDraftKey = (menteeName, sessionNo, mentorEmail) =>
     `laporanMaju:draft:v1:${mentorEmail || 'unknown'}:${menteeName || 'none'}:s${sessionNo}`;
@@ -504,6 +509,9 @@ const LaporanMajuPage = () => {
       ...prev,
       mia: { whatsapp: null, email: null, call: null }
     }));
+    setPraisiDari(null);
+    setLockedSections({ bank: false, aset: false, digital: false });
+    setPrefillBannerDismissed(false);
 
     if (!selectedMenteeName) {
       setMessage('');
@@ -517,13 +525,16 @@ const LaporanMajuPage = () => {
 
     try {
       const entrepreneurId = selectedMenteeData?.entrepreneur_id;
-      const [response, umPrefillRes, latarBelakangRes] = await Promise.all([
+      const [response, umPrefillRes, latarBelakangRes, latestUMRes] = await Promise.all([
         fetch(`/api/laporanMajuData?name=${encodeURIComponent(selectedMenteeName)}`),
         entrepreneurId
           ? fetch(`/api/mentee-um-prefill?entrepreneur_id=${encodeURIComponent(entrepreneurId)}`)
           : Promise.resolve(null),
         entrepreneurId
           ? fetch(`/api/prefill/maju-latarbelakang?entrepreneur_id=${encodeURIComponent(entrepreneurId)}`)
+          : Promise.resolve(null),
+        entrepreneurId
+          ? fetch(`/api/um/latest-report?entrepreneurId=${encodeURIComponent(entrepreneurId)}`)
           : Promise.resolve(null),
       ]);
       if (!response.ok) {
@@ -532,6 +543,12 @@ const LaporanMajuPage = () => {
       const sessionData = await response.json();
       const umPrefill = umPrefillRes?.ok ? await umPrefillRes.json() : {};
       const latarBelakangPrefill = latarBelakangRes?.ok ? await latarBelakangRes.json() : {};
+      const latestUMResult = latestUMRes?.ok ? await latestUMRes.json() : {};
+      const prevUM = latestUMResult?.data || null;
+      if (prevUM) {
+        setPraisiDari(prevUM.sesi_mentoring || 'Sesi Sebelumnya');
+        setPrefillBannerDismissed(false);
+      }
 
       setFormData(prev => {
         const updatedFormData = { ...prev };
@@ -591,6 +608,39 @@ const LaporanMajuPage = () => {
           };
         }
 
+        if (prevUM) {
+          const parseUMArray = (val) => {
+            if (!val) return [];
+            if (Array.isArray(val)) return val;
+            return typeof val === 'string' ? val.split(',').map(s => s.trim()).filter(Boolean) : [];
+          };
+          // Fix 2: normalize DB values to match radio option casing ('Ya'/'Tidak')
+          const normalizeYaTidak = (val) => {
+            if (val == null) return val;
+            const lower = String(val).toLowerCase();
+            if (lower === 'ya' || lower === 'yes') return 'Ya';
+            if (lower === 'tidak' || lower === 'no') return 'Tidak';
+            return val;
+          };
+          updatedFormData.UPWARD_MOBILITY = {
+            ...updatedFormData.UPWARD_MOBILITY,
+            ...(prevUM.bank_akaun_semasa != null && { UM_AKAUN_BIMB: normalizeYaTidak(prevUM.bank_akaun_semasa) }),
+            ...(prevUM.bank_bizapp != null && { UM_BIMB_BIZ: normalizeYaTidak(prevUM.bank_bizapp) }),
+            ...(prevUM.bank_al_awfar != null && { UM_AL_AWFAR: normalizeYaTidak(prevUM.bank_al_awfar) }),
+            ...(prevUM.bank_merchant_terminal != null && { UM_MERCHANT_TERMINAL: normalizeYaTidak(prevUM.bank_merchant_terminal) }),
+            ...(prevUM.bank_fasiliti_lain != null && { UM_FASILITI_LAIN: normalizeYaTidak(prevUM.bank_fasiliti_lain) }),
+            ...(prevUM.bank_mesinkira != null && { UM_MESINKIRA: normalizeYaTidak(prevUM.bank_mesinkira) }),
+            // Fix 4: always set aset fields unconditionally so null DB values reset to '' correctly
+            UM_ASET_BUKAN_TUNAI_SEMASA: prevUM.aset_bukan_tunai_semasa != null ? String(prevUM.aset_bukan_tunai_semasa) : '',
+            UM_ULASAN_ASET_BUKAN_TUNAI: prevUM.ulasan_aset_bukan_tunai ?? '',
+            UM_SIMPANAN_SEMASA: prevUM.simpanan_semasa != null ? String(prevUM.simpanan_semasa) : '',
+            UM_ZAKAT_SEMASA: prevUM.zakat_semasa != null ? String(prevUM.zakat_semasa) : '',
+            ...(parseUMArray(prevUM.digital_semasa).length > 0 && { UM_DIGITAL_SEMASA: parseUMArray(prevUM.digital_semasa) }),
+            ...(parseUMArray(prevUM.marketing_semasa).length > 0 && { UM_MARKETING_SEMASA: parseUMArray(prevUM.marketing_semasa) }),
+            ...(prevUM.ulasan_marketing && { UM_ULASAN_MARKETING: prevUM.ulasan_marketing }),
+          };
+        }
+
         return updatedFormData;
       });
 
@@ -616,6 +666,7 @@ const LaporanMajuPage = () => {
               Folder_ID: prev.Folder_ID,
               emel: prev.emel,
               NAMA_MENTEE: prev.NAMA_MENTEE, // Keep selected mentee name
+              UPWARD_MOBILITY: prev.UPWARD_MOBILITY, // Preserve carry-forward UM over stale draft
             };
 
             return {
@@ -870,6 +921,9 @@ const LaporanMajuPage = () => {
     });
     setSaveStatus('');
     setAutosaveArmed(false);
+    setPraisiDari(null);
+    setLockedSections({ bank: false, aset: false, digital: false });
+    setPrefillBannerDismissed(false);
 
     // Clear all file inputs in the DOM
     const fileInputs = document.querySelectorAll('input[type="file"]');
@@ -2383,6 +2437,23 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                 </div>
               )}
 
+              {/* UM carry-forward banner */}
+              {praisiDari && !prefillBannerDismissed && (
+                <div className="bg-amber-50 border border-amber-300 rounded-lg p-4 flex items-start justify-between">
+                  <p className="text-sm text-amber-800">
+                    ⚡ Data dipra-isi dari <strong>{praisiDari}</strong> — sila semak dan kemaskini
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setPrefillBannerDismissed(true)}
+                    className="ml-4 text-amber-600 hover:text-amber-800 text-xl leading-none"
+                    aria-label="Tutup"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+
               {/* ============== UPWARD MOBILITY SECTIONS (3-6) ============== */}
 
               {/* --- Section 3: Status & Mobiliti --- */}
@@ -2545,7 +2616,6 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
               </div>
 
               {/* --- Section 4: Bank Islam & Fintech --- */}
-              {/* --- Section 4: Bank Islam & Fintech --- */}
               <div className="bg-white p-6 rounded-lg shadow-sm border-l-4 border-orange-500">
                 <Section title={
                   <div className="flex items-center justify-between">
@@ -2555,7 +2625,22 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                     </span>
                   </div>
                 }>
-                  <div className="space-y-4">
+                  {praisiDari && !lockedSections.bank && (
+                    <button
+                      type="button"
+                      onClick={() => setLockedSections(prev => ({ ...prev, bank: true }))}
+                      className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-3 py-1.5 rounded mb-3"
+                    >
+                      🔒 Tidak Berubah
+                    </button>
+                  )}
+                  {lockedSections.bank && (
+                    <span className="inline-flex items-center text-sm font-medium text-green-600 border border-green-500 rounded px-2 py-1.5 mb-3 bg-green-50">
+                      ✓ Disalin dari {praisiDari}
+                      <button type="button" onClick={() => setLockedSections(prev => ({ ...prev, bank: false }))} className="ml-2 text-gray-400 hover:text-gray-700">Edit</button>
+                    </span>
+                  )}
+                  <div className={`space-y-4${lockedSections.bank ? ' opacity-50 cursor-not-allowed' : ''}`}>
                     {UPWARD_MOBILITY_SECTIONS.SECTION_4.items.map((item) => (
                       <div key={item.id} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                         <div className="font-semibold text-gray-700 mb-2">{item.title}</div>
@@ -2576,6 +2661,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                               checked={formData.UPWARD_MOBILITY[item.id] === 'Ya'}
                               onChange={(e) => handleUMChange(item.id, e.target.value)}
                               className="mr-2"
+                              disabled={lockedSections.bank}
                             />
                             <span>Yes</span>
                           </label>
@@ -2586,6 +2672,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                               checked={formData.UPWARD_MOBILITY[item.id] === 'Tidak'}
                               onChange={(e) => handleUMChange(item.id, e.target.value)}
                               className="mr-2"
+                              disabled={lockedSections.bank}
                             />
                             <span>No</span>
                           </label>
@@ -2611,7 +2698,8 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                   </InfoCard>
 
                   <div className="space-y-6">
-                    {UPWARD_MOBILITY_SECTIONS.SECTION_5.items.map((item) => (
+                    {/* Items 0-2: Always editable (pendapatan, pekerja, pekerja_parttime) */}
+                    {UPWARD_MOBILITY_SECTIONS.SECTION_5.items.slice(0, 3).map((item) => (
                       <div key={item.field} className="border-l-4 border-orange-300 pl-4">
                         {item.type === 'radio_yes_no' ? (
                           <div className="mb-2">
@@ -2675,6 +2763,66 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                         </div>
                       </div>
                     ))}
+
+                    {/* Items 3-5: Lockable aset group (aset_bukan_tunai, simpanan, zakat) */}
+                    <div>
+                      {praisiDari && !lockedSections.aset && (
+                        <button
+                          type="button"
+                          onClick={() => setLockedSections(prev => ({ ...prev, aset: true }))}
+                          className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-3 py-1.5 rounded mb-3"
+                        >
+                          🔒 Tidak Berubah
+                        </button>
+                      )}
+                      {lockedSections.aset && (
+                        <span className="inline-flex items-center text-sm font-medium text-green-600 border border-green-500 rounded px-2 py-1.5 mb-3 bg-green-50">
+                          ✓ Disalin dari {praisiDari}
+                          <button type="button" onClick={() => setLockedSections(prev => ({ ...prev, aset: false }))} className="ml-2 text-gray-400 hover:text-gray-700">Edit</button>
+                        </span>
+                      )}
+                      <div className={`space-y-6${lockedSections.aset ? ' opacity-50 cursor-not-allowed' : ''}`}>
+                        {UPWARD_MOBILITY_SECTIONS.SECTION_5.items.slice(3).map((item) => (
+                          <div key={item.field} className="border-l-4 border-orange-300 pl-4">
+                            {item.type === 'number_rm' ? (
+                              <InputField
+                                label={item.label + ' *'}
+                                type="number"
+                                value={formData.UPWARD_MOBILITY[item.field]}
+                                onChange={(e) => handleUMChange(item.field, e.target.value)}
+                                placeholder={item.placeholder}
+                                min="0"
+                                step="0.01"
+                                required
+                                disabled={lockedSections.aset}
+                              />
+                            ) : (
+                              <InputField
+                                label={item.label + ' *'}
+                                type="number"
+                                value={formData.UPWARD_MOBILITY[item.field]}
+                                onChange={(e) => handleUMChange(item.field, e.target.value)}
+                                placeholder={item.placeholder}
+                                step="0.01"
+                                required
+                                disabled={lockedSections.aset}
+                              />
+                            )}
+                            <div className="mt-3 bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                              <TextArea
+                                label={item.ulasanLabel}
+                                value={formData.UPWARD_MOBILITY[item.ulasanField]}
+                                onChange={(e) => handleUMChange(item.ulasanField, e.target.value)}
+                                rows={2}
+                                placeholder={item.ulasanPlaceholder}
+                                required
+                                disabled={lockedSections.aset}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </Section>
               </div>
@@ -2689,7 +2837,22 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                     </span>
                   </div>
                 }>
-                  <div className="space-y-6">
+                  {praisiDari && !lockedSections.digital && (
+                    <button
+                      type="button"
+                      onClick={() => setLockedSections(prev => ({ ...prev, digital: true }))}
+                      className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-3 py-1.5 rounded mb-3"
+                    >
+                      🔒 Tidak Berubah
+                    </button>
+                  )}
+                  {lockedSections.digital && (
+                    <span className="inline-flex items-center text-sm font-medium text-green-600 border border-green-500 rounded px-2 py-1.5 mb-3 bg-green-50">
+                      ✓ Disalin dari {praisiDari}
+                      <button type="button" onClick={() => setLockedSections(prev => ({ ...prev, digital: false }))} className="ml-2 text-gray-400 hover:text-gray-700">Edit</button>
+                    </span>
+                  )}
+                  <div className={`space-y-6${lockedSections.digital ? ' opacity-50 cursor-not-allowed' : ''}`}>
                     {/* Digital */}
                     <div className="border-l-4 border-orange-300 pl-4">
                       <label className="block text-sm font-medium text-gray-700 mb-3">
@@ -2701,9 +2864,10 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                             <input
                               type="checkbox"
                               value={opt}
-                              checked={(formData.UPWARD_MOBILITY[UPWARD_MOBILITY_SECTIONS.SECTION_6.digital.field] || []).includes(opt)}
+                              checked={Array.isArray(formData.UPWARD_MOBILITY[UPWARD_MOBILITY_SECTIONS.SECTION_6.digital.field]) && formData.UPWARD_MOBILITY[UPWARD_MOBILITY_SECTIONS.SECTION_6.digital.field].includes(opt)}
                               onChange={(e) => handleUMCheckboxChange(UPWARD_MOBILITY_SECTIONS.SECTION_6.digital.field, opt, e.target.checked)}
                               className="mr-3"
+                              disabled={lockedSections.digital}
                             />
                             <span>{opt}</span>
                           </label>
@@ -2717,6 +2881,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                           rows={2}
                           placeholder={UPWARD_MOBILITY_SECTIONS.SECTION_6.digital.ulasanPlaceholder}
                           required
+                          disabled={lockedSections.digital}
                         />
                       </div>
                     </div>
@@ -2732,9 +2897,10 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                             <input
                               type="checkbox"
                               value={opt}
-                              checked={(formData.UPWARD_MOBILITY[UPWARD_MOBILITY_SECTIONS.SECTION_6.marketing.field] || []).includes(opt)}
+                              checked={Array.isArray(formData.UPWARD_MOBILITY[UPWARD_MOBILITY_SECTIONS.SECTION_6.marketing.field]) && formData.UPWARD_MOBILITY[UPWARD_MOBILITY_SECTIONS.SECTION_6.marketing.field].includes(opt)}
                               onChange={(e) => handleUMCheckboxChange(UPWARD_MOBILITY_SECTIONS.SECTION_6.marketing.field, opt, e.target.checked)}
                               className="mr-3"
+                              disabled={lockedSections.digital}
                             />
                             <span>{opt}</span>
                           </label>
@@ -2748,6 +2914,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                           rows={2}
                           placeholder={UPWARD_MOBILITY_SECTIONS.SECTION_6.marketing.ulasanPlaceholder}
                           required
+                          disabled={lockedSections.digital}
                         />
                       </div>
                     </div>
