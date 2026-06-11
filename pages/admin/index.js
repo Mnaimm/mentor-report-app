@@ -282,6 +282,12 @@ export default function AdminCommandCenter({ userEmail, isReadOnlyUser, accessDe
             <h3 className="text-lg font-bold">Dashboard</h3>
             <p className="text-sm text-pink-100 mt-1">Charts & analytics</p>
           </Link>
+
+          <Link href="/admin/batch-timeline" className="bg-gradient-to-br from-teal-500 to-cyan-600 text-white rounded-xl shadow-md p-6 hover:shadow-lg transition-all transform hover:-translate-y-1">
+            <div className="text-4xl mb-3">📅</div>
+            <h3 className="text-lg font-bold">Jadual Batch</h3>
+            <p className="text-sm text-teal-100 mt-1">Garis masa pusingan batch</p>
+          </Link>
         </div>
       </div>
 

@@ -394,6 +394,11 @@ export default function HomePage() {
                 title="Penilaian GrowthWheel 360°"
                 description="Gunakan alat ini untuk penilaian dan muat turun carta."
               />
+              <ToolCard
+                href="/mentor/timeline"
+                title="Jadual Batch Saya"
+                description="Lihat garis masa pusingan batch yang anda kendalikan."
+              />
             </div>
 
             {/* MIA Section - Dedicated section for MIA mentees */}
