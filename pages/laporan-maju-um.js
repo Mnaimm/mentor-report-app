@@ -467,8 +467,9 @@ const LaporanMajuPage = () => {
   const handleMenteeSelect = useCallback(async (e) => {
     const selectedMenteeName = e.target.value;
 
-    // Find full mentee object to get entrepreneur_id
-    const selectedMenteeData = filteredMenteesForDropdown.find(m => m.Usahawan === selectedMenteeName);
+    // Look up in full mapping list — filteredMenteesForDropdown has a stale closure issue
+    // (same pattern as laporan-bangkit.js which uses allMentees.find)
+    const selectedMenteeData = allMenteesMapping.find(m => m.Usahawan === selectedMenteeName);
 
     setFormData(prev => ({
       ...prev,
