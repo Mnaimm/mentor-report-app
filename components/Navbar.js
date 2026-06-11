@@ -82,6 +82,14 @@ export default function Navbar() {
                   Usahawan Saya
                 </Link>
 
+                <Link
+                  href="/mentor/timeline"
+                  className={`px-2 lg:px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${isCurrentPage('/mentor/timeline') ? 'text-blue-600 bg-blue-50 cursor-default' : 'text-gray-700 hover:text-blue-600'}`}
+                  onClick={(e) => isCurrentPage('/mentor/timeline') && e.preventDefault()}
+                >
+                  Timeline
+                </Link>
+
                 {/* Dropdown for Laporan options */}
                 <div className="relative group pb-2">
                   <button className="text-gray-700 hover:text-blue-600 px-2 lg:px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1 whitespace-nowrap">
@@ -204,6 +212,13 @@ export default function Navbar() {
                       >
                         Perbandingan Zon
                       </Link>
+                      <Link
+                        href="/admin/batch-timeline"
+                        className={`block px-4 py-2 text-sm ${isCurrentPage('/admin/batch-timeline') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:bg-blue-50'}`}
+                        onClick={(e) => isCurrentPage('/admin/batch-timeline') && e.preventDefault()}
+                      >
+                        Batch Timeline
+                      </Link>
                     </div>
                   </div>
                 )}
@@ -285,6 +300,20 @@ export default function Navbar() {
                   }}
                 >
                   Usahawan Saya
+                </Link>
+
+                <Link
+                  href="/mentor/timeline"
+                  className={`block px-3 py-2 rounded-md text-sm font-medium transition-colors ${isCurrentPage('/mentor/timeline') ? 'text-blue-600 bg-blue-50 cursor-default' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
+                  onClick={(e) => {
+                    if (isCurrentPage('/mentor/timeline')) {
+                      e.preventDefault();
+                    } else {
+                      setMobileMenuOpen(false);
+                    }
+                  }}
+                >
+                  Timeline
                 </Link>
 
                 <div className="px-3 py-2">
@@ -481,6 +510,19 @@ export default function Navbar() {
                         }}
                       >
                         Perbandingan Zon
+                      </Link>
+                      <Link
+                        href="/admin/batch-timeline"
+                        className={`block px-3 py-2 rounded-md text-sm transition-colors ${isCurrentPage('/admin/batch-timeline') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
+                        onClick={(e) => {
+                          if (isCurrentPage('/admin/batch-timeline')) {
+                            e.preventDefault();
+                          } else {
+                            setMobileMenuOpen(false);
+                          }
+                        }}
+                      >
+                        Batch Timeline
                       </Link>
                     </div>
                   </div>
