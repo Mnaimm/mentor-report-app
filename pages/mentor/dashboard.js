@@ -149,12 +149,18 @@ export default function MentorDashboard() {
   };
 
   const handleSubmitReport = (mentee) => {
-    // Determine which form based on program
-    const isBangkit = mentee.program?.toLowerCase().includes('bangkit');
-    const formUrl = isBangkit ? '/laporan-bangkit' : '/laporan-maju-um';
+    const programLower = (mentee.program || '').toLowerCase();
+    const isMaju = programLower.includes('maju');
+    const formUrl = isMaju ? '/laporan-maju-um' : '/laporan-bangkit';
 
-    // Navigate to form with mentee ID as query param
-    router.push(`${formUrl}?mentee=${mentee.id}&name=${encodeURIComponent(mentee.name)}`);
+    const params = new URLSearchParams();
+    const mentorId = dashboardData?.mentor?.email;
+    if (mentorId) params.set('mentor_id', mentorId);
+    if (mentee.entrepreneurId) params.set('entrepreneur_id', mentee.entrepreneurId);
+    if (mentee.batchRoundId) params.set('batch_round_id', mentee.batchRoundId);
+
+    const query = params.toString();
+    router.push(query ? `${formUrl}?${query}` : formUrl);
   };
 
   const handleViewDetails = (mentee) => {

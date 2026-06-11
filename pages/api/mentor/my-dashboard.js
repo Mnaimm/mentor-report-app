@@ -125,6 +125,7 @@ export default async function handler(req, res) {
       console.log(`✅ Found round: ${currentRound.batch_name} - ${currentRound.round_name}`);
 
       return {
+        id: currentRound.id,
         batch: currentRound.batch_name,
         round: currentRound.round_name,
         roundNumber: currentRound.round_number,
@@ -163,7 +164,25 @@ export default async function handler(req, res) {
     const client = await getSheetsClient();
     let mappingRows = [];
     try {
-      mappingRows = await client.getRows('mapping');
+      const mappingResponse = await client.sheets.spreadsheets.values.get({
+        spreadsheetId: process.env.GOOGLE_SHEETS_MAPPING_ID,
+        range: 'mapping!A:L',
+      });
+      const rawValues = mappingResponse.data.values || [];
+      mappingRows = rawValues.slice(1).map(row => ({
+        Batch: row[0] || '',
+        Zon: row[1] || '',
+        Mentor: row[2] || '',
+        Mentor_Email: row[3] || '',
+        Usahawan: row[4] || '',
+        entrepreneur_id: row[5] || '',
+        Nama_Syarikat: row[6] || '',
+        Alamat: row[7] || '',
+        No_Tel: row[8] || '',
+        Folder_ID: row[9] || '',
+        Emel: row[10] || '',
+        Jenis_Bisnes: row[11] || '',
+      }));
       console.log(`✅ Loaded ${mappingRows.length} rows from mapping sheet`);
     } catch (sheetError) {
       console.error('❌ Error fetching mapping sheet:', sheetError);
@@ -233,6 +252,8 @@ export default async function handler(req, res) {
       if (batchStr.toLowerCase().includes('bangkit')) program = 'Bangkit';
       else if (batchStr.toLowerCase().includes('maju')) program = 'Maju';
 
+      const entrepreneurId = getCol(['entrepreneur_id']) || '';
+
       // Mock an 'entrepreneurs' object to match previous structure
       return {
         id: `sheet_row_${index}`, // Dummy ID since we don't have DB IDs
@@ -240,6 +261,7 @@ export default async function handler(req, res) {
         status: 'active',
         entrepreneurs: {
           id: `sheet_${index}`, // Dummy ID
+          entrepreneur_id: entrepreneurId,
           name: menteeName,
           email: email,
           business_name: businessName,
@@ -424,6 +446,7 @@ export default async function handler(req, res) {
 
       return {
         id: entrepreneur.id,
+        entrepreneurId: entrepreneur.entrepreneur_id || '',
         name: entrepreneur.name,
         email: entrepreneur.email,
         businessName: entrepreneur.business_name || 'Unknown Business',
@@ -441,9 +464,10 @@ export default async function handler(req, res) {
         lastSessionDate: lastSessionDate,
         roundDueDate: dueDate?.toISOString().split('T')[0],
         nextDueDate: dueDate?.toISOString().split('T')[0],
-        daysUntilDue: daysUntilDue, // Keep existing calc for display if needed, but status drives logic
+        daysUntilDue: daysUntilDue,
         assignedAt: assignment.assigned_at,
         batchPeriod: batchInfo?.period || '',
+        batchRoundId: batchInfo?.id || null,
         nextDueSession: validationResult.nextDueSession,
         missingSessions: validationResult.missingSessions
       };
