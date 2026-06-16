@@ -184,14 +184,14 @@ const mapBangkitDataToSheetRow = (data, miaRequestId = null) => {
  * Columns L-AR: Legacy fields (leave empty)
  * Columns AS-BT: UM-specific fields
  */
-const mapUMToUpwardMobilitySheetRow = (reportData, umData) => {
+const mapUMToUpwardMobilitySheetRow = (reportData, umData, entrepreneurBatch = '') => {
   const row = Array(72).fill(''); // Columns 0-71 (A-BT: 72 total)
 
   // ✅ Columns A-K (0-10): Basic session info
   row[0] = new Date().toISOString();                     // A  Timestamp
   row[1] = reportData?.mentorEmail || '';                // B  Email Address
   row[2] = 'Bangkit';                                    // C  Program
-  row[3] = reportData?.batch || '';                      // D  Batch
+  row[3] = entrepreneurBatch || '';                      // D  Batch (from entrepreneur record)
   row[4] = `Sesi ${reportData?.sesiLaporan ?? ''}`;      // E  Sesi Mentoring
   row[5] = reportData?.namaMentor || '';                 // F  Nama Mentor
   row[6] = reportData?.usahawan || '';                   // G  Nama Penuh Usahawan
@@ -634,8 +634,28 @@ export default async function handler(req, res) {
           throw new Error('Missing GOOGLE_SHEET_ID_UM environment variable');
         }
 
+        // Fetch entrepreneur batch from DB (form payload batch is unreliable)
+        let entrepreneurBatchForUM = '';
+        if (reportData.entrepreneur_id) {
+          const { data: _eById } = await supabaseAdmin
+            .from('entrepreneurs')
+            .select('batch')
+            .eq('id', reportData.entrepreneur_id)
+            .maybeSingle();
+          if (_eById?.batch) entrepreneurBatchForUM = _eById.batch;
+        }
+        if (!entrepreneurBatchForUM && reportData.emailUsahawan) {
+          const { data: _eByEmail } = await supabaseAdmin
+            .from('entrepreneurs')
+            .select('batch')
+            .eq('email', reportData.emailUsahawan.toLowerCase().trim())
+            .maybeSingle();
+          if (_eByEmail?.batch) entrepreneurBatchForUM = _eByEmail.batch;
+        }
+        console.log('📊 Entrepreneur batch for UM sheet:', entrepreneurBatchForUM);
+
         // Map data to UM sheet row
-        const umRowData = mapUMToUpwardMobilitySheetRow(reportData, umData);
+        const umRowData = mapUMToUpwardMobilitySheetRow(reportData, umData, entrepreneurBatchForUM);
 
         // Append to UM sheet with 8s timeout
         const umAppendRes = await Promise.race([
@@ -716,7 +736,7 @@ export default async function handler(req, res) {
         if (entrepreneurId) {
           const { data: byId, error: idError } = await supabaseAdmin
             .from('entrepreneurs')
-            .select('id')
+            .select('id, batch')
             .eq('id', entrepreneurId)
             .maybeSingle();
 
@@ -736,7 +756,7 @@ export default async function handler(req, res) {
           if (rawEmail) {
             const { data: byEmail } = await supabaseAdmin
               .from('entrepreneurs')
-              .select('id')
+              .select('id, batch')
               .eq('email', rawEmail)
               .maybeSingle();
             if (byEmail) {
@@ -753,7 +773,7 @@ export default async function handler(req, res) {
           if (usahawanName) {
             const { data: byName } = await supabaseAdmin
               .from('entrepreneurs')
-              .select('id')
+              .select('id, batch')
               .ilike('name', usahawanName)
               .maybeSingle();
             if (byName) {
@@ -777,6 +797,9 @@ export default async function handler(req, res) {
         // Required foreign keys
         umSupabasePayload.entrepreneur_id = entrepreneur.id;
         umSupabasePayload.mentor_id = mentorData.id;
+
+        // Batch from entrepreneur record (not from form payload — form doesn't send reliable batch)
+        if (entrepreneur.batch) umSupabasePayload.batch = entrepreneur.batch;
 
         // Program & Session
         if (reportData.sesiLaporan) umSupabasePayload.sesi_mentoring = `Sesi ${reportData.sesiLaporan}`;
