@@ -552,7 +552,7 @@ export default function HomePage() {
       </div>
 
       {/* Overdue floating banner — shown past round midpoint with pending reports */}
-      {session && pendingBanner?.hasPending && !bannerDismissed && (
+      {false && session && pendingBanner?.hasPending && !bannerDismissed && (
         <div className="fixed bottom-0 left-0 right-0 z-40 bg-amber-50 border-t-2 border-amber-400 shadow-lg">
           <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
             <p className="text-amber-800 text-sm font-medium">
