@@ -25,8 +25,6 @@ export default async function handler(req, res) {
         bank_merchant_terminal,
         bank_fasiliti_lain,
         bank_mesinkira,
-        pendapatan_semasa,
-        ulasan_pendapatan,
         pekerja_semasa,
         ulasan_pekerja,
         pekerja_parttime_semasa,

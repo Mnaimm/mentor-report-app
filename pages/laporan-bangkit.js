@@ -686,8 +686,6 @@ export default function LaporanSesiPage() {
         ...(prevUM.bank_fasiliti_lain != null && { UM_FASILITI_LAIN: normalizeYaTidak(prevUM.bank_fasiliti_lain) }),
         ...(prevUM.bank_mesinkira != null && { UM_MESINKIRA: normalizeYaTidak(prevUM.bank_mesinkira) }),
         // Bahagian 5: pendapatan/pekerja (editable, no lock)
-        UM_PENDAPATAN_SEMASA: prevUM.pendapatan_semasa != null ? String(prevUM.pendapatan_semasa) : '',
-        UM_ULASAN_PENDAPATAN: prevUM.ulasan_pendapatan ?? '',
         UM_PEKERJA_SEMASA: prevUM.pekerja_semasa != null ? String(prevUM.pekerja_semasa) : '',
         UM_ULASAN_PEKERJA: prevUM.ulasan_pekerja ?? '',
         UM_PEKERJA_PARTTIME_SEMASA: prevUM.pekerja_parttime_semasa != null ? String(prevUM.pekerja_parttime_semasa) : '',
