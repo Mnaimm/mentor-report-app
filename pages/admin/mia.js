@@ -1,511 +1,266 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { getSession } from 'next-auth/react';
 import Link from 'next/link';
 import { canAccessAdmin, isReadOnly } from '../../lib/auth';
 import AccessDenied from '../../components/AccessDenied';
 import ReadOnlyBadge from '../../components/ReadOnlyBadge';
-import {
-  MIA_STATUS,
-  getMIAStatusLabel,
-  getMIAStatusBadgeClasses,
-  generateBIMBMessage,
-  copyToClipboard,
-  formatTimestamp
-} from '../../lib/mia';
 
-export default function MIAAdminPage({ userEmail, isReadOnlyUser, accessDenied }) {
-  const [requests, setRequests] = useState([]);
+function DaysBadge({ days }) {
+  if (days > 90) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-900 text-red-300 border border-red-700">
+        🔴 Urgent &bull; {days} hari
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-900 text-yellow-300 border border-yellow-700">
+      🟡 Dalam Proses &bull; {days} hari
+    </span>
+  );
+}
+
+function TiadaSebabBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-700 text-gray-400 border border-gray-600">
+      ⚪ Tiada Sebab
+    </span>
+  );
+}
+
+function MenteeRow({ mentee }) {
+  const [expanded, setExpanded] = useState(false);
+  const displayDate = mentee.session_date
+    ? new Date(mentee.session_date).toLocaleDateString('ms-MY', { day: '2-digit', month: 'short', year: 'numeric' })
+    : new Date(mentee.submission_date).toLocaleDateString('ms-MY', { day: '2-digit', month: 'short', year: 'numeric' });
+
+  return (
+    <div className="border border-gray-700 rounded-lg mb-2 overflow-hidden">
+      <div
+        className="flex flex-col sm:flex-row sm:items-center gap-2 p-4 cursor-pointer hover:bg-gray-750 transition-colors"
+        style={{ backgroundColor: 'rgb(31,41,55)' }}
+        onClick={() => setExpanded(v => !v)}
+      >
+        {/* Name + business */}
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-white truncate">{mentee.nama_mentee}</p>
+          {mentee.business_name && (
+            <p className="text-xs text-gray-400 truncate">{mentee.business_name}</p>
+          )}
+        </div>
+
+        {/* Program / batch / session */}
+        <div className="text-right sm:w-48">
+          <p className="text-sm text-gray-300">{mentee.program} &bull; Sesi {mentee.session_number}</p>
+          {mentee.batch && <p className="text-xs text-gray-500">{mentee.batch}</p>}
+        </div>
+
+        {/* Days badge */}
+        <div className="sm:w-52 flex flex-wrap gap-1 sm:justify-end">
+          <DaysBadge days={mentee.days_since} />
+          {!mentee.mia_reason && <TiadaSebabBadge />}
+        </div>
+
+        {/* Expand toggle */}
+        <div className="text-gray-500 text-sm sm:w-8 text-right">
+          {expanded ? '▲' : '▼'}
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="bg-gray-900 border-t border-gray-700 p-4 space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+            <div>
+              <span className="text-gray-500">Tarikh MIA:</span>
+              <span className="ml-2 text-gray-200">{displayDate}</span>
+            </div>
+            {mentee.phone && (
+              <div>
+                <span className="text-gray-500">No. Telefon:</span>
+                <a
+                  href={`tel:${mentee.phone}`}
+                  className="ml-2 text-blue-400 hover:text-blue-300"
+                  onClick={e => e.stopPropagation()}
+                >
+                  {mentee.phone}
+                </a>
+              </div>
+            )}
+            {mentee.state && (
+              <div>
+                <span className="text-gray-500">Negeri:</span>
+                <span className="ml-2 text-gray-200">{mentee.state}</span>
+              </div>
+            )}
+          </div>
+
+          {mentee.mia_reason ? (
+            <div>
+              <p className="text-gray-500 text-xs mb-1">Alasan MIA:</p>
+              <p className="text-sm text-gray-200 bg-gray-800 rounded p-3 whitespace-pre-wrap border border-gray-700">
+                {mentee.mia_reason}
+              </p>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500 italic">Tiada alasan dinyatakan oleh mentor.</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MentorGroup({ group }) {
+  const [expanded, setExpanded] = useState(false);
+  const hasUrgent = group.max_days_since > 90;
+
+  return (
+    <div className={`rounded-xl mb-4 border overflow-hidden ${hasUrgent ? 'border-red-800' : 'border-gray-700'}`}>
+      {/* Group header */}
+      <button
+        onClick={() => setExpanded(v => !v)}
+        className={`w-full flex flex-col sm:flex-row sm:items-center gap-2 p-5 text-left transition-colors ${
+          hasUrgent ? 'bg-red-950 hover:bg-red-900' : 'bg-gray-800 hover:bg-gray-750'
+        }`}
+        style={hasUrgent ? {} : { backgroundColor: 'rgb(31,41,55)' }}
+      >
+        <div className="flex-1 min-w-0">
+          <p className="font-bold text-white text-base">{group.mentor_name}</p>
+          <p className="text-xs text-gray-400">{group.mentor_email}</p>
+        </div>
+        <div className="flex items-center gap-3 sm:justify-end">
+          <span className="text-sm text-gray-400">{group.mentees.length} usahawan MIA</span>
+          <DaysBadge days={group.max_days_since} />
+          <span className="text-gray-500">{expanded ? '▲' : '▼'}</span>
+        </div>
+      </button>
+
+      {/* Mentee list */}
+      {expanded && (
+        <div className="p-4 bg-gray-900 border-t border-gray-700 space-y-2">
+          {group.mentees.map(m => (
+            <MenteeRow key={m.report_id} mentee={m} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function SenaraeMIAPage({ userEmail, isReadOnlyUser, accessDenied }) {
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [expandedRows, setExpandedRows] = useState({});
-  const [filterProgram, setFilterProgram] = useState('all');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [actionLoading, setActionLoading] = useState({});
-  const [copySuccess, setCopySuccess] = useState({});
-  const ITEMS_PER_PAGE = 20;
 
-  if (accessDenied) {
-    return <AccessDenied userEmail={userEmail} />;
-  }
+  if (accessDenied) return <AccessDenied userEmail={userEmail} />;
 
-  const fetchRequests = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/admin/mia-requests');
+      const res = await fetch('/api/admin/mia');
       const json = await res.json();
-
-      if (!json.success) {
-        throw new Error(json.error || 'Failed to fetch MIA requests');
-      }
-
-      setRequests(json.data || []);
+      if (!json.success) throw new Error(json.error || 'Gagal memuatkan data');
+      setData(json);
     } catch (err) {
-      console.error('Error fetching MIA requests:', err);
+      console.error('Error fetching MIA data:', err);
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchRequests();
   }, []);
 
-  // Toggle row expansion
-  const toggleRow = (requestId) => {
-    setExpandedRows(prev => ({
-      ...prev,
-      [requestId]: !prev[requestId]
-    }));
-  };
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Handle copy BIMB message
-  const handleCopyBIMBMessage = async (request) => {
-    const menteeData = {
-      mentee_name: request.mentee_name,
-      mentee_company: request.mentee_company,
-      mentee_business_type: request.mentee_business_type,
-      mentee_location: request.mentee_location,
-      mentee_phone: request.mentee_phone
-    };
-
-    const message = generateBIMBMessage(menteeData, request.program, request.batch);
-    const success = await copyToClipboard(message);
-
-    if (success) {
-      setCopySuccess({ ...copySuccess, [request.id]: true });
-      setTimeout(() => {
-        setCopySuccess(prev => ({ ...prev, [request.id]: false }));
-      }, 2000);
-    } else {
-      alert('Gagal menyalin mesej. Sila cuba lagi.');
-    }
-  };
-
-  // Update MIA request status
-  const updateRequestStatus = async (requestId, newStatus, rejectionReason = null) => {
-    if (isReadOnlyUser) {
-      alert('Anda tidak mempunyai akses untuk mengubah status MIA.');
-      return;
-    }
-
-    setActionLoading({ ...actionLoading, [requestId]: true });
-
-    try {
-      const res = await fetch('/api/admin/mia-requests/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          requestId,
-          status: newStatus,
-          adminEmail: userEmail,
-          rejectionReason
-        })
-      });
-
-      const json = await res.json();
-
-      if (!json.success) {
-        throw new Error(json.error || 'Failed to update status');
-      }
-
-      // Refresh data
-      await fetchRequests();
-      alert('Status MIA berjaya dikemaskini!');
-    } catch (err) {
-      console.error('Error updating status:', err);
-      alert(`Gagal mengemas kini status: ${err.message}`);
-    } finally {
-      setActionLoading({ ...actionLoading, [requestId]: false });
-    }
-  };
-
-  // Handle status actions
-  const handleBIMBContacted = (requestId) => {
-    if (confirm('Adakah anda sudah menghubungi BIMB untuk kes ini?')) {
-      updateRequestStatus(requestId, MIA_STATUS.BIMB_CONTACTED);
-    }
-  };
-
-  const handleApprove = (requestId) => {
-    if (confirm('Adakah anda pasti untuk meluluskan MIA ini?')) {
-      updateRequestStatus(requestId, MIA_STATUS.APPROVED);
-    }
-  };
-
-  const handleReject = (requestId) => {
-    const reason = prompt('Sila nyatakan sebab penolakan MIA:');
-    if (reason && reason.trim() !== '') {
-      updateRequestStatus(requestId, MIA_STATUS.REJECTED, reason.trim());
-    }
-  };
-
-  // Filtering
-  const filteredRequests = requests.filter(request => {
-    if (filterProgram !== 'all' && request.program !== filterProgram) return false;
-    if (filterStatus !== 'all' && request.status !== filterStatus) return false;
-    return true;
-  });
-
-  // Pagination
-  const totalPages = Math.ceil(filteredRequests.length / ITEMS_PER_PAGE);
-  const paginatedRequests = filteredRequests.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
-
-  // Stats calculation
-  const stats = {
-    total: requests.length,
-    requested: requests.filter(r => r.status === MIA_STATUS.REQUESTED).length,
-    bimbContacted: requests.filter(r => r.status === MIA_STATUS.BIMB_CONTACTED).length,
-    approved: requests.filter(r => r.status === MIA_STATUS.APPROVED).length,
-    rejected: requests.filter(r => r.status === MIA_STATUS.REJECTED).length
-  };
+  const summary = data?.summary || { total: 0, urgent: 0, tanpaSebab: 0 };
+  const mentorGroups = data?.mentorGroups || [];
+  const unassigned = data?.unassigned || [];
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 bg-gray-50 min-h-screen">
-      {isReadOnlyUser && <ReadOnlyBadge userEmail={userEmail} />}
+    <div className="min-h-screen bg-gray-900 text-white">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {isReadOnlyUser && <ReadOnlyBadge userEmail={userEmail} />}
 
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">
-          Pengurusan MIA (Missing In Action)
-        </h1>
-        <nav className="text-sm text-gray-600">
-          <Link href="/admin" className="hover:text-blue-600">Admin</Link>
-          <span className="mx-2">/</span>
-          <span className="font-medium text-gray-800">MIA Requests</span>
-        </nav>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
-        <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-blue-400">
-          <p className="text-gray-500 text-sm font-medium">Jumlah Permohonan</p>
-          <p className="text-3xl font-bold text-gray-800">{stats.total}</p>
-        </div>
-        <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-yellow-400">
-          <p className="text-gray-500 text-sm font-medium">Menunggu Semakan</p>
-          <p className="text-3xl font-bold text-yellow-600">{stats.requested}</p>
-        </div>
-        <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-blue-500">
-          <p className="text-gray-500 text-sm font-medium">BIMB Dihubungi</p>
-          <p className="text-3xl font-bold text-blue-600">{stats.bimbContacted}</p>
-        </div>
-        <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-green-400">
-          <p className="text-gray-500 text-sm font-medium">Diluluskan</p>
-          <p className="text-3xl font-bold text-green-600">{stats.approved}</p>
-        </div>
-        <div className="bg-white p-6 rounded-xl shadow-md border-l-4 border-red-400">
-          <p className="text-gray-500 text-sm font-medium">Ditolak</p>
-          <p className="text-3xl font-bold text-red-600">{stats.rejected}</p>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="bg-white p-6 rounded-xl shadow-md mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Program Filter */}
-          <select
-            value={filterProgram}
-            onChange={(e) => {
-              setFilterProgram(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
-          >
-            <option value="all">Semua Program</option>
-            <option value="bangkit">iTEKAD Bangkit</option>
-            <option value="maju">iTEKAD Maju</option>
-          </select>
-
-          {/* Status Filter */}
-          <select
-            value={filterStatus}
-            onChange={(e) => {
-              setFilterStatus(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
-          >
-            <option value="all">Semua Status</option>
-            <option value={MIA_STATUS.REQUESTED}>Menunggu Semakan</option>
-            <option value={MIA_STATUS.BIMB_CONTACTED}>BIMB Dihubungi</option>
-            <option value={MIA_STATUS.APPROVED}>Diluluskan</option>
-            <option value={MIA_STATUS.REJECTED}>Ditolak</option>
-          </select>
-
-          {/* Spacer */}
-          <div></div>
-
-          {/* Refresh Button */}
+        {/* Header */}
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <nav className="text-xs text-gray-500 mb-1">
+              <Link href="/admin" className="hover:text-gray-300">Admin</Link>
+              <span className="mx-2">/</span>
+              <span className="text-gray-300">Senarai MIA</span>
+            </nav>
+            <h1 className="text-2xl font-bold text-white">Senarai MIA</h1>
+            <p className="text-sm text-gray-400 mt-1">Usahawan yang tidak dapat dihubungi (Missing In Action)</p>
+          </div>
           <button
-            onClick={fetchRequests}
+            onClick={fetchData}
             disabled={loading}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
+            className="self-start sm:self-auto px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-600 text-sm text-white rounded-lg transition-colors"
           >
-            {loading ? 'Loading...' : '🔄 Refresh'}
+            {loading ? 'Memuatkan...' : '↻ Muat Semula'}
           </button>
         </div>
-      </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl shadow-md overflow-hidden">
+        {/* Summary cards */}
+        <div className="grid grid-cols-3 gap-4 mb-8">
+          <div className="bg-gray-800 rounded-xl p-5 border border-gray-700">
+            <p className="text-gray-400 text-xs font-medium uppercase tracking-wide mb-1">Jumlah MIA</p>
+            <p className="text-3xl font-bold text-white">{summary.total}</p>
+          </div>
+          <div className="bg-red-950 rounded-xl p-5 border border-red-800">
+            <p className="text-red-400 text-xs font-medium uppercase tracking-wide mb-1">Urgent (&gt;90 hari)</p>
+            <p className="text-3xl font-bold text-red-300">{summary.urgent}</p>
+          </div>
+          <div className="bg-gray-800 rounded-xl p-5 border border-gray-600">
+            <p className="text-gray-400 text-xs font-medium uppercase tracking-wide mb-1">Tiada Sebab</p>
+            <p className="text-3xl font-bold text-gray-300">{summary.tanpaSebab}</p>
+          </div>
+        </div>
+
+        {/* Content */}
         {loading ? (
-          <div className="p-10 text-center text-gray-500">Loading MIA requests...</div>
+          <div className="text-center py-20 text-gray-500">Memuatkan senarai MIA...</div>
         ) : error ? (
-          <div className="p-10 text-center text-red-500">Error: {error}</div>
-        ) : paginatedRequests.length === 0 ? (
-          <div className="p-10 text-center text-gray-500">Tiada permohonan MIA ditemui</div>
+          <div className="text-center py-20 text-red-400">Ralat: {error}</div>
+        ) : mentorGroups.length === 0 && unassigned.length === 0 ? (
+          <div className="text-center py-20 text-gray-500">
+            <p className="text-4xl mb-3">✅</p>
+            <p className="text-lg font-medium text-gray-300">Tiada usahawan MIA</p>
+            <p className="text-sm text-gray-500 mt-1">Semua usahawan boleh dihubungi.</p>
+          </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Mentor / Mentee</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Syarikat</th>
-                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase">Program / Batch</th>
-                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase">Tarikh</th>
-                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase">Status</th>
-                    <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase">Tindakan</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {paginatedRequests.map((request) => (
-                    <React.Fragment key={request.id}>
-                      {/* Main Row */}
-                      <tr className="hover:bg-gray-50">
-                        <td className="px-6 py-4">
-                          <div className="font-medium text-gray-900">{request.mentor_name}</div>
-                          <div className="text-sm text-gray-500">{request.mentee_name}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm text-gray-700">{request.mentee_company || 'N/A'}</div>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <div className="font-medium text-gray-900">
-                            {request.program === 'bangkit' ? 'Bangkit' : 'Maju'}
-                          </div>
-                          <div className="text-sm text-gray-500">{request.batch} - Sesi {request.session_number}</div>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <div className="text-sm text-gray-700">{formatTimestamp(request.requested_at)}</div>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full border ${getMIAStatusBadgeClasses(request.status)}`}>
-                            {getMIAStatusLabel(request.status)}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <button
-                            onClick={() => toggleRow(request.id)}
-                            className="text-blue-600 hover:text-blue-800 font-medium"
-                          >
-                            {expandedRows[request.id] ? '▲ Tutup' : '▼ Lihat Butiran'}
-                          </button>
-                        </td>
-                      </tr>
+            {/* Mentor groups */}
+            {mentorGroups.length > 0 && (
+              <section className="mb-8">
+                <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">
+                  Mengikut Mentor ({mentorGroups.length} mentor)
+                </h2>
+                {mentorGroups.map(g => (
+                  <MentorGroup key={g.mentor_id} group={g} />
+                ))}
+              </section>
+            )}
 
-                      {/* Expanded Row */}
-                      {expandedRows[request.id] && (
-                        <tr>
-                          <td colSpan="6" className="px-6 py-6 bg-gray-50">
-                            <div className="space-y-6">
-                              {/* Mentee Details */}
-                              <div>
-                                <h4 className="font-semibold text-gray-800 mb-3">Maklumat Usahawan</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                                  <div>
-                                    <span className="text-gray-500">Jenis Bisnes:</span>
-                                    <span className="ml-2 text-gray-800">{request.mentee_business_type || 'N/A'}</span>
-                                  </div>
-                                  <div>
-                                    <span className="text-gray-500">Lokasi:</span>
-                                    <span className="ml-2 text-gray-800">{request.mentee_location || 'N/A'}</span>
-                                  </div>
-                                  <div>
-                                    <span className="text-gray-500">No. Telefon:</span>
-                                    <span className="ml-2 text-gray-800">{request.mentee_phone || 'N/A'}</span>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* MIA Reason */}
-                              <div>
-                                <h4 className="font-semibold text-gray-800 mb-2">Alasan MIA</h4>
-                                <p className="text-sm text-gray-700 bg-white p-4 rounded-lg border">
-                                  {request.alasan}
-                                </p>
-                              </div>
-
-                              {/* Proof Images */}
-                              <div>
-                                <h4 className="font-semibold text-gray-800 mb-3">Bukti Percubaan Menghubungi</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                  {/* WhatsApp Proof */}
-                                  <div className="bg-white p-4 rounded-lg border">
-                                    <p className="text-sm font-medium text-gray-700 mb-2">Bukti WhatsApp</p>
-                                    {request.proof_whatsapp_url ? (
-                                      <a
-                                        href={request.proof_whatsapp_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="block"
-                                      >
-                                        <img
-                                          src={request.proof_whatsapp_url}
-                                          alt="WhatsApp Proof"
-                                          className="w-full h-48 object-cover rounded border cursor-pointer hover:opacity-80"
-                                        />
-                                      </a>
-                                    ) : (
-                                      <div className="w-full h-48 bg-gray-200 rounded flex items-center justify-center text-gray-500 text-sm">
-                                        Tiada bukti
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  {/* Email Proof */}
-                                  <div className="bg-white p-4 rounded-lg border">
-                                    <p className="text-sm font-medium text-gray-700 mb-2">Bukti E-mel</p>
-                                    {request.proof_email_url ? (
-                                      <a
-                                        href={request.proof_email_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="block"
-                                      >
-                                        <img
-                                          src={request.proof_email_url}
-                                          alt="Email Proof"
-                                          className="w-full h-48 object-cover rounded border cursor-pointer hover:opacity-80"
-                                        />
-                                      </a>
-                                    ) : (
-                                      <div className="w-full h-48 bg-gray-200 rounded flex items-center justify-center text-gray-500 text-sm">
-                                        Tiada bukti
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  {/* Call Proof */}
-                                  <div className="bg-white p-4 rounded-lg border">
-                                    <p className="text-sm font-medium text-gray-700 mb-2">Bukti Panggilan</p>
-                                    {request.proof_call_url ? (
-                                      <a
-                                        href={request.proof_call_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="block"
-                                      >
-                                        <img
-                                          src={request.proof_call_url}
-                                          alt="Call Proof"
-                                          className="w-full h-48 object-cover rounded border cursor-pointer hover:opacity-80"
-                                        />
-                                      </a>
-                                    ) : (
-                                      <div className="w-full h-48 bg-gray-200 rounded flex items-center justify-center text-gray-500 text-sm">
-                                        Tiada bukti
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Action Buttons */}
-                              <div className="flex flex-wrap gap-3 pt-4 border-t">
-                                {/* Copy BIMB Message */}
-                                <button
-                                  onClick={() => handleCopyBIMBMessage(request)}
-                                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2"
-                                >
-                                  {copySuccess[request.id] ? '✓ Disalin!' : '📋 Salin Mesej BIMB'}
-                                </button>
-
-                                {/* BIMB Contacted */}
-                                {request.status === MIA_STATUS.REQUESTED && (
-                                  <button
-                                    onClick={() => handleBIMBContacted(request.id)}
-                                    disabled={actionLoading[request.id] || isReadOnlyUser}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                                  >
-                                    {actionLoading[request.id] ? 'Processing...' : '✉️ BIMB Dah Dihubungi'}
-                                  </button>
-                                )}
-
-                                {/* Approve */}
-                                {(request.status === MIA_STATUS.REQUESTED || request.status === MIA_STATUS.BIMB_CONTACTED) && (
-                                  <button
-                                    onClick={() => handleApprove(request.id)}
-                                    disabled={actionLoading[request.id] || isReadOnlyUser}
-                                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                                  >
-                                    {actionLoading[request.id] ? 'Processing...' : '✅ Luluskan MIA'}
-                                  </button>
-                                )}
-
-                                {/* Reject */}
-                                {(request.status === MIA_STATUS.REQUESTED || request.status === MIA_STATUS.BIMB_CONTACTED) && (
-                                  <button
-                                    onClick={() => handleReject(request.id)}
-                                    disabled={actionLoading[request.id] || isReadOnlyUser}
-                                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                                  >
-                                    {actionLoading[request.id] ? 'Processing...' : '❌ Tolak MIA'}
-                                  </button>
-                                )}
-
-                                {/* Show rejection reason if rejected */}
-                                {request.status === MIA_STATUS.REJECTED && request.rejection_reason && (
-                                  <div className="w-full mt-2">
-                                    <p className="text-sm font-medium text-red-600">Sebab Ditolak:</p>
-                                    <p className="text-sm text-gray-700 bg-red-50 p-3 rounded border border-red-200 mt-1">
-                                      {request.rejection_reason}
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="px-6 py-4 border-t bg-gray-50 flex justify-between items-center">
-                <div className="text-sm text-gray-600">
-                  Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, filteredRequests.length)} of {filteredRequests.length} requests
+            {/* Penugasan Tamat */}
+            {unassigned.length > 0 && (
+              <section>
+                <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">
+                  Penugasan Tamat — Tiada Mentor Aktif ({unassigned.length})
+                </h2>
+                <div className="rounded-xl border border-gray-700 overflow-hidden">
+                  <div className="bg-gray-800 p-5 border-b border-gray-700">
+                    <p className="text-sm text-gray-400">
+                      Usahawan ini tidak mempunyai penugasan mentor aktif. Mungkin mentor sudah dipindahkan atau berhenti.
+                    </p>
+                  </div>
+                  <div className="p-4 bg-gray-900 space-y-2">
+                    {unassigned.map(m => (
+                      <MenteeRow key={m.report_id} mentee={m} />
+                    ))}
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                    className="px-3 py-1 border rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Previous
-                  </button>
-                  <span className="px-3 py-1">
-                    Page {currentPage} of {totalPages}
-                  </span>
-                  <button
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                    disabled={currentPage === totalPages}
-                    className="px-3 py-1 border rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
+              </section>
             )}
           </>
         )}
@@ -514,38 +269,21 @@ export default function MIAAdminPage({ userEmail, isReadOnlyUser, accessDenied }
   );
 }
 
-// Server-side authentication and authorization
 export async function getServerSideProps(context) {
   const session = await getSession(context);
 
   if (!session) {
-    return {
-      redirect: {
-        destination: '/api/auth/signin',
-        permanent: false,
-      },
-    };
+    return { redirect: { destination: '/api/auth/signin', permanent: false } };
   }
 
   const userEmail = session.user.email;
   const hasAccess = await canAccessAdmin(userEmail);
 
   if (!hasAccess) {
-    return {
-      props: {
-        accessDenied: true,
-        userEmail,
-      },
-    };
+    return { props: { accessDenied: true, userEmail } };
   }
 
   const isReadOnlyUser = await isReadOnly(userEmail);
 
-  return {
-    props: {
-      userEmail,
-      isReadOnlyUser,
-      accessDenied: false,
-    },
-  };
+  return { props: { userEmail, isReadOnlyUser, accessDenied: false } };
 }

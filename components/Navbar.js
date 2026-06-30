@@ -182,7 +182,7 @@ export default function Navbar() {
                         className={`block px-4 py-2 text-sm ${isCurrentPage('/admin/mia') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:bg-blue-50'}`}
                         onClick={(e) => isCurrentPage('/admin/mia') && e.preventDefault()}
                       >
-                        MIA
+                        Senarai MIA
                       </Link>
                       <Link
                         href="/admin/mentors"
@@ -457,7 +457,7 @@ export default function Navbar() {
                           }
                         }}
                       >
-                        MIA
+                        Senarai MIA
                       </Link>
                       <Link
                         href="/admin/mentors"
