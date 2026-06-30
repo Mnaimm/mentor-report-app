@@ -19,22 +19,24 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Fetch all MIA reports, ordered so JS dedup keeps latest per entrepreneur
-    const { data: miaReports, error: reportsError } = await supabaseAdmin
+    // Fetch ALL reports (all statuses) ordered so JS dedup picks the latest per entrepreneur.
+    // We must NOT pre-filter by mia_status here — an entrepreneur who had session 2 (MIA)
+    // then session 3 (Selesai) should be excluded because their latest session is Selesai.
+    const { data: allReports, error: reportsError } = await supabaseAdmin
       .from('reports')
-      .select('id, entrepreneur_id, program, session_number, session_date, submission_date, mia_reason, nama_mentee, nama_mentor, mentor_email')
-      .eq('mia_status', 'MIA')
+      .select('id, entrepreneur_id, program, session_number, session_date, submission_date, mia_status, mia_reason, nama_mentee, nama_mentor, mentor_email')
+      .order('entrepreneur_id', { ascending: true })
       .order('session_number', { ascending: false })
       .order('submission_date', { ascending: false });
 
     if (reportsError) throw reportsError;
 
-    // Deduplicate: keep latest report per entrepreneur (DISTINCT ON equivalent)
+    // Keep the latest report per entrepreneur, then filter: only those whose latest is still MIA
     const seen = new Set();
-    const latestMia = (miaReports || []).filter(r => {
+    const latestMia = (allReports || []).filter(r => {
       if (seen.has(r.entrepreneur_id)) return false;
       seen.add(r.entrepreneur_id);
-      return true;
+      return r.mia_status === 'MIA';
     });
 
     if (latestMia.length === 0) {
