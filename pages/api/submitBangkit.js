@@ -287,56 +287,6 @@ export default async function handler(req, res) {
     let rowData;
     let miaRequestId = null;
 
-    // ============================================================
-    // CREATE MIA REQUEST RECORD (if MIA status)
-    // This must happen BEFORE Sheets write so we can include the UUID
-    // ============================================================
-    if (reportData?.status === 'MIA') {
-      console.log('📝 Creating MIA request record...');
-      console.log('🔍 [DEBUG] Bangkit MIA Request Data:');
-      console.log('  - Reason:', reportData.mia?.alasan?.substring(0, 100) + '...');
-      console.log('  - WhatsApp URL:', reportData.imageUrls?.mia?.whatsapp);
-      console.log('  - Email URL:', reportData.imageUrls?.mia?.email);
-      console.log('  - Call URL:', reportData.imageUrls?.mia?.call);
-
-      try {
-        const miaPayload = prepareMIARequestPayload({
-          mentorEmail: reportData.mentorEmail,
-          mentorName: reportData.namaMentor,
-          menteeName: reportData.usahawan,
-          menteeIC: reportData.menteeIC || reportData.usahawan, // Use IC if available, fallback to name
-          menteeCompany: reportData.namaSyarikat,
-          sessionNumber: reportData.sesiLaporan,
-          batch: reportData.batch,
-          miaReason: reportData.mia?.alasan,
-          proofWhatsappUrl: reportData.imageUrls?.mia?.whatsapp,
-          proofEmailUrl: reportData.imageUrls?.mia?.email,
-          proofCallUrl: reportData.imageUrls?.mia?.call
-        }, 'bangkit');
-
-        console.log('🔍 [DEBUG] Prepared Bangkit MIA payload:');
-        console.log('  - alasan:', miaPayload.alasan?.substring(0, 100) + '...');
-        console.log('  - proof_whatsapp_url:', miaPayload.proof_whatsapp_url);
-        console.log('  - proof_email_url:', miaPayload.proof_email_url);
-        console.log('  - proof_call_url:', miaPayload.proof_call_url);
-
-        const { data: miaRequestData, error: miaError } = await supabaseAdmin
-          .from('mia_requests')
-          .insert(miaPayload)
-          .select()
-          .single();
-
-        if (miaError) {
-          console.error('⚠️ Failed to create MIA request (non-blocking):', miaError);
-        } else {
-          miaRequestId = miaRequestData.id;
-          console.log(`✅ MIA request created with ID: ${miaRequestId}`);
-        }
-      } catch (error) {
-        console.error('⚠️ MIA request creation failed (non-blocking):', error);
-      }
-    }
-
     // Only Bangkit is handled by this endpoint now
     // Maju has its own dedicated endpoint: /api/submitMajuReport
     if (programType !== 'bangkit') {
@@ -530,6 +480,43 @@ export default async function handler(req, res) {
 
     const supabaseRecordId = insertedData?.[0]?.id || null;
     console.log(`✅ supabaseAdmin write successful. Record ID: ${supabaseRecordId}`);
+
+    // ============================================================
+    // CREATE MIA REQUEST RECORD (after reports INSERT so report_id can be linked)
+    // ============================================================
+    if (reportData?.status === 'MIA' && supabaseRecordId) {
+      try {
+        const miaPayload = prepareMIARequestPayload({
+          mentorEmail: reportData.mentorEmail,
+          mentorName: reportData.namaMentor,
+          menteeName: reportData.usahawan,
+          menteeIC: reportData.menteeIC || reportData.usahawan,
+          menteeCompany: reportData.namaSyarikat,
+          sessionNumber: reportData.sesiLaporan,
+          batch: reportData.batch,
+          miaReason: reportData.mia?.alasan,
+          proofWhatsappUrl: reportData.imageUrls?.mia?.whatsapp,
+          proofEmailUrl: reportData.imageUrls?.mia?.email,
+          proofCallUrl: reportData.imageUrls?.mia?.call
+        }, 'bangkit');
+        miaPayload.report_id = supabaseRecordId;
+
+        const { data: miaRequestData, error: miaError } = await supabaseAdmin
+          .from('mia_requests')
+          .insert(miaPayload)
+          .select()
+          .single();
+
+        if (miaError) {
+          console.error('⚠️ Failed to create MIA request (non-blocking):', miaError);
+        } else {
+          miaRequestId = miaRequestData.id;
+          console.log(`✅ MIA request created with ID: ${miaRequestId}`);
+        }
+      } catch (error) {
+        console.error('⚠️ MIA request creation failed (non-blocking):', error);
+      }
+    }
 
     // ============================================================
     // STEP 2: GOOGLE SHEETS WRITE (NON-BLOCKING - SECONDARY)
@@ -808,6 +795,7 @@ export default async function handler(req, res) {
         // Section 1: Status & Mobiliti
         if (umData.UM_STATUS_PENGLIBATAN) umSupabasePayload.status_penglibatan = umData.UM_STATUS_PENGLIBATAN;
         if (umData.UM_STATUS) umSupabasePayload.um_status = umData.UM_STATUS;
+        if (umData.UM_STATUS) umSupabasePayload.upward_mobility_status = umData.UM_STATUS;
         if (umData.UM_KRITERIA_IMPROVEMENT) umSupabasePayload.kriteria_improvement = umData.UM_KRITERIA_IMPROVEMENT;
         if (umData.UM_TARIKH_LAWATAN_PREMIS) umSupabasePayload.tarikh_lawatan = umData.UM_TARIKH_LAWATAN_PREMIS;
 
