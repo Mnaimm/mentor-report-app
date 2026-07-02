@@ -14,7 +14,7 @@ function getRowNumberFromUpdatedRange(updatedRange) {
  * Ensure this matches your 'Bangkit' sheet column headers.
  */
 const mapBangkitDataToSheetRow = (data) => {
-  const row = Array(91).fill(''); // Updated from 87 to 91 for kemaskini maklumat fields
+  const row = Array(94).fill(''); // Extended to 94: CE/CF/CG (82-84) + CP (93) for MIA fields
 
   // A–J
   row[0] = new Date().toISOString();                     // 0  Timestamp
@@ -63,8 +63,13 @@ const mapBangkitDataToSheetRow = (data) => {
   // AN: GrowthWheel chart
   row[39] = data?.imageUrls?.growthwheel || '';         // 39 Link_Carta_GrowthWheel
 
-  // AO: Bukti MIA (only if status === 'MIA') - This is `imageUrls.mia` from laporan-sesi.js
-  row[40] = data?.status === 'MIA' ? (data?.imageUrls?.mia || '') : ''; // 40 Link_Bukti_MIA
+  // AO: Bukti MIA legacy single-URL field (kept for backward compat; GAS falls back to this)
+  row[40] = data?.status === 'MIA' ? (data?.imageUrls?.mia?.whatsapp || '') : ''; // 40 Link_Bukti_MIA
+
+  // CE-CG: Individual MIA proof URLs (3-proof structure, columns 82-84)
+  row[82] = data?.imageUrls?.mia?.whatsapp || ''; // 82 MIA_PROOF_WHATSAPP
+  row[83] = data?.imageUrls?.mia?.email    || ''; // 83 MIA_PROOF_EMAIL
+  row[84] = data?.imageUrls?.mia?.call     || ''; // 84 MIA_PROOF_CALL
 
   // AP–AW: Sesi 1 extras (safe blank for 2–4)
   row[41] = data?.pemerhatian || '';                    // 41 Panduan_Pemerhatian_Mentor
@@ -97,6 +102,9 @@ const mapBangkitDataToSheetRow = (data) => {
   row[88] = data?.noTelefon || '';                           // CK NO_TELEFON original
   row[89] = data?.kemaskiniMaklumat?.alamat_baharu || '';    // CL ALAMAT_BAHARU
   row[90] = data?.kemaskiniMaklumat?.telefon_baharu || '';   // CM TELEFON_BAHARU
+
+  // CP (93): MIA reason text
+  row[93] = data?.mia?.alasan || '';                        // 93 MIA_REASON
 
   return row;
 };
