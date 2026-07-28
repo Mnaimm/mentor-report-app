@@ -119,6 +119,7 @@ export default async function handler(req, res) {
 
       // Mentee Info (use reports table column names!)
       nama_mentee: reportData.NAMA_MENTEE || null,       // Maju uses 'nama_mentee'
+      nama_usahawan: reportData.NAMA_MENTEE || null,     // keep in sync with Bangkit's nama_usahawan
       nama_bisnes: reportData.NAMA_BISNES || null,
       lokasi_bisnes: reportData.LOKASI_BISNES || null,
       produk_servis: reportData.PRODUK_SERVIS || null,

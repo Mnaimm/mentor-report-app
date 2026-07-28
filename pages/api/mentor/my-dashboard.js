@@ -277,20 +277,33 @@ export default async function handler(req, res) {
     // We no longer check assignmentsError because we used try/catch above for Sheets
 
 
-    // 2. CRITICAL: Read sessions from Google Sheets (source of truth), NOT Supabase
-    console.log('📋 Reading session data from Google Sheets...');
-    // client is already initialized in Step 1
-    const bangkitSheet = await client.getRows('Bangkit');
+    // 2. Fetch session/report data from Supabase `reports`, keyed by entrepreneur_id.
+    // entrepreneur_id is the stable FK — nama_usahawan/nama_mentee are free-text
+    // fields that are inconsistently populated for Maju (see CLAUDE.md). Mirrors
+    // the approach in mentor-stats.js's fetchStatsFromSupabase().
+    const entrepreneurIds = [...new Set(
+      (assignments || [])
+        .map(a => a.entrepreneurs?.entrepreneur_id)
+        .filter(Boolean)
+    )];
 
-    // Read Maju reports sheet
-    let majuSheet = [];
-    try {
-      majuSheet = await client.getRows('LaporanMajuUM');
-    } catch (e) {
-      console.warn('⚠️ LaporanMajuUM sheet not found, skipping Maju reports');
+    const reportsByEntrepreneurId = {};
+    if (entrepreneurIds.length > 0) {
+      const { data: reportsData, error: reportsFetchError } = await supabase
+        .from('reports')
+        .select('entrepreneur_id, session_number, session_date, mia_status')
+        .in('entrepreneur_id', entrepreneurIds);
+
+      if (reportsFetchError) {
+        console.error('❌ Error fetching reports from Supabase:', reportsFetchError);
+      } else {
+        console.log(`📊 Loaded ${reportsData?.length || 0} reports from Supabase for ${entrepreneurIds.length} mentees`);
+        (reportsData || []).forEach(r => {
+          if (!reportsByEntrepreneurId[r.entrepreneur_id]) reportsByEntrepreneurId[r.entrepreneur_id] = [];
+          reportsByEntrepreneurId[r.entrepreneur_id].push(r);
+        });
+      }
     }
-
-    console.log(`📊 Loaded ${bangkitSheet.length} Bangkit reports and ${majuSheet.length} Maju reports`);
 
     // 3. Get payment requests for this mentor (if table exists)
     let paymentRequests = [];
@@ -332,40 +345,24 @@ export default async function handler(req, res) {
         console.log(`✅ Found batch info for ${entrepreneur.name}:`, batchInfo);
       }
 
-      // CRITICAL FIX: Get sessions from Google Sheets for this mentee
+      // Sessions for this mentee — fetched from Supabase `reports`, keyed by the
+      // stable entrepreneur_id FK (not by name matching against nama_usahawan/
+      // nama_mentee, which are inconsistently populated for Maju — see CLAUDE.md).
       const menteeName = entrepreneur.name;
-      let menteeSessions = [];
+      const programType = (menteeProgram || '').toLowerCase().includes('maju') ? 'maju' : 'bangkit';
+      const entrepreneurReports = reportsByEntrepreneurId[entrepreneur.entrepreneur_id] || [];
 
-      // Get Bangkit sessions
-      const bangkitSessions = bangkitSheet.filter(row => {
-        const rowMenteeName = (row['Nama Usahawan'] || '').trim();
-        return rowMenteeName === menteeName;
-      }).map(row => ({
-        menteeName: row['Nama Usahawan'],
-        sessionLabel: row['Sesi Laporan'] || '',
-        status: row['Status Sesi'] || '',
-        sessionDate: row['Tarikh Sesi'] || '',
-        programType: 'bangkit'
-      }));
-
-      // Get Maju sessions
-      const majuSessions = majuSheet.filter(row => {
-        const rowMenteeName = (row['NAMA_MENTEE'] || '').trim();
-        return rowMenteeName === menteeName;
-      }).map(row => ({
-        menteeName: row['NAMA_MENTEE'],
-        sessionNumber: row['SESI_NUMBER'],
-        status: row['MIA_STATUS'] || 'Tidak MIA',
-        sessionDate: row['TARIKH_SESI'] || '',
-        programType: 'maju'
-      }));
-
-      // Combine and sort by date
-      menteeSessions = [...bangkitSessions, ...majuSessions].sort((a, b) => {
-        const dateA = new Date(a.sessionDate || '1970-01-01');
-        const dateB = new Date(b.sessionDate || '1970-01-01');
-        return dateA - dateB;
-      });
+      const menteeSessions = entrepreneurReports
+        .map(r => {
+          const isMia = (r.mia_status || '').trim().toUpperCase() === 'MIA';
+          return {
+            sessionNumber: r.session_number,
+            status: isMia ? 'MIA' : (programType === 'maju' ? 'Tidak MIA' : 'Selesai'),
+            sessionDate: r.session_date || '',
+            programType
+          };
+        })
+        .sort((a, b) => new Date(a.sessionDate || '1970-01-01') - new Date(b.sessionDate || '1970-01-01'));
 
       // Assign sequential session numbers based on chronological order
       const sessionsWithNumbers = menteeSessions.map((s, index) => {
