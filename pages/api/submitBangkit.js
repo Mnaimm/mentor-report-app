@@ -482,6 +482,30 @@ export default async function handler(req, res) {
     console.log(`✅ supabaseAdmin write successful. Record ID: ${supabaseRecordId}`);
 
     // ============================================================
+    // AUTO-COMPLETE ASSIGNMENT (non-blocking, best-effort) — final session submitted
+    // ============================================================
+    const sessionNum = reportData?.sesiLaporan;
+    if (sessionNum === 4) {
+      try {
+        const { error: completionError } = await supabaseAdmin
+          .from('mentor_assignments')
+          .update({
+            status: 'completed',
+            is_active: false,
+            completed_at: new Date().toISOString()
+          })
+          .eq('mentor_id', mentorRecord?.id)
+          .eq('entrepreneur_id', entrepreneur.id)
+          .eq('is_active', true);
+        if (completionError) {
+          console.error('⚠️ Assignment completion update failed (non-blocking):', completionError);
+        }
+      } catch (err) {
+        console.error('⚠️ Assignment completion exception (non-blocking):', err);
+      }
+    }
+
+    // ============================================================
     // CREATE MIA REQUEST RECORD (after reports INSERT so report_id can be linked)
     // ============================================================
     if (reportData?.status === 'MIA' && supabaseRecordId) {
