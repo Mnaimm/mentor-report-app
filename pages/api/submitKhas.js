@@ -114,6 +114,29 @@ export default async function handler(req, res) {
     const reportId = inserted.id;
     console.log(`[submitKhas][DB_OK] report_id=${reportId.slice(0, 8)} status=submitted`);
 
+    // ============================================================
+    // AUTO-COMPLETE ASSIGNMENT (non-blocking, best-effort) — final session submitted
+    // ============================================================
+    if (sessionNum === 4) {
+      try {
+        const { error: completionError } = await supabase
+          .from('mentor_assignments')
+          .update({
+            status: 'completed',
+            is_active: false,
+            completed_at: new Date().toISOString()
+          })
+          .eq('mentor_id', mentorRecord.id)
+          .eq('entrepreneur_id', entrepreneur.id)
+          .eq('is_active', true);
+        if (completionError) {
+          console.error('⚠️ Assignment completion update failed (non-blocking):', completionError);
+        }
+      } catch (err) {
+        console.error('⚠️ Assignment completion exception (non-blocking):', err);
+      }
+    }
+
     // ── SECONDARY WRITE: Google Sheets + GAS doc generation (non-blocking) ──
     setImmediate(async () => {
       try {

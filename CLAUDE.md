@@ -218,7 +218,7 @@ For any backfill, migration, or data fix script: always run a SELECT first to co
 Supabase is now primary. Google Sheets is kept only for Apps Script PDF generation.
 
 ```javascript
-// In API handlers (submitReport.js, submitMajuReport.js)
+// In API handlers (submitBangkit.js, submitMajuReportum.js)
 
 // Step 1: Write to Supabase (PRIMARY — blocking)
 try {
@@ -461,8 +461,8 @@ pages/
 │   ├── mentors.js                    # 🔨 Mentor management (building)
 │   └── reassign-mentor.js            # 🔨 Reassignment wizard (building)
 └── api/
-    ├── submitReport.js               # 🔥 Bangkit dual-write handler
-    ├── submitMajuReport.js           # 🔥 Maju dual-write handler
+    ├── submitBangkit.js              # 🔥 Bangkit dual-write handler (called by laporan-bangkit.js)
+    ├── submitMajuReportum.js         # 🔥 Maju dual-write handler (called by laporan-maju-um.js)
     ├── admin/
     │   ├── overview-stats.js         # 🔨 New: command center stats (building)
     │   ├── sales-status.js           # Legacy batch status table

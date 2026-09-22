@@ -393,6 +393,29 @@ export default async function handler(req, res) {
 
       console.log(`✅ Supabase dual-write successful. Record ID: ${supabaseRecordId}`);
 
+      // ============================================================
+      // AUTO-COMPLETE ASSIGNMENT (non-blocking, best-effort) — final session submitted
+      // ============================================================
+      if (reportData.SESI_NUMBER === 4) {
+        try {
+          const { error: completionError } = await supabaseAdmin
+            .from('mentor_assignments')
+            .update({
+              status: 'completed',
+              is_active: false,
+              completed_at: new Date().toISOString()
+            })
+            .eq('mentor_id', mentorId)
+            .eq('entrepreneur_id', entrepreneurId)
+            .eq('is_active', true);
+          if (completionError) {
+            console.error('⚠️ Assignment completion update failed (non-blocking):', completionError);
+          }
+        } catch (err) {
+          console.error('⚠️ Assignment completion exception (non-blocking):', err);
+        }
+      }
+
       // Link mia_requests to this report (now that report_id is available)
       if (reportData.MIA_STATUS === 'MIA') {
         try {
