@@ -219,6 +219,13 @@ export default function Navbar() {
                       >
                         Batch Timeline
                       </Link>
+                      <Link
+                        href="/admin/kapasiti-mentor"
+                        className={`block px-4 py-2 text-sm ${isCurrentPage('/admin/kapasiti-mentor') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:bg-blue-50'}`}
+                        onClick={(e) => isCurrentPage('/admin/kapasiti-mentor') && e.preventDefault()}
+                      >
+                        Kapasiti Mentor
+                      </Link>
                     </div>
                   </div>
                 )}
@@ -523,6 +530,19 @@ export default function Navbar() {
                         }}
                       >
                         Batch Timeline
+                      </Link>
+                      <Link
+                        href="/admin/kapasiti-mentor"
+                        className={`block px-3 py-2 rounded-md text-sm transition-colors ${isCurrentPage('/admin/kapasiti-mentor') ? 'text-blue-600 bg-blue-50 font-medium cursor-default' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'}`}
+                        onClick={(e) => {
+                          if (isCurrentPage('/admin/kapasiti-mentor')) {
+                            e.preventDefault();
+                          } else {
+                            setMobileMenuOpen(false);
+                          }
+                        }}
+                      >
+                        Kapasiti Mentor
                       </Link>
                     </div>
                   </div>
