@@ -18,11 +18,13 @@
  */
 
 import { logDualWrite } from '@/lib/monitoring/dual-write-logger';
-import { canAccessMonitoring } from '../../../lib/auth';
+import { canAccessMonitoring, isSystemAdmin } from '../../../lib/auth';
 import { requireAccess } from '../../../lib/api-guard';
 
 export default async function handler(req, res) {
-  const session = await requireAccess(req, res, canAccessMonitoring);
+  // POST writes logs: system_admin only. Other methods keep canAccessMonitoring.
+  const canAccess = req.method === 'POST' ? isSystemAdmin : canAccessMonitoring;
+  const session = await requireAccess(req, res, canAccess);
   if (!session) return;
 
   // Only allow POST
