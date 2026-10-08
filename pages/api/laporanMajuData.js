@@ -1,7 +1,7 @@
 // pages/api/laporanMajuData.js
 import { google } from 'googleapis';
 import { requireSession, userHasAnyRole } from '../../lib/api-guard';
-import { isMenteeOfMentor } from '../../lib/mapping-ownership';
+import { hasMentorEmailColumn, isMenteeOfMentor } from '../../lib/mapping-ownership';
 
 const normHeader = (s) => (s || "").toString().trim().toLowerCase().replace(/\s+/g, " ");
 
@@ -44,6 +44,10 @@ export default async function handler(req, res) {
 
     // Non-admins may only read mentees mapped to their own Mentor_Email.
     const isAdmin = await userHasAnyRole(session.user.email, ['system_admin', 'program_coordinator']);
+    if (!isAdmin && mappingRows && mappingRows.length > 0 && !hasMentorEmailColumn(mappingRows)) {
+      console.error(`❌ [laporanMajuData] Header 'Mentor_Email' not found in '${MAPPING_TAB}' tab; cannot verify mentee ownership.`);
+      return res.status(500).json({ error: `Header 'Mentor_Email' not found in '${MAPPING_TAB}' tab.` });
+    }
     if (!isAdmin && !isMenteeOfMentor(mappingRows, name, session.user.email)) {
       return res.status(403).json({ error: 'Anda tidak dibenarkan' });
     }
