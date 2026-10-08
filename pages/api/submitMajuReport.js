@@ -3,11 +3,15 @@ import { google } from 'googleapis';
 import cache from '../../lib/simple-cache';
 import supabaseAdmin from '../../lib/supabaseAdmin';
 import { prepareMIARequestPayload } from '../../lib/mia';
+import { requireSession } from '../../lib/api-guard';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
+
+  const session = await requireSession(req, res);
+  if (!session) return;
 
   try {
     const reportData = req.body;
