@@ -1,9 +1,13 @@
 // pages/api/laporanMajuData.js
 import { google } from 'googleapis';
+import { requireSession } from '../../lib/api-guard';
 
 const normHeader = (s) => (s || "").toString().trim().toLowerCase().replace(/\s+/g, " ");
 
 export default async function handler(req, res) {
+  const session = await requireSession(req, res);
+  if (!session) return;
+
   try {
     const { name } = req.query;
     if (!name) {
