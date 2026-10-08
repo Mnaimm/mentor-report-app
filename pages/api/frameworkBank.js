@@ -1,6 +1,10 @@
 import { google } from 'googleapis';
+import { requireSession } from '../../lib/api-guard';
 
 export default async function handler(req, res) {
+  const session = await requireSession(req, res);
+  if (!session) return;
+
   try {
     const credentialsJson = Buffer.from(process.env.GOOGLE_CREDENTIALS_BASE64, 'base64').toString('ascii');
     const credentials = JSON.parse(credentialsJson);
