@@ -2,6 +2,7 @@
 import { google } from 'googleapis';
 import cache from '../../lib/simple-cache';
 import { supabase } from '../../lib/supabaseClient';
+import { requireSession } from '../../lib/api-guard';
 
 /** Extract the row number from "SheetName!A37:T37" */
 function getRowNumberFromUpdatedRange(updatedRange) {
@@ -114,6 +115,9 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
+
+  const session = await requireSession(req, res);
+  if (!session) return;
 
   try {
     const reportData = req.body;
