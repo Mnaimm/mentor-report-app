@@ -1,6 +1,7 @@
 // pages/api/laporanMajuData.js
 import { google } from 'googleapis';
-import { requireSession } from '../../lib/api-guard';
+import { requireSession, userHasAnyRole } from '../../lib/api-guard';
+import { isMenteeOfMentor } from '../../lib/mapping-ownership';
 
 const normHeader = (s) => (s || "").toString().trim().toLowerCase().replace(/\s+/g, " ");
 
@@ -29,6 +30,23 @@ export default async function handler(req, res) {
 
     console.log('🔍 [laporanMajuData] Using sheet ID:', REPORT_SHEET_ID);
     console.log('🔍 [laporanMajuData] Using tab name:', LAPORAN_MAJU_TAB);
+
+    // Fetch mentee's mapping info from the MAPPING_SHEET_ID first, so ownership
+    // is checked before any report data is read.
+    const MAPPING_SHEET_ID = process.env.GOOGLE_SHEETS_MAPPING_ID;
+    const MAPPING_TAB = process.env.MAPPING_TAB || "mapping";
+
+    const mappingResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: MAPPING_SHEET_ID,
+      range: `${MAPPING_TAB}!A:ZZ`, // Fetch wide range for mapping as well
+    });
+    const mappingRows = mappingResponse.data.values;
+
+    // Non-admins may only read mentees mapped to their own Mentor_Email.
+    const isAdmin = await userHasAnyRole(session.user.email, ['system_admin', 'program_coordinator']);
+    if (!isAdmin && !isMenteeOfMentor(mappingRows, name, session.user.email)) {
+      return res.status(403).json({ error: 'Anda tidak dibenarkan' });
+    }
 
     // Fetch the LaporanMajuUM tab
     const laporanMajuResponse = await sheets.spreadsheets.values.get({
@@ -162,15 +180,7 @@ export default async function handler(req, res) {
       );
     }
 
-    // Fetch mentee's mapping info from the MAPPING_SHEET_ID
-    const MAPPING_SHEET_ID = process.env.GOOGLE_SHEETS_MAPPING_ID;
-    const MAPPING_TAB = process.env.MAPPING_TAB || "mapping";
-
-    const mappingResponse = await sheets.spreadsheets.values.get({
-      spreadsheetId: MAPPING_SHEET_ID,
-      range: `${MAPPING_TAB}!A:ZZ`, // Fetch wide range for mapping as well
-    });
-    const mappingRows = mappingResponse.data.values;
+    // mappingRows was fetched above (before the ownership check)
     if (!mappingRows || mappingRows.length < 1) {
       console.warn(`Mapping tab '${MAPPING_TAB}' is empty or does not exist.`);
       return res.status(200).json({
