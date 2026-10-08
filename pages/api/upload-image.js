@@ -3,6 +3,7 @@ import { google } from 'googleapis';
 import { IncomingForm } from 'formidable';
 import fs from 'fs';
 import { Readable } from 'stream';
+import { requireSession } from '../../lib/api-guard';
 
 // Disable bodyParser to handle file uploads
 export const config = {
@@ -18,6 +19,9 @@ export default async function handler(req, res) {
     console.log('❌ Wrong method:', req.method);
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
+
+  const session = await requireSession(req, res);
+  if (!session) return;
 
   const form = new IncomingForm();
 
