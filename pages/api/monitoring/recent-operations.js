@@ -15,8 +15,13 @@
 
 import { getRecentLogs } from '@/lib/monitoring/dual-write-logger';
 import { adaptMonitoringRecords } from '@/lib/monitoring/data-adapter';
+import { canAccessMonitoring } from '../../../lib/auth';
+import { requireAccess } from '../../../lib/api-guard';
 
 export default async function handler(req, res) {
+  const session = await requireAccess(req, res, canAccessMonitoring);
+  if (!session) return;
+
   // Only allow GET
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
