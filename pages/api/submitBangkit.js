@@ -3,6 +3,7 @@ import { google } from 'googleapis';
 import cache from '../../lib/simple-cache';
 import supabaseAdmin from '../../lib/supabaseAdmin';
 import { prepareMIARequestPayload, MIA_STATUS } from '../../lib/mia';
+import { requireSession, requireSubmitterEmail } from '../../lib/api-guard';
 
 
 /** Extract the row number from "SheetName!A37:T37" */
@@ -252,6 +253,15 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
+
+  const session = await requireSession(req, res);
+  if (!session) return;
+
+  // Mentor email comes from the session. A different body email is allowed
+  // only for system_admin/program_coordinator submitting on behalf of a mentor.
+  const submitterEmail = await requireSubmitterEmail(res, session, req.body?.mentorEmail);
+  if (!submitterEmail) return;
+  if (req.body && typeof req.body === 'object') req.body.mentorEmail = submitterEmail;
 
   try {
     console.log(' Supabase admin client check:', {
