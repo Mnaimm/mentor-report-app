@@ -1,7 +1,7 @@
 // pages/monitoring.js
 import React, { useEffect, useState } from "react";
 import { getSession } from "next-auth/react";
-import { canAccessMonitoring, isReadOnly } from "../lib/auth";
+import { canAccessMonitoring, isReadOnly, isSystemAdmin } from "../lib/auth";
 import Head from "next/head";
 import AccessDenied from "../components/AccessDenied";
 import ReadOnlyBadge from "../components/ReadOnlyBadge";
@@ -317,7 +317,7 @@ const DiscrepanciesPanel = ({ discrepancies, loading, onResolve, isReadOnly }) =
   );
 };
 
-export default function MonitoringDashboard({ userEmail, isReadOnlyUser, accessDenied }) {
+export default function MonitoringDashboard({ userEmail, isReadOnlyUser, canCompare, accessDenied }) {
   const [health, setHealth] = useState(null);
   const [stats, setStats] = useState(null);
   const [operations, setOperations] = useState([]);
@@ -460,13 +460,13 @@ export default function MonitoringDashboard({ userEmail, isReadOnlyUser, accessD
               </button>
               <button
                 onClick={handleTriggerComparison}
-                disabled={loading || isReadOnlyUser}
+                disabled={loading || !canCompare}
                 className={`px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50 ${
-                  isReadOnlyUser
+                  !canCompare
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     : 'bg-purple-600 text-white hover:bg-purple-700'
                 }`}
-                title={isReadOnlyUser ? 'View-only access - comparison disabled' : ''}
+                title={!canCompare ? 'Hanya system_admin boleh menjalankan perbandingan' : ''}
               >
                 🔍 Compare Now
               </button>
@@ -631,11 +631,14 @@ export async function getServerSideProps(context) {
 
   // Check if user is in read-only mode
   const isReadOnlyUser = await isReadOnly(userEmail);
+  // compare-now POST is system_admin only (API enforces this too)
+  const canCompare = await isSystemAdmin(userEmail);
 
   return {
     props: {
       userEmail,
       isReadOnlyUser,
+      canCompare,
     },
   };
 }
