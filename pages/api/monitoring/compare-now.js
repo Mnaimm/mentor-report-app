@@ -12,6 +12,8 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { canAccessMonitoring, isSystemAdmin } from '../../../lib/auth';
+import { requireAccess } from '../../../lib/api-guard';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -19,6 +21,11 @@ const supabase = createClient(
 );
 
 export default async function handler(req, res) {
+  // POST writes logs: system_admin only. Other methods keep canAccessMonitoring.
+  const canAccess = req.method === 'POST' ? isSystemAdmin : canAccessMonitoring;
+  const session = await requireAccess(req, res, canAccess);
+  if (!session) return;
+
   // Only allow POST
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });

@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
+import supabaseAdmin from '@/lib/supabaseAdmin'
 import { EntrepreneurDirectoryAdmin, MyEntrepreneur } from '@/types/entrepreneur'
 
+// Service role: caller MUST check session + canAccessAdmin before calling.
 export async function getEntrepreneursDirectory(params: {
     batch?: string
     zone?: string
@@ -18,9 +20,7 @@ export async function getEntrepreneursDirectory(params: {
         offset = 0,
     } = params
 
-    const supabase = await createClient()
-
-    const { data, error } = await supabase.rpc('get_entrepreneurs_directory_simple', {
+    const { data, error } = await supabaseAdmin.rpc('get_entrepreneurs_directory_simple', {
         p_batch: batch,
         p_zone: zone,
         p_program: program,

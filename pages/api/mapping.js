@@ -2,11 +2,17 @@ import { google } from 'googleapis';
 import cache from '../../lib/simple-cache';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "./auth/[...nextauth]";
+import { userHasAnyRole } from '../../lib/api-guard';
+import { filterMenteesForMentor } from '../../lib/mapping-ownership';
 
 export default async function handler(req, res) {
   try {
     const session = await getServerSession(req, res, authOptions);
     if (!session) return res.status(401).json({ error: 'Unauthorized' });
+
+    // Cache always holds the full list; non-admins only get their own mentees.
+    const isAdmin = await userHasAnyRole(session.user.email, ['system_admin', 'program_coordinator']);
+    const forUser = (list) => (isAdmin ? list : filterMenteesForMentor(list, session.user.email));
 
     const { programType } = req.query;
     const cacheKey = `mapping:${programType || 'all'}`;
@@ -15,7 +21,7 @@ export default async function handler(req, res) {
     const cachedData = cache.get(cacheKey);
     if (cachedData) {
       console.log(`⚡ Cache HIT for mapping:${programType}`);
-      return res.json(cachedData);
+      return res.json(forUser(cachedData));
     }
 
     console.log(`🔄 Cache MISS for mapping:${programType}, fetching from Google Sheets...`);
@@ -107,7 +113,7 @@ export default async function handler(req, res) {
     cache.set(cacheKey, filteredMentees, 15 * 60 * 1000);
     console.log(`💾 Cached mapping data for ${programType} (${filteredMentees.length} mentees)`);
 
-    res.status(200).json(filteredMentees);
+    res.status(200).json(forUser(filteredMentees));
 
   } catch (error) {
     console.error("❌ Error in /api/mapping:", error);
