@@ -4,6 +4,7 @@ import cache from '../../lib/simple-cache';
 import supabaseAdmin from '../../lib/supabaseAdmin';
 import { prepareMIARequestPayload } from '../../lib/mia';
 import { requireSession } from '../../lib/api-guard';
+import { MIA_API_ENABLED } from '../../lib/featureFlags';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -12,6 +13,16 @@ export default async function handler(req, res) {
 
   const session = await requireSession(req, res);
   if (!session) return;
+
+  // MIA is disabled unless MIA_ENABLED=true. Block before any Sheets/reports/mia_requests write.
+  if (!MIA_API_ENABLED && (
+    req.body?.status === 'MIA' || req.body?.MIA_STATUS === 'MIA' ||
+    req.body?.mia?.alasan || req.body?.MIA_REASON
+  )) {
+    return res.status(400).json({
+      error: 'Ciri MIA tidak dibuka buat masa ini. Sila muat semula halaman dan hantar laporan sesi biasa, atau hubungi admin.'
+    });
+  }
 
   try {
     const reportData = req.body;

@@ -4,6 +4,7 @@ import cache from '../../lib/simple-cache';
 import supabaseAdmin from '../../lib/supabaseAdmin';
 import { prepareMIARequestPayload } from '../../lib/mia';
 import { requireSession, requireSubmitterEmail } from '../../lib/api-guard';
+import { MIA_API_ENABLED } from '../../lib/featureFlags';
 
 
 /** Extract the row number from "SheetName!A37:T37" */
@@ -25,6 +26,16 @@ export default async function handler(req, res) {
   const submitterEmail = await requireSubmitterEmail(res, session, req.body?.EMAIL_MENTOR);
   if (!submitterEmail) return;
   if (req.body && typeof req.body === 'object') req.body.EMAIL_MENTOR = submitterEmail;
+
+  // MIA is disabled unless MIA_ENABLED=true. Block before any Sheets/reports/mia_requests write.
+  if (!MIA_API_ENABLED && (
+    req.body?.status === 'MIA' || req.body?.MIA_STATUS === 'MIA' ||
+    req.body?.mia?.alasan || req.body?.MIA_REASON
+  )) {
+    return res.status(400).json({
+      error: 'Ciri MIA tidak dibuka buat masa ini. Sila muat semula halaman dan hantar laporan sesi biasa, atau hubungi admin.'
+    });
+  }
 
   try {
     const reportData = req.body;
