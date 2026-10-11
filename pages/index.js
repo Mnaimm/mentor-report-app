@@ -4,6 +4,7 @@ import { useSession, signIn, signOut } from "next-auth/react";
 import DebugPanel from '../components/DebugPanel';
 import UserSwitcher from '../components/UserSwitcher';
 import { ImpersonationManager } from '../lib/impersonation';
+import { MIA_UI_ENABLED } from '../lib/featureFlags';
 
 const ToolCard = ({ href, title, description }) => (
   <Link
@@ -388,7 +389,7 @@ export default function HomePage() {
                 <h3 className="text-lg font-semibold text-gray-700 mb-4">
                   Kemajuan Semasa ({stats.currentPeriod?.periodName || stats.currentPeriod?.label || 'Current Period'})
                 </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
+                <div className={`grid grid-cols-1 ${MIA_UI_ENABLED ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-6`}>
                   <StatCard
                     label="Jumlah Usahawan"
                     value={stats.totalMentees ?? 0}
@@ -406,11 +407,13 @@ export default function HomePage() {
                     value={stats.currentRoundStats.pendingThisRound ?? 0}
                     color="orange"
                   />
-                  <StatCard
-                    label="MIA Tempoh Ini"
-                    value={stats.currentRoundStats.miaThisRound ?? 0}
-                    color="red"
-                  />
+                  {MIA_UI_ENABLED && (
+                    <StatCard
+                      label="MIA Tempoh Ini"
+                      value={stats.currentRoundStats.miaThisRound ?? 0}
+                      color="red"
+                    />
+                  )}
                 </div>
               </div>
             )}
@@ -431,7 +434,7 @@ export default function HomePage() {
                 <h3 className="text-lg font-semibold text-gray-700 mb-4">
                   Ringkasan Keseluruhan
                 </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className={`grid grid-cols-1 sm:grid-cols-2 ${MIA_UI_ENABLED ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-6`}>
                   <StatCard
                     label="Jumlah Laporan Dihantar"
                     value={stats.allTime.totalReports ?? 0}
@@ -450,12 +453,14 @@ export default function HomePage() {
                     sublabel="usahawan dengan premis dilawat"
                     color="blue"
                   />
-                  <StatCard
-                    label="Jumlah MIA"
-                    value={stats.allTime.miaCount ?? 0}
-                    sublabel="semua pusingan"
-                    color="red"
-                  />
+                  {MIA_UI_ENABLED && (
+                    <StatCard
+                      label="Jumlah MIA"
+                      value={stats.allTime.miaCount ?? 0}
+                      sublabel="semua pusingan"
+                      color="red"
+                    />
+                  )}
                 </div>
               </div>
             )}
@@ -490,7 +495,7 @@ export default function HomePage() {
             </div>
 
             {/* MIA Section - Dedicated section for MIA mentees */}
-            {stats?.miaMentees && <MiaSection miaMentees={stats.miaMentees} />}
+            {MIA_UI_ENABLED && stats?.miaMentees && <MiaSection miaMentees={stats.miaMentees} />}
 
             {/* Upward Mobility Forms - REMOVED per user request (legacy tracking) */}
 

@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import MenteeCard from '../../components/MenteeCard';
+import { MIA_UI_ENABLED } from '../../lib/featureFlags';
 
 export default function MentorDashboard() {
   const { data: session, status } = useSession();
@@ -469,7 +470,7 @@ export default function MentorDashboard() {
               <option value="on_track">Mengikut Jadual</option>
               <option value="due_soon">Tamat Tempoh Terdekat</option>
               <option value="overdue">Lewat</option>
-              <option value="mia">MIA (Tidak Dapat Dihubungi)</option>
+              {MIA_UI_ENABLED && <option value="mia">MIA (Tidak Dapat Dihubungi)</option>}
               <option value="pending_first_session">Belum Bermula</option>
             </select>
           </div>

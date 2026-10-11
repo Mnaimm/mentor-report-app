@@ -7,7 +7,6 @@ import InputField from '../components/InputField';
 import SelectField from '../components/SelectField';
 import TextArea from '../components/TextArea';
 import FileInput from '../components/FileInput';
-import MIAEvidenceForm from '../components/MIAEvidenceForm';
 import ReceiptModal from '../components/ReceiptModal'; // Import ReceiptModal
 import InfoCard from '../components/InfoCard';
 import { format } from 'date-fns';
@@ -23,6 +22,7 @@ import {
   prepareMIARequestPayload,
   getMIACheckboxClasses
 } from '../lib/mia';
+import { MIA_UI_ENABLED } from '../lib/featureFlags';
 
 // Helper function to get today's date in yyyy-MM-dd format (safe for SSR)
 const getTodayDate = () => {
@@ -150,6 +150,9 @@ const LaporanMajuPage = () => {
   const [messageType, setMessageType] = useState('');
   const [isMIA, setIsMIA] = useState(false);
   const [miaReason, setMiaReason] = useState('');
+
+  // MIA is hidden unless NEXT_PUBLIC_MIA_ENABLED=true
+  const isMIARevisionBlocked = !MIA_UI_ENABLED && isRevisionMode && revisionData?.mia_status === 'MIA';
   const [maklumatBerubah, setMaklumatBerubah] = useState(false);
   const [files, setFiles] = useState({
     gw360: null,
@@ -355,8 +358,8 @@ const LaporanMajuPage = () => {
       setCurrentSessionNumber(revisionData.session_number);
 
       // Set MIA status
-      setIsMIA(revisionData.mia_status === 'MIA');
-      if (revisionData.mia_status === 'MIA') {
+      setIsMIA(MIA_UI_ENABLED && revisionData.mia_status === 'MIA');
+      if (MIA_UI_ENABLED && revisionData.mia_status === 'MIA') {
         setMiaReason(revisionData.mia_reason || '');
       }
 
@@ -570,7 +573,7 @@ const LaporanMajuPage = () => {
 
         updatedFormData.SESI_NUMBER = sessionData.currentSession || 1;
         setCurrentSessionNumber(sessionData.currentSession || 1);
-        setIsMIA(sessionData.isMIA || false);
+        setIsMIA(MIA_UI_ENABLED && (sessionData.isMIA || false));
 
         if (sessionData.currentSession > 1 && sessionData.previousData) {
           setPreviousMentoringFindings(safeJSONParse(sessionData.previousData.MENTORING_FINDINGS_JSON));
@@ -1070,6 +1073,7 @@ const LaporanMajuPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isMIARevisionBlocked) return;
 
     // Safety Check: Ensure session is valid
     if (status !== 'authenticated' || !session?.user) {
@@ -1742,28 +1746,36 @@ const LaporanMajuPage = () => {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* MIA Checkbox always visible at the top */}
-          <div className="bg-white p-6 rounded-lg shadow-sm">
-            {isMIA && formData.NAMA_MENTEE && (
-              <InfoCard title="Usahawan ini telah ditandakan sebagai MIA." type="info">
-                <p>Anda hanya boleh menghantar laporan MIA untuk mentee ini.</p>
-                <p>Sila nyatakan alasan dan muat naik bukti.</p>
-              </InfoCard>
-            )}
-            <label className="flex items-center mt-4">
-              <input
-                type="checkbox"
-                className="form-checkbox h-5 w-5 text-red-600"
-                checked={isMIA}
-                onChange={(e) => setIsMIA(e.target.checked)}
-                disabled={isMIA && (formData.NAMA_MENTEE && currentSessionNumber > 1)}
-              />
-              <span className="ml-2 text-lg font-semibold text-gray-800">Tandakan jika Usahawan Tidak Hadir / MIA</span>
-            </label>
-          </div>
+          {/* MIA Checkbox (only when NEXT_PUBLIC_MIA_ENABLED=true) */}
+          {MIA_UI_ENABLED && (
+            <div className="bg-white p-6 rounded-lg shadow-sm">
+              {isMIA && formData.NAMA_MENTEE && (
+                <InfoCard title="Usahawan ini telah ditandakan sebagai MIA." type="info">
+                  <p>Anda hanya boleh menghantar laporan MIA untuk mentee ini.</p>
+                  <p>Sila nyatakan alasan dan muat naik bukti.</p>
+                </InfoCard>
+              )}
+              <label className="flex items-center mt-4">
+                <input
+                  type="checkbox"
+                  className="form-checkbox h-5 w-5 text-red-600"
+                  checked={isMIA}
+                  onChange={(e) => setIsMIA(e.target.checked)}
+                  disabled={isMIA && (formData.NAMA_MENTEE && currentSessionNumber > 1)}
+                />
+                <span className="ml-2 text-lg font-semibold text-gray-800">Tandakan jika Usahawan Tidak Hadir / MIA</span>
+              </label>
+            </div>
+          )}
 
           {/* Conditional rendering based on isMIA status */}
-          {isMIA ? (
+          {isMIARevisionBlocked ? (
+            <div className="bg-white p-6 rounded-lg shadow-sm">
+              <Section title="Status Laporan">
+                <p className="text-center font-semibold text-red-600">Laporan MIA tidak boleh disemak buat masa ini. Sila hubungi admin.</p>
+              </Section>
+            </div>
+          ) : MIA_UI_ENABLED && isMIA ? (
             /* MIA Form Section */
             <div className="bg-white p-6 rounded-lg shadow-sm">
               <Section title="Laporan Status MIA">
@@ -2536,6 +2548,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
           }
 
           {/* Submit area: white card with centered buttons */}
+          {!isMIARevisionBlocked && (
           <div className="bg-white p-6 rounded-lg shadow-sm">
             {/* Compression Progress Indicator */}
             {compressionProgress.show && (
@@ -2634,6 +2647,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
               </div>
             )}
           </div>
+          )}
         </form >
       </div >
 

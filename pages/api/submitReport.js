@@ -122,8 +122,7 @@ export default async function handler(req, res) {
 
   // MIA is disabled unless MIA_ENABLED=true. Block before any Sheets/reports write.
   if (!MIA_API_ENABLED && (
-    req.body?.status === 'MIA' || req.body?.MIA_STATUS === 'MIA' ||
-    req.body?.mia?.alasan || req.body?.MIA_REASON
+    req.body?.status === 'MIA' || req.body?.MIA_STATUS === 'MIA'
   )) {
     return res.status(400).json({
       error: 'Ciri MIA tidak dibuka buat masa ini. Sila muat semula halaman dan hantar laporan sesi biasa, atau hubungi admin.'

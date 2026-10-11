@@ -15,6 +15,7 @@ import {
   prepareMIARequestPayload,
   getMIACheckboxClasses
 } from '../lib/mia';
+import { MIA_UI_ENABLED } from '../lib/featureFlags';
 
 
 
@@ -24,7 +25,6 @@ import {
 
 // --- UI Components ---
 import InfoCard from '../components/InfoCard';
-import MIAEvidenceForm from '../components/MIAEvidenceForm';
 import ReceiptModal from '../components/ReceiptModal'; // Import ReceiptModal
 import { format } from 'date-fns';
 
@@ -197,6 +197,10 @@ export default function LaporanSesiPage() {
   const [menteeStatus, setMenteeStatus] = useState('');
   const [isMIA, setIsMIA] = useState(false);
   const [maklumatBerubah, setMaklumatBerubah] = useState(false);
+
+  // MIA is hidden unless NEXT_PUBLIC_MIA_ENABLED=true
+  const isMenteeMIALocked = MIA_UI_ENABLED && menteeStatus === 'MIA';
+  const isMIARevisionBlocked = !MIA_UI_ENABLED && isRevisionMode && revisionData?.mia_status === 'MIA';
   const [previousData, setPreviousData] = useState({ sales: [], inisiatif: [], premisDilawat: false });
 
   // UM carry-forward state
@@ -404,7 +408,7 @@ export default function LaporanSesiPage() {
       setCurrentSession(revisionData.session_number);
 
       // Set MIA status
-      setIsMIA(revisionData.mia_status === 'MIA');
+      setIsMIA(MIA_UI_ENABLED && revisionData.mia_status === 'MIA');
 
       // Pre-fill form state
       const preFillData = {
@@ -881,6 +885,7 @@ export default function LaporanSesiPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isMIARevisionBlocked) return;
 
     // Safety Check: Ensure session is valid
     if (status !== 'authenticated' || !session?.user) {
@@ -2291,20 +2296,26 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
             )}
           </Section>
 
-          {selectedMentee && menteeStatus === 'MIA' ? (
+          {isMIARevisionBlocked ? (
+            <Section title="Status Laporan">
+              <p className="text-center font-semibold text-red-600">Laporan MIA tidak boleh disemak buat masa ini. Sila hubungi admin.</p>
+            </Section>
+          ) : selectedMentee && isMenteeMIALocked ? (
             <Section title="Status Usahawan">
               <p className="text-center font-semibold text-red-600">Usahawan ini telah ditandakan sebagai MIA (Missing In Action) dan tidak boleh diisi borang lagi.</p>
             </Section>
           ) : (
             selectedMentee && (
               <>
-                <div className={getMIACheckboxClasses(isMIA)}>
-                  <input type="checkbox" id="mia-checkbox" checked={isMIA} onChange={(e) => setIsMIA(e.target.checked)} className="h-5 w-5 rounded text-red-600 focus:ring-red-500" />
-                  <label htmlFor="mia-checkbox" className="ml-3 font-semibold text-gray-700">Tandakan jika Usahawan Tidak Hadir / MIA</label>
-                </div>
+                {MIA_UI_ENABLED && (
+                  <div className={getMIACheckboxClasses(isMIA)}>
+                    <input type="checkbox" id="mia-checkbox" checked={isMIA} onChange={(e) => setIsMIA(e.target.checked)} className="h-5 w-5 rounded text-red-600 focus:ring-red-500" />
+                    <label htmlFor="mia-checkbox" className="ml-3 font-semibold text-gray-700">Tandakan jika Usahawan Tidak Hadir / MIA</label>
+                  </div>
+                )}
                 {isHistoryLoading ? (
                   <div className="text-center p-4">Memuatkan sejarah sesi...</div>
-                ) : isMIA ? (
+                ) : MIA_UI_ENABLED && isMIA ? (
                   renderMIAForm()
                 ) : currentSession === 1 ? (
                   renderSesi1Form()
@@ -2315,7 +2326,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
             )
           )}
 
-          {selectedMentee && menteeStatus !== 'MIA' && (
+          {selectedMentee && !isMenteeMIALocked && !isMIARevisionBlocked && (
             <div className="mt-6 pt-6 border-t">
               {/* Compression Progress Indicator - Near Submit Button */}
               {compressionProgress.show && (
