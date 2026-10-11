@@ -1,11 +1,21 @@
 // pages/api/submit-upward-mobility.js
 import { google } from 'googleapis';
 import { createAdminClient } from '../../lib/supabaseAdmin';
+import { requireSession, requireSubmitterEmail } from '../../lib/api-guard';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
+
+  const session = await requireSession(req, res);
+  if (!session) return;
+
+  // Mentor email comes from the session. A different body email is allowed
+  // only for system_admin/program_coordinator submitting on behalf of a mentor.
+  const submitterEmail = await requireSubmitterEmail(res, session, req.body?.email);
+  if (!submitterEmail) return;
+  if (req.body && typeof req.body === 'object') req.body.email = submitterEmail;
 
   try {
     const formData = req.body;

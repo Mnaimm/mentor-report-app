@@ -1,6 +1,7 @@
 // components/MenteeCard.js
 import React from 'react';
 import { useRouter } from 'next/router';
+import { MIA_UI_ENABLED } from '../lib/featureFlags';
 
 export default function MenteeCard({ mentee, selected, onSelect, onAssign, onViewDetails, isReadOnly, onSubmitReport, onContact }) {
   const router = useRouter();
@@ -18,7 +19,9 @@ export default function MenteeCard({ mentee, selected, onSelect, onAssign, onVie
 
   // Status colors and text (Bahasa Melayu)
   const getStatusStyles = (mentee) => {
-    switch (mentee.status) {
+    // With MIA hidden, a 'mia' mentee falls through to the default (pending) style
+    const status = !MIA_UI_ENABLED && mentee.status === 'mia' ? null : mentee.status;
+    switch (status) {
       case 'mia':
         return {
           border: 'border-l-4 border-red-600',
