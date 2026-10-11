@@ -482,6 +482,38 @@ export default async function handler(req, res) {
     console.log(`✅ supabaseAdmin write successful. Record ID: ${supabaseRecordId}`);
 
     // ============================================================
+    // AUTO-COMPLETE ASSIGNMENT (non-blocking, best-effort) — final session submitted
+    // Runs in parallel with the Sheets writes below; awaited just before the response.
+    // MIA reports do not complete the assignment.
+    // ============================================================
+    const sessionNum = Number(reportData?.sesiLaporan);
+    const completionMentorId = mentorRecord?.id;
+    const completionEntrepreneurId = entrepreneur?.id;
+    let completionPromise = Promise.resolve();
+    if (sessionNum === 4 && reportData?.status !== 'MIA' && completionMentorId && completionEntrepreneurId) {
+      completionPromise = (async () => {
+        try {
+          const { error: completionError } = await supabaseAdmin
+            .from('mentor_assignments')
+            .update({
+              status: 'completed',
+              is_active: false,
+              completed_at: new Date().toISOString()
+            })
+            .eq('mentor_id', completionMentorId)
+            .eq('entrepreneur_id', completionEntrepreneurId)
+            .eq('status', 'active')
+            .eq('is_active', true);
+          if (completionError) {
+            console.error('⚠️ Assignment completion update failed (non-blocking):', completionError);
+          }
+        } catch (err) {
+          console.error('⚠️ Assignment completion exception (non-blocking):', err);
+        }
+      })();
+    }
+
+    // ============================================================
     // CREATE MIA REQUEST RECORD (after reports INSERT so report_id can be linked)
     // ============================================================
     if (reportData?.status === 'MIA' && supabaseRecordId) {
@@ -933,6 +965,8 @@ export default async function handler(req, res) {
 
       console.log(`🗑️ Cache invalidated for mentor: ${mentorEmail}`);
     }
+
+    await completionPromise; // never rejects; usually already settled by now
 
     return res.status(200).json({
       success: true,
