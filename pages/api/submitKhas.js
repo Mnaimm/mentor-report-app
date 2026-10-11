@@ -116,25 +116,30 @@ export default async function handler(req, res) {
 
     // ============================================================
     // AUTO-COMPLETE ASSIGNMENT (non-blocking, best-effort) — final session submitted
+    // Started here, awaited just before the response.
     // ============================================================
-    if (sessionNum === 4) {
-      try {
-        const { error: completionError } = await supabase
-          .from('mentor_assignments')
-          .update({
-            status: 'completed',
-            is_active: false,
-            completed_at: new Date().toISOString()
-          })
-          .eq('mentor_id', mentorRecord.id)
-          .eq('entrepreneur_id', entrepreneur.id)
-          .eq('is_active', true);
-        if (completionError) {
-          console.error('⚠️ Assignment completion update failed (non-blocking):', completionError);
+    let completionPromise = Promise.resolve();
+    if (sessionNum === 4 && mentorRecord?.id && entrepreneur?.id) {
+      completionPromise = (async () => {
+        try {
+          const { error: completionError } = await supabase
+            .from('mentor_assignments')
+            .update({
+              status: 'completed',
+              is_active: false,
+              completed_at: new Date().toISOString()
+            })
+            .eq('mentor_id', mentorRecord.id)
+            .eq('entrepreneur_id', entrepreneur.id)
+            .eq('status', 'active')
+            .eq('is_active', true);
+          if (completionError) {
+            console.error('⚠️ Assignment completion update failed (non-blocking):', completionError);
+          }
+        } catch (err) {
+          console.error('⚠️ Assignment completion exception (non-blocking):', err);
         }
-      } catch (err) {
-        console.error('⚠️ Assignment completion exception (non-blocking):', err);
-      }
+      })();
     }
 
     // ── SECONDARY WRITE: Google Sheets + GAS doc generation (non-blocking) ──
@@ -421,6 +426,8 @@ export default async function handler(req, res) {
         });
       } catch { /* non-blocking */ }
     });
+
+    await completionPromise; // never rejects
 
     return res.status(200).json({
       success: true,

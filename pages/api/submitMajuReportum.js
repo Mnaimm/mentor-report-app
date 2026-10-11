@@ -188,6 +188,7 @@ export default async function handler(req, res) {
     let supabaseSuccess = false;
     let supabaseError = null;
     let supabaseRecordId = null;
+    let completionPromise = Promise.resolve();
 
     try {
       console.log('📊 Starting Supabase dual-write for MAJU report...');
@@ -395,25 +396,30 @@ export default async function handler(req, res) {
 
       // ============================================================
       // AUTO-COMPLETE ASSIGNMENT (non-blocking, best-effort) — final session submitted
+      // Runs in parallel with the UM writes below; awaited just before the response.
+      // MIA reports do not complete the assignment.
       // ============================================================
-      if (reportData.SESI_NUMBER === 4) {
-        try {
-          const { error: completionError } = await supabaseAdmin
-            .from('mentor_assignments')
-            .update({
-              status: 'completed',
-              is_active: false,
-              completed_at: new Date().toISOString()
-            })
-            .eq('mentor_id', mentorId)
-            .eq('entrepreneur_id', entrepreneurId)
-            .eq('is_active', true);
-          if (completionError) {
-            console.error('⚠️ Assignment completion update failed (non-blocking):', completionError);
+      if (Number(reportData.SESI_NUMBER) === 4 && reportData.MIA_STATUS !== 'MIA' && mentorId && entrepreneurId) {
+        completionPromise = (async () => {
+          try {
+            const { error: completionError } = await supabaseAdmin
+              .from('mentor_assignments')
+              .update({
+                status: 'completed',
+                is_active: false,
+                completed_at: new Date().toISOString()
+              })
+              .eq('mentor_id', mentorId)
+              .eq('entrepreneur_id', entrepreneurId)
+              .eq('status', 'active')
+              .eq('is_active', true);
+            if (completionError) {
+              console.error('⚠️ Assignment completion update failed (non-blocking):', completionError);
+            }
+          } catch (err) {
+            console.error('⚠️ Assignment completion exception (non-blocking):', err);
           }
-        } catch (err) {
-          console.error('⚠️ Assignment completion exception (non-blocking):', err);
-        }
+        })();
       }
 
       // Link mia_requests to this report (now that report_id is available)
@@ -729,6 +735,8 @@ export default async function handler(req, res) {
 
       console.log(`🗑️ Cache invalidated for mentor: ${mentorEmail}`);
     }
+
+    await completionPromise; // never rejects; usually already settled by now
 
     // Build comprehensive response including UM status
     const responseMessage = umSheetRowNumber
