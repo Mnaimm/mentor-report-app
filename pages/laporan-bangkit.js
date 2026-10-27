@@ -1428,7 +1428,8 @@ export default function LaporanSesiPage() {
           submittedAt: new Date().toISOString(),
           menteeName: selectedMentee?.Usahawan || 'Usahawan',
           sessionNumber: currentSession,
-          program: 'Bangkit'
+          program: 'Bangkit',
+          warnings: result?.warnings || []
         };
         setSubmissionResult(receiptData);
         setIsReceiptModalOpen(true);
@@ -2415,6 +2416,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
         menteeName={submissionResult?.menteeName}
         sessionNumber={submissionResult?.sessionNumber}
         program={submissionResult?.program}
+        warnings={submissionResult?.warnings}
       />
     </div>
   );

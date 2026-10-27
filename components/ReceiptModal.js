@@ -8,7 +8,8 @@ const ReceiptModal = ({
     submittedAt,
     menteeName,
     sessionNumber,
-    program
+    program,
+    warnings = []
 }) => {
     const router = useRouter();
     const [copied, setCopied] = useState(false);
@@ -109,6 +110,14 @@ const ReceiptModal = ({
                             <span className="font-bold text-teal-800">{program}</span>
                         </div>
                     </div>
+
+                    {warnings.length > 0 && (
+                        <div className="bg-amber-50 border border-amber-300 text-amber-900 rounded-lg p-3 mb-4 text-sm space-y-1">
+                            {warnings.map((w) => (
+                                <p key={w.code}>⚠️ {w.message}</p>
+                            ))}
+                        </div>
+                    )}
 
                     <p className="text-gray-500 text-sm italic mb-6">
                         Simpan ID ini sebagai rujukan sekiranya berlaku sebarang isu.

@@ -1490,11 +1490,12 @@ const LaporanMajuPage = () => {
           // NORMAL MODE: Show receipt and reset form
           // Show Receipt Modal
           const receiptData = {
-            submissionId: result?.dualWrite?.supabaseReports?.recordId || `ROW-${result?.rowNumber || 'UNKNOWN'}`,
+            submissionId: result?.supabase?.reports?.recordId || `ROW-${result?.rowNumber || 'UNKNOWN'}`,
             submittedAt: new Date().toISOString(),
             menteeName: formData.NAMA_MENTEE || 'Usahawan',
             sessionNumber: currentSessionNumber,
-            program: 'Maju & Upward Mobility'
+            program: 'Maju & Upward Mobility',
+            warnings: result?.warnings || []
           };
           setSubmissionResult(receiptData);
           setIsReceiptModalOpen(true);
@@ -2662,6 +2663,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
         menteeName={submissionResult?.menteeName}
         sessionNumber={submissionResult?.sessionNumber}
         program={submissionResult?.program}
+        warnings={submissionResult?.warnings}
       />
     </div >
   );
