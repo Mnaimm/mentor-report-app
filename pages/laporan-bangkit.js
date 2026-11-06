@@ -9,6 +9,13 @@ import {
 } from '../lib/upwardMobilityUtils';
 import { UM_V2_NOT_OPEN } from '../lib/resolveUMVersion';
 import UMSection from '../components/UMSection';
+import UMSectionV2 from '../components/UMSectionV2';
+import {
+  INITIAL_UM_V2_STATE,
+  validateUpwardMobilityV2,
+  serializeUMV2,
+  umV2PrefillFromRow,
+} from '../lib/upwardMobilityV2';
 import {
   MIA_PROOF_TYPES,
   validateMIAProofs,
@@ -209,9 +216,11 @@ export default function LaporanSesiPage() {
   const [praisiDari, setPraisiDari] = useState(null);
   const [lockedSections, setLockedSections] = useState({ bank: false, aset: false, digital: false });
 
-  // UM v2 batches (B10 Bangkit / M9 Maju) are closed until the v2 form ships; server enforces too
+  // UM v2 batches (B10 Bangkit / M9 Maju): blocked until opened server-side (umV2Open); server enforces too
   const [umVersion, setUmVersion] = useState(1);
-  const isUMV2Blocked = umVersion === 2;
+  const [umV2Open, setUmV2Open] = useState(false);
+  const isUMV2Blocked = umVersion === 2 && !umV2Open;
+  const useUMV2 = umVersion === 2 && umV2Open;
 
   const initialFormState = {
     inisiatif: [{ focusArea: '', keputusan: '', keputusanCustom: undefined, pelanTindakan: '' }],
@@ -228,6 +237,7 @@ export default function LaporanSesiPage() {
     mia: { alasan: '' },
     // UPWARD MOBILITY FIELDS (MANDATORY for ALL Bangkit sessions)
     upwardMobility: { ...INITIAL_UPWARD_MOBILITY_STATE },
+    upwardMobilityV2: INITIAL_UM_V2_STATE, // used only when the UM v2 form is open for this mentee
     // KEMASKINI MAKLUMAT (Updated Contact Info)
     kemaskiniMaklumat: { telefon_baharu: '', alamat_baharu: '' },
   };
@@ -263,8 +273,16 @@ export default function LaporanSesiPage() {
   };
 
   // --- Autosave (local only) ---
-  const getDraftKey = (menteeName, sessionNo, mentorEmail) =>
-    `laporanSesi:draft:v1:${mentorEmail || 'unknown'}:${menteeName || 'none'}:s${sessionNo}`;
+  // v1 key unchanged so existing drafts survive; the UM v2 form saves under its own key
+  const getDraftKey = (menteeName, sessionNo, mentorEmail, umV2 = false) =>
+    `laporanSesi:draft:v1:${mentorEmail || 'unknown'}:${menteeName || 'none'}:s${sessionNo}${umV2 ? ':um2' : ''}`;
+  const clearDrafts = () => {
+    try {
+      localStorage.removeItem(getDraftKey(selectedMentee?.Usahawan, currentSession, session?.user?.email, useUMV2));
+      // v2: also the v1-key draft that may have been restored as a fallback
+      if (useUMV2) localStorage.removeItem(getDraftKey(selectedMentee?.Usahawan, currentSession, session?.user?.email));
+    } catch { }
+  };
   const [saveStatus, setSaveStatus] = useState('');
   const [autosaveArmed, setAutosaveArmed] = useState(false);
 
@@ -281,13 +299,9 @@ export default function LaporanSesiPage() {
 
   const resetForm = () => {
     // Keep the draft of a blocked (UM v2) mentee; it could not have been submitted
-    if (!isUMV2Blocked) {
-      try {
-        const k = getDraftKey(selectedMentee?.Usahawan, currentSession, session?.user?.email);
-        localStorage.removeItem(k);
-      } catch { }
-    }
+    if (!isUMV2Blocked) clearDrafts();
     setUmVersion(1);
+    setUmV2Open(false);
 
     setFormState(initialFormState);
     setFiles({
@@ -526,7 +540,7 @@ export default function LaporanSesiPage() {
     if (!autosaveArmed) return;
     if (!selectedMentee || !currentSession) return;
 
-    const draftKey = getDraftKey(selectedMentee?.Usahawan, currentSession, session?.user?.email);
+    const draftKey = getDraftKey(selectedMentee?.Usahawan, currentSession, session?.user?.email, useUMV2);
     const payload = { ...formState };
 
     const t = setTimeout(() => {
@@ -541,7 +555,7 @@ export default function LaporanSesiPage() {
 
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formState, selectedMentee, currentSession, autosaveArmed]);
+  }, [formState, selectedMentee, currentSession, autosaveArmed, useUMV2]);
 
   const handleAdminMentorChange = (mentorName) => {
     setSelectedAdminMentor(mentorName);
@@ -657,6 +671,7 @@ export default function LaporanSesiPage() {
     const menteeData = allMentees.find((m) => m.Usahawan === menteeName);
     setSelectedMentee(menteeData);
     setUmVersion(1);
+    setUmV2Open(false);
     try {
       const [res, umPrefillRes, pemerhatianRes, latestUMRes] = await Promise.all([
         fetch(`/api/menteeData?name=${encodeURIComponent(menteeName)}&programType=bangkit${menteeData?.entrepreneur_id ? `&entrepreneur_id=${encodeURIComponent(menteeData.entrepreneur_id)}` : ''}`),
@@ -667,7 +682,7 @@ export default function LaporanSesiPage() {
           ? fetch(`/api/prefill/bangkit-pemerhatian?entrepreneur_id=${encodeURIComponent(menteeData.entrepreneur_id)}`)
           : Promise.resolve(null),
         menteeData?.entrepreneur_id
-          ? fetch(`/api/um/latest-report?entrepreneurId=${encodeURIComponent(menteeData.entrepreneur_id)}`)
+          ? fetch(`/api/um/latest-report?entrepreneurId=${encodeURIComponent(menteeData.entrepreneur_id)}&program=bangkit`)
           : menteeData?.Emel
             ? fetch(`/api/um/latest-report?email=${encodeURIComponent(menteeData.Emel)}`) // umVersion only
             : Promise.resolve(null),
@@ -677,7 +692,10 @@ export default function LaporanSesiPage() {
       const pemerhatianPrefill = pemerhatianRes?.ok ? await pemerhatianRes.json() : {};
       const latestUMResult = latestUMRes?.ok ? await latestUMRes.json() : {};
       const prevUM = latestUMResult?.data || null;
-      setUmVersion(latestUMResult?.umVersion === 2 ? 2 : 1);
+      const resolvedUMVersion = latestUMResult?.umVersion === 2 ? 2 : 1;
+      const resolvedUMV2 = resolvedUMVersion === 2 && latestUMResult?.umV2Open === true;
+      setUmVersion(resolvedUMVersion);
+      setUmV2Open(resolvedUMV2);
       if (prevUM) {
         setPraisiDari(prevUM.sesi_mentoring || 'Sesi Sebelumnya');
       }
@@ -695,7 +713,9 @@ export default function LaporanSesiPage() {
         if (lower === 'tidak' || lower === 'no') return 'Tidak';
         return val;
       };
-      const umCarryForward = prevUM ? {
+      // v2 mentees get a v2 row (or nothing) from latest-report; never map it into v1 state
+      const umV2CarryForward = prevUM && resolvedUMV2 ? umV2PrefillFromRow(prevUM) : null;
+      const umCarryForward = prevUM && resolvedUMVersion !== 2 ? {
         // Bahagian 4: Bank Islam
         ...(prevUM.bank_akaun_semasa != null && { UM_AKAUN_BIMB: normalizeYaTidak(prevUM.bank_akaun_semasa) }),
         ...(prevUM.bank_bizapp != null && { UM_BIMB_BIZ: normalizeYaTidak(prevUM.bank_bizapp) }),
@@ -753,6 +773,7 @@ export default function LaporanSesiPage() {
           ...p.upwardMobility,
           ...umCarryForward,
         },
+        ...(umV2CarryForward && { upwardMobilityV2: { ...p.upwardMobilityV2, ...umV2CarryForward } }),
       }));
 
       if (res.ok) {
@@ -767,8 +788,11 @@ export default function LaporanSesiPage() {
 
         // --- Restore draft
         try {
-          const draftKey = getDraftKey(menteeName, data.lastSession + 1, session?.user?.email);
-          const saved = localStorage.getItem(draftKey);
+          // v2: own draft first; else the v1-key draft (saved while v2 was blocked) without its UM part
+          const savedV2 = resolvedUMV2
+            ? localStorage.getItem(getDraftKey(menteeName, data.lastSession + 1, session?.user?.email, true))
+            : null;
+          const saved = savedV2 || localStorage.getItem(getDraftKey(menteeName, data.lastSession + 1, session?.user?.email));
           if (saved) {
             const parsed = JSON.parse(saved);
 
@@ -791,6 +815,9 @@ export default function LaporanSesiPage() {
                 ? parsed.data_kewangan_bulanan
                 : (data.previousKewangan || prev.data_kewangan_bulanan || []),
               upwardMobility: prev.upwardMobility, // Preserve carry-forward UM over stale draft
+              upwardMobilityV2: savedV2 && parsed.upwardMobilityV2
+                ? { ...prev.upwardMobilityV2, ...parsed.upwardMobilityV2 }
+                : prev.upwardMobilityV2,
             }));
 
             // Re-apply preserved fields to selectedMentee after draft restoration
@@ -817,6 +844,9 @@ export default function LaporanSesiPage() {
       l[index] = { ...l[index], [field]: value };
       return { ...p, [listName]: l };
     });
+  // UM v2 section passes an updater: (prev) => next
+  const handleUMV2Change = (updater) =>
+    setFormState((p) => ({ ...p, upwardMobilityV2: updater(p.upwardMobilityV2) }));
   // Handler for UPWARD_MOBILITY nested fields
   const handleUMChange = (field, value) => {
     setFormState((p) => ({
@@ -1026,7 +1056,9 @@ export default function LaporanSesiPage() {
     // ============== END INISIATIF VALIDATION ==============
 
     // ============== UPWARD MOBILITY VALIDATION ==============
-    const umErrors = validateUpwardMobility(formState.upwardMobility, isMIA);
+    const umErrors = useUMV2
+      ? (isMIA ? [] : validateUpwardMobilityV2(formState.upwardMobilityV2, { sesiNumber: currentSession }))
+      : validateUpwardMobility(formState.upwardMobility, isMIA);
 
     if (umErrors.length > 0) {
       setError(`Sila lengkapkan medan Upward Mobility yang diperlukan:\n\n${umErrors.join('\n')}`);
@@ -1265,10 +1297,7 @@ export default function LaporanSesiPage() {
       await Promise.all(uploadPromises);
 
       // Clear saved draft BEFORE resetting
-      try {
-        const k = getDraftKey(selectedMentee?.Usahawan, currentSession, session?.user?.email);
-        localStorage.removeItem(k);
-      } catch { }
+      clearDrafts();
 
       // Transform inisiatif: merge keputusanCustom into keputusan if CUSTOM is selected
       const transformedInisiatif = (formState.inisiatif || []).map(item => {
@@ -1305,7 +1334,9 @@ export default function LaporanSesiPage() {
 
       // UPWARD MOBILITY - Only include for non-MIA submissions
       if (!isMIA) {
-        reportData.UPWARD_MOBILITY_JSON = JSON.stringify({
+        reportData.UPWARD_MOBILITY_JSON = useUMV2
+          ? JSON.stringify(serializeUMV2(formState.upwardMobilityV2, { sesiNumber: currentSession }))
+          : JSON.stringify({
           UM_STATUS: formState.upwardMobility.UM_STATUS || '',
           UM_KRITERIA_IMPROVEMENT: formState.upwardMobility.UM_KRITERIA_IMPROVEMENT || '',
           UM_AKAUN_BIMB: formState.upwardMobility.UM_AKAUN_BIMB || '',
@@ -1392,6 +1423,10 @@ export default function LaporanSesiPage() {
         if (!response.ok) {
           // Enhanced error message based on status code
           let userMessage = result.error;
+          // UM v2 validation (400) returns the full list of missing fields
+          if (Array.isArray(result.errors) && result.errors.length > 0) {
+            userMessage = `${result.error}\n\n${result.errors.join('\n')}`;
+          }
 
           if (response.status === 504) {
             userMessage = `⏱️ Server timeout - your images were uploaded, but we couldn't confirm if data was saved.\n\n` +
@@ -1734,13 +1769,25 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
           <p className="text-sm text-orange-700 text-center mb-6">
             ⚠️ Bahagian ini WAJIB diisi untuk SEMUA sesi Bangkit (1, 2, 3, 4)
           </p>
-          <UMSection
-            umState={formState.upwardMobility}
-            onUmChange={handleUMChange}
-            lockedSections={lockedSections}
-            onLockSection={handleLockSection}
-            praisiDari={praisiDari}
-          />
+          {useUMV2 ? (
+            <>
+              <p className="text-xs font-semibold text-orange-700 mb-3">Format UM baharu · B10 Bangkit / M9 Maju</p>
+              <UMSectionV2
+                umState={formState.upwardMobilityV2}
+                onChange={handleUMV2Change}
+                sesiNumber={currentSession}
+                praisiDari={praisiDari}
+              />
+            </>
+          ) : (
+            <UMSection
+              umState={formState.upwardMobility}
+              onUmChange={handleUMChange}
+              lockedSections={lockedSections}
+              onLockSection={handleLockSection}
+              praisiDari={praisiDari}
+            />
+          )}
         </div>
 
         <Section title="Muat Naik Gambar (Sesi 1)">
@@ -2051,13 +2098,25 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
           <p className="text-sm text-orange-700 text-center mb-6">
             ⚠️ Bahagian ini WAJIB diisi untuk SEMUA sesi Bangkit (1, 2, 3, 4)
           </p>
-          <UMSection
-            umState={formState.upwardMobility}
-            onUmChange={handleUMChange}
-            lockedSections={lockedSections}
-            onLockSection={handleLockSection}
-            praisiDari={praisiDari}
-          />
+          {useUMV2 ? (
+            <>
+              <p className="text-xs font-semibold text-orange-700 mb-3">Format UM baharu · B10 Bangkit / M9 Maju</p>
+              <UMSectionV2
+                umState={formState.upwardMobilityV2}
+                onChange={handleUMV2Change}
+                sesiNumber={currentSession}
+                praisiDari={praisiDari}
+              />
+            </>
+          ) : (
+            <UMSection
+              umState={formState.upwardMobility}
+              onUmChange={handleUMChange}
+              lockedSections={lockedSections}
+              onLockSection={handleLockSection}
+              praisiDari={praisiDari}
+            />
+          )}
         </div>
 
         {!previousData.premisDilawat && (
