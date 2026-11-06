@@ -5,6 +5,8 @@ import supabaseAdmin from '../../lib/supabaseAdmin';
 import { prepareMIARequestPayload, MIA_STATUS } from '../../lib/mia';
 import { requireSession, requireSubmitterEmail } from '../../lib/api-guard';
 import { MIA_API_ENABLED } from '../../lib/featureFlags';
+import { buildUMPayload, insertUMWithRetry, logUMFailure, UM_DB_FAILED_WARNING } from '../../lib/umDbWrite';
+import { resolveUMVersion, UM_V2_NOT_OPEN, UM_VERSION_LOOKUP_FAILED } from '../../lib/resolveUMVersion';
 
 
 /** Extract the row number from "SheetName!A37:T37" */
@@ -328,7 +330,7 @@ export default async function handler(req, res) {
     if (entrepreneurId) {
       const { data: byId, error: idError } = await supabaseAdmin
         .from('entrepreneurs')
-        .select('id')
+        .select('id, batch')
         .eq('id', entrepreneurId)
         .maybeSingle();
 
@@ -348,7 +350,7 @@ export default async function handler(req, res) {
       if (rawEmail) {
         const { data: byEmail } = await supabaseAdmin
           .from('entrepreneurs')
-          .select('id')
+          .select('id, batch')
           .eq('email', rawEmail)
           .maybeSingle();
         if (byEmail) {
@@ -365,7 +367,7 @@ export default async function handler(req, res) {
       if (usahawanName) {
         const { data: byName } = await supabaseAdmin
           .from('entrepreneurs')
-          .select('id')
+          .select('id, batch')
           .ilike('name', usahawanName)
           .maybeSingle();
         if (byName) {
@@ -376,9 +378,13 @@ export default async function handler(req, res) {
     }
 
     if (!entrepreneur) {
-      throw new Error(
-        `Entrepreneur not found. ID: ${entrepreneurId || 'none'}, Email: ${reportData.emailUsahawan || 'none'}, Name: ${reportData.usahawan || 'none'}`
-      );
+      console.error(`❌ Entrepreneur not found. ID: ${entrepreneurId || 'none'}, Email: ${reportData.emailUsahawan || 'none'}, Name: ${reportData.usahawan || 'none'}`);
+      return res.status(422).json({
+        success: false,
+        code: 'ENTREPRENEUR_NOT_FOUND',
+        error: 'Usahawan tidak dijumpai dalam sistem. Sila muat semula halaman dan pilih usahawan semula, atau hubungi admin.',
+        retryable: false
+      });
     }
     console.log('✅ Final entrepreneur ID:', entrepreneur.id);
     // ─────────────────────────────────────────────────────────────
@@ -392,6 +398,32 @@ export default async function handler(req, res) {
       .eq('email', normalizedMentorEmail)
       .limit(1)
       .maybeSingle();
+
+    // reports.mentor_id is NOT NULL — reject clearly instead of failing the insert
+    if (!mentorRecord?.id) {
+      console.error(`❌ Mentor not found for email: ${normalizedMentorEmail}`);
+      return res.status(422).json({
+        success: false,
+        code: 'MENTOR_NOT_FOUND',
+        error: 'Mentor tidak dijumpai dalam sistem untuk emel ini. Sila hubungi admin.',
+        retryable: false
+      });
+    }
+
+    // UM v2 batches (B10 Bangkit / M9 Maju) stay closed until the v2 form ships.
+    // Checked before any reports / UM / Sheets write; a failed lookup fails closed.
+    const umResolution = await resolveUMVersion(supabaseAdmin, {
+      entrepreneurId: entrepreneur.id,
+      mentorId: mentorRecord.id,
+    });
+    if (umResolution.error) {
+      console.error('❌ UM version lookup failed:', umResolution.error);
+      return res.status(503).json({ success: false, ...UM_VERSION_LOOKUP_FAILED, retryable: true });
+    }
+    if (umResolution.version === 2) {
+      console.warn(`⛔ UM v2 batch ${umResolution.batchId}: submission blocked for entrepreneur ${entrepreneur.id}`);
+      return res.status(409).json({ success: false, ...UM_V2_NOT_OPEN, retryable: false });
+    }
 
     // Prepare supabaseAdmin payload - MUST match 'reports' table schema
     const supabasePayload = {
@@ -495,6 +527,15 @@ export default async function handler(req, res) {
 
     if (supabaseInsertError) {
       console.error('❌ supabaseAdmin insert failed:', supabaseInsertError);
+      // unique_mentor_entrepreneur_session: this session was already submitted
+      if (supabaseInsertError.code === '23505') {
+        return res.status(409).json({
+          success: false,
+          duplicate: true,
+          error: 'Laporan untuk sesi ini telah pun dihantar. Sila semak "Laporan Saya" sebelum menghantar semula.',
+          retryable: false
+        });
+      }
       throw new Error(`supabaseAdmin insert failed: ${supabaseInsertError.message}`);
     }
 
@@ -571,94 +612,148 @@ export default async function handler(req, res) {
     }
 
     // ============================================================
-    // STEP 2: GOOGLE SHEETS WRITE (NON-BLOCKING - SECONDARY)
+    // STEP 2: UPWARD_MOBILITY_REPORTS INSERT (AWAITED, retried once)
+    // The reports row is already saved, so a UM failure never fails the submission:
+    // it is stored as a replayable dual_write_monitoring row and returned as a warning.
+    // ============================================================
+    let umSuccess = false;
+    let umError = null;
+    let umRecordId = null;
+    const warnings = [];
+
+    // For Bangkit, UM data is required EXCEPT for MIA submissions
+    const umWanted = reportData.status !== 'MIA' && !!reportData.UPWARD_MOBILITY_JSON;
+
+    if (umWanted) {
+      console.log('📊 Starting Upward Mobility DB write for BANGKIT...');
+      const umFailureLog = {
+        source_system: 'google_sheets',
+        target_system: 'supabaseAdmin',
+        metadata: {
+          mentor_email: reportData.mentorEmail,
+          mentee_name: reportData.usahawan,
+          session_number: reportData.sesiLaporan,
+          program: 'BANGKIT'
+        }
+      };
+
+      let umSupabasePayload = null;
+      try {
+        const umData = JSON.parse(reportData.UPWARD_MOBILITY_JSON);
+        umSupabasePayload = buildUMPayload(umData, {
+          entrepreneur,
+          mentorId: mentorRecord.id,
+          sesiNumber: reportData.sesiLaporan,
+          program: 'BANGKIT',
+          reportId: supabaseRecordId,
+          umVersion: 1 // v2 never reaches here (guarded before the reports insert)
+        });
+        console.log('📋 UM payload keys:', Object.keys(umSupabasePayload));
+      } catch (error) {
+        umError = `UM payload could not be built: ${error.message}`;
+        console.error('⚠️ UM payload build failed:', error);
+        await logUMFailure(supabaseAdmin, {
+          reportId: supabaseRecordId,
+          entrepreneurId: entrepreneur.id,
+          program: 'BANGKIT',
+          sesiNumber: reportData.sesiLaporan,
+          payload: null,
+          rawUM: reportData.UPWARD_MOBILITY_JSON,
+          error: umError,
+          attempts: 0,
+          failureLog: umFailureLog
+        });
+      }
+
+      if (umSupabasePayload) {
+        const umResult = await insertUMWithRetry(supabaseAdmin, umSupabasePayload, {
+          reportId: supabaseRecordId,
+          program: 'BANGKIT',
+          sesiNumber: reportData.sesiLaporan,
+          failureLog: umFailureLog
+        });
+        umSuccess = umResult.success;
+        umRecordId = umResult.recordId;
+        umError = umResult.error;
+        if (umSuccess) console.log(`✅ UM DB write successful. Record ID: ${umRecordId}`);
+      }
+
+      if (!umSuccess) warnings.push(UM_DB_FAILED_WARNING);
+    } else {
+      console.log(`ℹ️ Skipping UM write. MIA: ${reportData.status === 'MIA'}, Has UM Data: ${!!reportData.UPWARD_MOBILITY_JSON}`);
+    }
+
+    // ============================================================
+    // STEP 3: GOOGLE SHEETS WRITES (NON-BLOCKING - SECONDARY, run in parallel)
+    // Each append has its own try/catch; failures are logged with report_id.
     // ============================================================
     let newRowNumber = null;
     let sheetsSuccess = false;
     let sheetsError = null;
 
-    try {
-      console.log('📊 Step 2: Writing to Google Sheets (secondary, non-blocking)...');
-
-      spreadsheetId = process.env.GOOGLE_SHEETS_REPORT_ID;
-      const bangkitTab = process.env.Bangkit_TAB || 'Bangkit';
-      range = `${bangkitTab}!A1`; // Bangkit tab (columns A-CI: 0-86)
-
-      if (!spreadsheetId) {
-        throw new Error('Missing GOOGLE_SHEETS_REPORT_ID environment variable for Bangkit program.');
-      }
-
-      console.log('🔗 Bangkit Sheet ID:', spreadsheetId, '- Tab:', bangkitTab);
-
-      // Map data to Sheet row
-      rowData = mapBangkitDataToSheetRow(reportData, miaRequestId);
-      // Column P (index 15) must remain Fokus Area 2 - store report_id in reserved column instead
-      rowData[80] = supabaseRecordId; // Column CC (reserved) = report_id
-
-      // Append data to Google Sheet with timeout
-      const appendRes = await Promise.race([
-        sheets.spreadsheets.values.append({
-          spreadsheetId: spreadsheetId,
-          range: range,
-          valueInputOption: 'USER_ENTERED',
-          insertDataOption: 'INSERT_ROWS',
-          requestBody: { values: [rowData] },
-        }),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Google Sheets API timeout after 10 seconds')), 10000)
-        )
-      ]);
-
-      // Get the row number where data was appended
-      const updatedRange = appendRes.data?.updates?.updatedRange || '';
-      newRowNumber = getRowNumberFromUpdatedRange(updatedRange);
-      sheetsSuccess = true;
-
-      console.log(`✅ Sheets write successful. Row: ${newRowNumber}. Document will be generated automatically.`);
-
-      // Update supabaseAdmin with sheets_row_number (non-blocking)
-      await supabaseAdmin
-        .from('reports')
-        .update({ sheets_row_number: newRowNumber })
-        .eq('id', supabaseRecordId);
-
-    } catch (error) {
-      sheetsError = error.message;
-      console.error('⚠️ Google Sheets write failed (non-blocking):', error);
-      // DO NOT throw - Sheets failure is non-blocking
-    }
-
-    // Log to dual_write_logs
-    try {
-      await supabaseAdmin.from('dual_write_logs').insert({
-        operation_type: 'submit_report',
-        table_name: 'reports',
-        record_id: supabaseRecordId,
-        supabase_success: true,
-        sheets_success: sheetsSuccess,
-        sheets_error: sheetsError,
-        sheets_row_number: newRowNumber,
-        program: 'Bangkit',
-        created_at: new Date().toISOString()
-      });
-    } catch (logError) {
-      console.error('⚠️ Failed to log to dual_write_logs:', logError);
-    }
-    // ============================================================
-    // END PRIMARY DUAL-WRITE (supabaseAdmin + Sheets)
-    // ============================================================
-
-
-
-    // ============================================================
-    // DUAL-WRITE TO UPWARD MOBILITY GOOGLE SHEET (NON-BLOCKING)
-    // ============================================================
     let umSheetSuccess = false;
     let umSheetError = null;
     let umSheetRowNumber = null;
 
+    const bangkitSheetTask = async () => {
+      try {
+        console.log('📊 Writing to Bangkit Google Sheet (secondary, non-blocking)...');
+
+        spreadsheetId = process.env.GOOGLE_SHEETS_REPORT_ID;
+        const bangkitTab = process.env.Bangkit_TAB || 'Bangkit';
+        range = `${bangkitTab}!A1`; // Bangkit tab (columns A-CI: 0-86)
+
+        if (!spreadsheetId) {
+          throw new Error('Missing GOOGLE_SHEETS_REPORT_ID environment variable for Bangkit program.');
+        }
+
+        console.log('🔗 Bangkit Sheet ID:', spreadsheetId, '- Tab:', bangkitTab);
+
+        // Map data to Sheet row
+        rowData = mapBangkitDataToSheetRow(reportData, miaRequestId);
+        // Column P (index 15) must remain Fokus Area 2 - store report_id in reserved column instead
+        rowData[80] = supabaseRecordId; // Column CC (reserved) = report_id
+
+        // Append data to Google Sheet with timeout
+        const appendRes = await Promise.race([
+          sheets.spreadsheets.values.append({
+            spreadsheetId: spreadsheetId,
+            range: range,
+            valueInputOption: 'USER_ENTERED',
+            insertDataOption: 'INSERT_ROWS',
+            requestBody: { values: [rowData] },
+          }),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Google Sheets API timeout after 10 seconds')), 10000)
+          )
+        ]);
+
+        // Get the row number where data was appended
+        const updatedRange = appendRes.data?.updates?.updatedRange || '';
+        newRowNumber = getRowNumberFromUpdatedRange(updatedRange);
+        sheetsSuccess = true;
+
+        console.log(`✅ Sheets write successful. Row: ${newRowNumber}. Document will be generated automatically.`);
+
+        // Update supabaseAdmin with sheets_row_number (non-blocking)
+        await supabaseAdmin
+          .from('reports')
+          .update({ sheets_row_number: newRowNumber })
+          .eq('id', supabaseRecordId);
+
+      } catch (error) {
+        sheetsError = error.message;
+        console.error(`⚠️ Google Sheets write failed (non-blocking). report_id: ${supabaseRecordId}`, error);
+        // DO NOT throw - Sheets failure is non-blocking
+      }
+    };
+
     // Only write to UM sheet if NOT MIA and UM data exists
-    if (reportData.status !== 'MIA' && reportData.UPWARD_MOBILITY_JSON) {
+    const umSheetTask = async () => {
+      if (!umWanted) {
+        console.log(`ℹ️ Skipping UM sheet write. MIA: ${reportData.status === 'MIA'}, Has UM Data: ${!!reportData.UPWARD_MOBILITY_JSON}`);
+        return;
+      }
       try {
         console.log('📊 Starting dual-write to Upward Mobility Google Sheet...');
 
@@ -673,24 +768,8 @@ export default async function handler(req, res) {
           throw new Error('Missing GOOGLE_SHEET_ID_UM environment variable');
         }
 
-        // Fetch entrepreneur batch from DB (form payload batch is unreliable)
-        let entrepreneurBatchForUM = '';
-        if (reportData.entrepreneur_id) {
-          const { data: _eById } = await supabaseAdmin
-            .from('entrepreneurs')
-            .select('batch')
-            .eq('id', reportData.entrepreneur_id)
-            .maybeSingle();
-          if (_eById?.batch) entrepreneurBatchForUM = _eById.batch;
-        }
-        if (!entrepreneurBatchForUM && reportData.emailUsahawan) {
-          const { data: _eByEmail } = await supabaseAdmin
-            .from('entrepreneurs')
-            .select('batch')
-            .eq('email', reportData.emailUsahawan.toLowerCase().trim())
-            .maybeSingle();
-          if (_eByEmail?.batch) entrepreneurBatchForUM = _eByEmail.batch;
-        }
+        // Batch from the resolved entrepreneur record (form payload batch is unreliable)
+        const entrepreneurBatchForUM = entrepreneur.batch || '';
         console.log('📊 Entrepreneur batch for UM sheet:', entrepreneurBatchForUM);
 
         // Map data to UM sheet row
@@ -718,208 +797,33 @@ export default async function handler(req, res) {
 
       } catch (error) {
         umSheetError = error.message;
-        console.error('⚠️ Upward Mobility sheet write failed (non-blocking):', error);
+        console.error(`⚠️ Upward Mobility sheet write failed (non-blocking). report_id: ${supabaseRecordId}`, error);
         // This failure does NOT fail the main Bangkit submission
       }
-    } else {
-      console.log(`ℹ️ Skipping UM sheet write. MIA: ${reportData.status === 'MIA'}, Has UM Data: ${!!reportData.UPWARD_MOBILITY_JSON}`);
+    };
+
+    await Promise.allSettled([bangkitSheetTask(), umSheetTask()]);
+
+    // Log to dual_write_logs
+    try {
+      await supabaseAdmin.from('dual_write_logs').insert({
+        operation_type: 'submit_report',
+        table_name: 'reports',
+        record_id: supabaseRecordId,
+        supabase_success: true,
+        sheets_success: sheetsSuccess,
+        sheets_error: sheetsError,
+        sheets_row_number: newRowNumber,
+        program: 'Bangkit',
+        created_at: new Date().toISOString()
+      });
+    } catch (logError) {
+      console.error('⚠️ Failed to log to dual_write_logs:', logError);
     }
-    // ============================================================
-    // END UPWARD MOBILITY GOOGLE SHEET DUAL-WRITE
-    // ============================================================
 
-    // (Old supabaseAdmin dual-write section removed - now done in Step 1 above)
-
-    // ============================================================
-    // DUAL-WRITE TO UPWARD_MOBILITY_REPORTS TABLE (NON-BLOCKING)
-    // ============================================================
-    let umSuccess = false;
-    let umError = null;
-    let umRecordId = null;
-
-    // For Bangkit, UM data is required EXCEPT for MIA submissions
-    // Use unified check for MIA status
-    if (reportData.status !== 'MIA' && reportData.UPWARD_MOBILITY_JSON && supabaseRecordId) {
+    // Log UM success to dual_write_monitoring (after Sheets so the row number is known)
+    if (umSuccess) {
       try {
-        console.log('📊 Starting Upward Mobility dual-write for BANGKIT...');
-
-        // Parse the UM JSON data
-        const umData = JSON.parse(reportData.UPWARD_MOBILITY_JSON);
-
-        // Get mentor and entrepreneur IDs from reports table record
-        const { data: reportRecord, error: reportFetchError } = await supabaseAdmin
-          .from('reports')
-          .select('id, mentor_email, nama_mentee')
-          .eq('id', supabaseRecordId)
-          .single();
-
-        if (reportFetchError) throw reportFetchError;
-
-        const normalizedMentorEmail = (reportData.mentorEmail || '').toLowerCase().trim();
-
-        const { data: mentorData, error: mentorError } = await supabaseAdmin
-          .from('mentors')
-          .select('id')
-          .eq('email', normalizedMentorEmail)
-          .limit(1)
-          .maybeSingle();
-
-        if (mentorError) throw new Error(`Mentor lookup failed: ${mentorError.message}`);
-        if (!mentorData) throw new Error(`Mentor not found for email: ${normalizedMentorEmail}`);
-
-        // ── Entrepreneur lookup (3-tier: ID → email → name fallback) ──
-        let entrepreneur = null;
-
-        // 🆕 PRIMARY: Try entrepreneur_id if provided
-        const entrepreneurId = reportData.entrepreneur_id;
-        if (entrepreneurId) {
-          const { data: byId, error: idError } = await supabaseAdmin
-            .from('entrepreneurs')
-            .select('id, batch')
-            .eq('id', entrepreneurId)
-            .maybeSingle();
-
-          if (byId) {
-            entrepreneur = byId;
-            console.log('✅ [REVISION] Entrepreneur resolved by ID:', entrepreneurId);
-          } else if (idError) {
-            console.warn('⚠️ [REVISION] entrepreneur_id lookup failed:', idError.message);
-          } else {
-            console.warn(`⚠️ [REVISION] entrepreneur_id not found: ${entrepreneurId}`);
-          }
-        }
-
-        // Fallback 1: Email (most reliable text identifier)
-        if (!entrepreneur) {
-          const rawEmail = (reportData.emailUsahawan || '').toLowerCase().trim();
-          if (rawEmail) {
-            const { data: byEmail } = await supabaseAdmin
-              .from('entrepreneurs')
-              .select('id, batch')
-              .eq('email', rawEmail)
-              .maybeSingle();
-            if (byEmail) {
-              entrepreneur = byEmail;
-              console.log('✅ [REVISION] Entrepreneur resolved by email:', rawEmail);
-            }
-          }
-        }
-
-        // ⚠️ DEPRECATED Fallback 2: Name-based (temporary safety net)
-        if (!entrepreneur) {
-          const usahawanName = (reportData.usahawan || '').trim();
-          console.warn('⚠️ [REVISION] entrepreneur_id missing, falling back to name lookup:', usahawanName);
-          if (usahawanName) {
-            const { data: byName } = await supabaseAdmin
-              .from('entrepreneurs')
-              .select('id, batch')
-              .ilike('name', usahawanName)
-              .maybeSingle();
-            if (byName) {
-              entrepreneur = byName;
-              console.warn('⚠️ [REVISION] Entrepreneur resolved by NAME (deprecated):', usahawanName);
-            }
-          }
-        }
-
-        if (!entrepreneur) {
-          throw new Error(
-            `Entrepreneur not found. ID: ${entrepreneurId || 'none'}, Email: ${reportData.emailUsahawan || 'none'}, Name: ${reportData.usahawan || 'none'}`
-          );
-        }
-        console.log('✅ Entrepreneur resolved:', entrepreneur.id);
-        // ─────────────────────────────────────────────────────────────
-
-        // Build schema-whitelisted UM payload (aligned with upward_mobility_reports table)
-        const umSupabasePayload = {};
-
-        // Required foreign keys
-        umSupabasePayload.entrepreneur_id = entrepreneur.id;
-        umSupabasePayload.mentor_id = mentorData.id;
-
-        // Batch from entrepreneur record (not from form payload — form doesn't send reliable batch)
-        if (entrepreneur.batch) umSupabasePayload.batch = entrepreneur.batch;
-
-        // Program & Session
-        if (reportData.sesiLaporan) umSupabasePayload.sesi_mentoring = `Sesi ${reportData.sesiLaporan}`;
-        umSupabasePayload.program = 'BANGKIT';
-
-        // Section 1: Status & Mobiliti
-        if (umData.UM_STATUS_PENGLIBATAN) umSupabasePayload.status_penglibatan = umData.UM_STATUS_PENGLIBATAN;
-        if (umData.UM_STATUS) umSupabasePayload.um_status = umData.UM_STATUS;
-        if (umData.UM_STATUS) umSupabasePayload.upward_mobility_status = umData.UM_STATUS;
-        if (umData.UM_KRITERIA_IMPROVEMENT) umSupabasePayload.kriteria_improvement = umData.UM_KRITERIA_IMPROVEMENT;
-        if (umData.UM_TARIKH_LAWATAN_PREMIS) umSupabasePayload.tarikh_lawatan = umData.UM_TARIKH_LAWATAN_PREMIS;
-
-        // Section 2: Bank Islam & Fintech
-        if (umData.UM_AKAUN_BIMB) umSupabasePayload.bank_akaun_semasa = umData.UM_AKAUN_BIMB;
-        if (umData.UM_BIMB_BIZ) umSupabasePayload.bank_bizapp = umData.UM_BIMB_BIZ;
-        if (umData.UM_AL_AWFAR) umSupabasePayload.bank_al_awfar = umData.UM_AL_AWFAR;
-        if (umData.UM_MERCHANT_TERMINAL) umSupabasePayload.bank_merchant_terminal = umData.UM_MERCHANT_TERMINAL;
-        if (umData.UM_FASILITI_LAIN) umSupabasePayload.bank_fasiliti_lain = umData.UM_FASILITI_LAIN;
-        if (umData.UM_MESINKIRA) umSupabasePayload.bank_mesinkira = umData.UM_MESINKIRA;
-
-        // Section 3: Financial & Employment Metrics
-        if (umData.UM_PENDAPATAN_SEMASA) {
-          const parsed = parseFloat(umData.UM_PENDAPATAN_SEMASA);
-          if (!isNaN(parsed)) umSupabasePayload.pendapatan_semasa = parsed;
-        }
-        if (umData.UM_ULASAN_PENDAPATAN) umSupabasePayload.ulasan_pendapatan = umData.UM_ULASAN_PENDAPATAN;
-
-        if (umData.UM_PEKERJA_SEMASA) {
-          const parsed = parseInt(umData.UM_PEKERJA_SEMASA);
-          if (!isNaN(parsed)) umSupabasePayload.pekerja_semasa = parsed;
-        }
-        if (umData.UM_ULASAN_PEKERJA) umSupabasePayload.ulasan_pekerjaan = umData.UM_ULASAN_PEKERJA;
-
-        if (umData.UM_ASET_BUKAN_TUNAI_SEMASA) {
-          const parsed = parseFloat(umData.UM_ASET_BUKAN_TUNAI_SEMASA);
-          if (!isNaN(parsed)) umSupabasePayload.aset_bukan_tunai_semasa = parsed;
-        }
-        if (umData.UM_ULASAN_ASET_BUKAN_TUNAI) umSupabasePayload.ulasan_aset_bukan_tunai = umData.UM_ULASAN_ASET_BUKAN_TUNAI;
-
-        if (umData.UM_PEKERJA_PARTTIME_SEMASA) {
-          const parsed = parseInt(umData.UM_PEKERJA_PARTTIME_SEMASA);
-          if (!isNaN(parsed)) umSupabasePayload.pekerja_parttime_semasa = parsed;
-        }
-        if (umData.UM_ULASAN_PEKERJA_PARTTIME) umSupabasePayload.ulasan_pekerja_parttime = umData.UM_ULASAN_PEKERJA_PARTTIME;
-
-        if (umData.UM_SIMPANAN_SEMASA) {
-          const parsed = parseFloat(umData.UM_SIMPANAN_SEMASA);
-          if (!isNaN(parsed)) umSupabasePayload.simpanan_semasa = parsed;
-        }
-        if (umData.UM_ULASAN_SIMPANAN) umSupabasePayload.ulasan_simpanan = umData.UM_ULASAN_SIMPANAN;
-
-        if (umData.UM_ZAKAT_SEMASA) umSupabasePayload.zakat_semasa = umData.UM_ZAKAT_SEMASA;
-        if (umData.UM_ULASAN_ZAKAT) umSupabasePayload.ulasan_zakat = umData.UM_ULASAN_ZAKAT;
-
-        // Section 4: Digitalization
-        if (umData.UM_DIGITAL_SEMASA) umSupabasePayload.digital_semasa = umData.UM_DIGITAL_SEMASA;
-        if (umData.UM_ULASAN_DIGITAL) umSupabasePayload.ulasan_digital = umData.UM_ULASAN_DIGITAL;
-
-        // Section 5: Marketing
-        if (umData.UM_MARKETING_SEMASA) umSupabasePayload.marketing_semasa = umData.UM_MARKETING_SEMASA;
-        if (umData.UM_ULASAN_MARKETING) umSupabasePayload.ulasan_marketing = umData.UM_ULASAN_MARKETING;
-
-        // Timestamps
-        const now = new Date().toISOString();
-        umSupabasePayload.created_at = now;
-        umSupabasePayload.updated_at = now;
-
-        console.log('📋 UM payload keys:', Object.keys(umSupabasePayload));
-
-        const { data: insertedUM, error: umInsertError } = await supabaseAdmin
-          .from('upward_mobility_reports')
-          .insert(umSupabasePayload)
-          .select();
-
-        if (umInsertError) throw umInsertError;
-
-        umSuccess = true;
-        umRecordId = insertedUM?.[0]?.id || null;
-        console.log(`✅ UM dual-write successful. Record ID: ${umRecordId}`);
-
-        // Log success to dual_write_monitoring
         await supabaseAdmin.from('dual_write_monitoring').insert({
           source_system: 'google_sheets',
           target_system: 'supabaseAdmin',
@@ -936,38 +840,12 @@ export default async function handler(req, res) {
             program: 'BANGKIT'
           }
         });
-
-      } catch (error) {
-        umError = error.message;
-        console.error('⚠️ UM dual-write failed (non-blocking):', error);
-
-        // Log failure to dual_write_monitoring (best effort)
-        try {
-          await supabaseAdmin.from('dual_write_monitoring').insert({
-            source_system: 'google_sheets',
-            target_system: 'supabaseAdmin',
-            operation_type: 'insert',
-            table_name: 'upward_mobility_reports',
-            google_sheets_row: newRowNumber,
-            status: 'failed',
-            error_message: error.message,
-            timestamp: new Date().toISOString(),
-            metadata: {
-              mentor_email: reportData.mentorEmail,
-              mentee_name: reportData.usahawan,
-              session_number: reportData.sesiLaporan,
-              program: 'BANGKIT'
-            }
-          });
-        } catch (monitoringError) {
-          console.error('⚠️ Failed to log UM failure to dual_write_monitoring:', monitoringError);
-        }
+      } catch (monitoringError) {
+        console.error('⚠️ Failed to log UM success to dual_write_monitoring:', monitoringError);
       }
-    } else {
-      console.log(`ℹ️ Skipping UM write. MIA: ${reportData.status === 'MIA'}, Has UM Data: ${!!reportData.UPWARD_MOBILITY_JSON}, Has Reports ID: ${!!supabaseRecordId}`);
     }
     // ============================================================
-    // END UPWARD MOBILITY DUAL-WRITE
+    // END DUAL-WRITE
     // ============================================================
 
     // Invalidate relevant cache entries on successful submission
@@ -1015,7 +893,8 @@ export default async function handler(req, res) {
           error: umError,
           skipped: reportData.status === 'MIA' || !reportData.UPWARD_MOBILITY_JSON
         }
-      }
+      },
+      warnings
     });
 
   } catch (error) {

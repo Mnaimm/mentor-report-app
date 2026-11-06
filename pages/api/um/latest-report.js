@@ -1,6 +1,7 @@
 import { unstable_getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import supabaseAdmin from '../../../lib/supabaseAdmin';
+import { resolveUMVersion } from '../../../lib/resolveUMVersion';
 
 export default async function handler(req, res) {
   console.log('[UM latest-report] Called with entrepreneurId:', req.query.entrepreneurId);
@@ -9,10 +10,26 @@ export default async function handler(req, res) {
   const session = await unstable_getServerSession(req, res, authOptions);
   if (!session) return res.status(401).json({ error: 'Unauthorized' });
 
-  const { entrepreneurId } = req.query;
-  if (!entrepreneurId) return res.status(400).json({ error: 'entrepreneurId is required' });
+  const { entrepreneurId, email } = req.query;
+  if (!entrepreneurId && !email) return res.status(400).json({ error: 'entrepreneurId or email is required' });
 
   try {
+    // Email fallback for mapping rows without entrepreneur_id: version only, no prefill data.
+    // Used only on an exact single match; zero or duplicate matches return umVersion null.
+    if (!entrepreneurId) {
+      const { data: matches, error: emailError } = await supabaseAdmin
+        .from('entrepreneurs')
+        .select('id')
+        .eq('email', String(email).toLowerCase().trim())
+        .limit(2);
+      if (emailError) throw emailError;
+      if (!matches || matches.length !== 1) return res.status(200).json({ data: null, umVersion: null });
+
+      const byEmail = await resolveUMVersion(supabaseAdmin, { entrepreneurId: matches[0].id });
+      if (byEmail.error) console.error('[UM latest-report] UM version lookup failed:', byEmail.error);
+      return res.status(200).json({ data: null, umVersion: byEmail.error ? null : byEmail.version });
+    }
+
     const { data, error } = await supabaseAdmin
       .from('upward_mobility_reports')
       .select(`
@@ -49,7 +66,15 @@ export default async function handler(req, res) {
 
     if (error) throw error;
 
-    return res.status(200).json({ data: data || null });
+    // Form version for the client-side block only; the submit routes enforce it themselves.
+    // A failed lookup returns null so prefill still works (the submit guard fails closed).
+    const umResolution = await resolveUMVersion(supabaseAdmin, { entrepreneurId });
+    if (umResolution.error) console.error('[UM latest-report] UM version lookup failed:', umResolution.error);
+
+    return res.status(200).json({
+      data: data || null,
+      umVersion: umResolution.error ? null : umResolution.version,
+    });
   } catch (error) {
     console.error('[UM latest-report] Error:', error.message, error.stack);
     return res.status(500).json({ error: 'Internal server error', detail: error.message });
