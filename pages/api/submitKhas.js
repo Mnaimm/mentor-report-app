@@ -2,6 +2,7 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from './auth/[...nextauth]';
 import { createAdminClient } from '../../lib/supabaseAdmin';
+import { resolveUMVersion, UM_V2_NOT_OPEN, UM_VERSION_LOOKUP_FAILED } from '../../lib/resolveUMVersion';
 import { google } from 'googleapis';
 
 export default async function handler(req, res) {
@@ -40,6 +41,21 @@ export default async function handler(req, res) {
 
     if (entErr) throw new Error(`Entrepreneur lookup failed: ${entErr.message}`);
     if (!entrepreneur) throw new Error(`Entrepreneur not found: ${data.entrepreneur_id}`);
+
+    // UM v2 batches (B10 Bangkit / M9 Maju) stay closed until the v2 form ships.
+    // Checked before any reports / UM / Sheets write; a failed lookup fails closed.
+    const umResolution = await resolveUMVersion(supabase, {
+      entrepreneurId: entrepreneur.id,
+      mentorId: mentorRecord.id,
+    });
+    if (umResolution.error) {
+      console.error(`[submitKhas][ERROR_UM_VERSION] ${umResolution.error}`);
+      return res.status(503).json({ success: false, ...UM_VERSION_LOOKUP_FAILED, retryable: true });
+    }
+    if (umResolution.version === 2) {
+      console.warn(`[submitKhas][UM_V2_BLOCKED] batch=${umResolution.batchId} entrepreneur=${entrepreneur.id}`);
+      return res.status(409).json({ success: false, ...UM_V2_NOT_OPEN, retryable: false });
+    }
 
     const normalizedProgram = data.program.charAt(0).toUpperCase() + data.program.slice(1).toLowerCase();
     const isMaju = normalizedProgram === 'Maju';

@@ -7,6 +7,7 @@ import {
   INITIAL_UPWARD_MOBILITY_STATE,
   validateUpwardMobility,
 } from '../lib/upwardMobilityUtils';
+import { UM_V2_NOT_OPEN } from '../lib/resolveUMVersion';
 import UMSection from '../components/UMSection';
 import {
   MIA_PROOF_TYPES,
@@ -108,7 +109,7 @@ const TextArea = ({ label, value, onChange, placeholder, helperText, rows = 4, r
     />
   </div>
 );
-const FileInput = ({ label, multiple = false, onChange, required = false, isImageUpload = false }) => {
+const FileInput = ({ label, multiple = false, onChange, required = false, isImageUpload = false, disabled = false }) => {
   const [warning, setWarning] = React.useState('');
 
   const handleFileChange = (e) => {
@@ -150,8 +151,9 @@ const FileInput = ({ label, multiple = false, onChange, required = false, isImag
         multiple={multiple}
         onChange={handleFileChange}
         required={required}
+        disabled={disabled}
         accept={isImageUpload ? "image/jpeg,image/png" : undefined}
-        className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+        className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
       />
       {isImageUpload && (
         <p className="mt-1 text-xs text-gray-500">
@@ -206,6 +208,10 @@ export default function LaporanSesiPage() {
   // UM carry-forward state
   const [praisiDari, setPraisiDari] = useState(null);
   const [lockedSections, setLockedSections] = useState({ bank: false, aset: false, digital: false });
+
+  // UM v2 batches (B10 Bangkit / M9 Maju) are closed until the v2 form ships; server enforces too
+  const [umVersion, setUmVersion] = useState(1);
+  const isUMV2Blocked = umVersion === 2;
 
   const initialFormState = {
     inisiatif: [{ focusArea: '', keputusan: '', keputusanCustom: undefined, pelanTindakan: '' }],
@@ -274,10 +280,14 @@ export default function LaporanSesiPage() {
   }, [status]);
 
   const resetForm = () => {
-    try {
-      const k = getDraftKey(selectedMentee?.Usahawan, currentSession, session?.user?.email);
-      localStorage.removeItem(k);
-    } catch { }
+    // Keep the draft of a blocked (UM v2) mentee; it could not have been submitted
+    if (!isUMV2Blocked) {
+      try {
+        const k = getDraftKey(selectedMentee?.Usahawan, currentSession, session?.user?.email);
+        localStorage.removeItem(k);
+      } catch { }
+    }
+    setUmVersion(1);
 
     setFormState(initialFormState);
     setFiles({
@@ -646,6 +656,7 @@ export default function LaporanSesiPage() {
     setFormState(initialFormState);
     const menteeData = allMentees.find((m) => m.Usahawan === menteeName);
     setSelectedMentee(menteeData);
+    setUmVersion(1);
     try {
       const [res, umPrefillRes, pemerhatianRes, latestUMRes] = await Promise.all([
         fetch(`/api/menteeData?name=${encodeURIComponent(menteeName)}&programType=bangkit${menteeData?.entrepreneur_id ? `&entrepreneur_id=${encodeURIComponent(menteeData.entrepreneur_id)}` : ''}`),
@@ -657,13 +668,16 @@ export default function LaporanSesiPage() {
           : Promise.resolve(null),
         menteeData?.entrepreneur_id
           ? fetch(`/api/um/latest-report?entrepreneurId=${encodeURIComponent(menteeData.entrepreneur_id)}`)
-          : Promise.resolve(null),
+          : menteeData?.Emel
+            ? fetch(`/api/um/latest-report?email=${encodeURIComponent(menteeData.Emel)}`) // umVersion only
+            : Promise.resolve(null),
       ]);
       const data = await res.json();
       const umPrefill = umPrefillRes?.ok ? await umPrefillRes.json() : {};
       const pemerhatianPrefill = pemerhatianRes?.ok ? await pemerhatianRes.json() : {};
       const latestUMResult = latestUMRes?.ok ? await latestUMRes.json() : {};
       const prevUM = latestUMResult?.data || null;
+      setUmVersion(latestUMResult?.umVersion === 2 ? 2 : 1);
       if (prevUM) {
         setPraisiDari(prevUM.sesi_mentoring || 'Sesi Sebelumnya');
       }
@@ -886,6 +900,8 @@ export default function LaporanSesiPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (isMIARevisionBlocked) return;
+    // Stop before image uploads and draft clearing; the banner explains why
+    if (isUMV2Blocked) return;
 
     // Safety Check: Ensure session is valid
     if (status !== 'authenticated' || !session?.user) {
@@ -1730,7 +1746,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
         <Section title="Muat Naik Gambar (Sesi 1)">
           {renderFieldWarning('Tiada gambar Growth Wheel')}
           <div className={getFieldHighlightClass('Tiada gambar Growth Wheel')}>
-            <FileInput label="Gambar Carta GrowthWheel 360°" onChange={(e) => handleFileChange('gw', e.target.files)} required isImageUpload={true} />
+            <FileInput label="Gambar Carta GrowthWheel 360°" onChange={(e) => handleFileChange('gw', e.target.files)} required isImageUpload={true} disabled={isUMV2Blocked} />
             {isRevisionMode && revisionData?.image_urls?.growthwheel && (
               <div className="mt-2">
                 <p className="text-sm text-gray-600">Existing GrowthWheel Image:</p>
@@ -1750,7 +1766,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
 
           {renderFieldWarning('Gambar sesi tidak ada / tidak mencukupi')}
           <div className={getFieldHighlightClass('Gambar sesi tidak ada / tidak mencukupi')}>
-            <FileInput label="Satu (1) Gambar Individu Usahawan (Profil)" onChange={(e) => handleFileChange('profil', e.target.files)} required isImageUpload={true} />
+            <FileInput label="Satu (1) Gambar Individu Usahawan (Profil)" onChange={(e) => handleFileChange('profil', e.target.files)} required isImageUpload={true} disabled={isUMV2Blocked} />
             {isRevisionMode && revisionData?.image_urls?.profil && (
               <div className="mt-2">
                 <p className="text-sm text-gray-600">Existing Profile Image:</p>
@@ -1767,7 +1783,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
               </div>
             )}
 
-            <FileInput label="Dua (2) Gambar Sesi Mentoring" multiple onChange={(e) => handleFileChange('sesi', e.target.files, true)} required isImageUpload={true} />
+            <FileInput label="Dua (2) Gambar Sesi Mentoring" multiple onChange={(e) => handleFileChange('sesi', e.target.files, true)} required isImageUpload={true} disabled={isUMV2Blocked} />
             {isRevisionMode && revisionData?.image_urls?.sesi && revisionData.image_urls.sesi.length > 0 && (
               <div className="mt-2">
                 <p className="text-sm text-gray-600">Existing Session Images:</p>
@@ -1797,7 +1813,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
           </div>
           {formState.sesi.premisDilawat && (
             <div>
-              <FileInput label="Gambar Lawatan Premis *" multiple onChange={(e) => handleFileChange('premis', e.target.files, true)} required isImageUpload={true} />
+              <FileInput label="Gambar Lawatan Premis *" multiple onChange={(e) => handleFileChange('premis', e.target.files, true)} required isImageUpload={true} disabled={isUMV2Blocked} />
               {isRevisionMode && revisionData?.image_urls?.premis && revisionData.image_urls.premis.length > 0 && (
                 <div className="mt-2">
                   <p className="text-sm text-gray-600">Existing Premises Images:</p>
@@ -2053,7 +2069,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
         )}
 
         <Section title={`Muat Naik Gambar (Sesi ${currentSession})`}>
-          <FileInput label="Gambar Sesi Mentoring" multiple onChange={(e) => handleFileChange('sesi', e.target.files, true)} required isImageUpload={true} />
+          <FileInput label="Gambar Sesi Mentoring" multiple onChange={(e) => handleFileChange('sesi', e.target.files, true)} required isImageUpload={true} disabled={isUMV2Blocked} />
           {isRevisionMode && revisionData?.image_urls?.sesi && revisionData.image_urls.sesi.length > 0 && (
             <div className="mt-2">
               <p className="text-sm text-gray-600">Existing Session Images:</p>
@@ -2076,7 +2092,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                 label="Gambar Lawatan Premis (disyorkan – belum dilawat)"
                 multiple
                 onChange={(e) => handleFileChange('premis', e.target.files, true)}
-                isImageUpload={true}
+                isImageUpload={true} disabled={isUMV2Blocked}
               />
               {isRevisionMode && revisionData?.image_urls?.premis && revisionData.image_urls.premis.length > 0 && (
                 <div className="mt-2">
@@ -2123,7 +2139,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
             label={`${MIA_PROOF_TYPES.WHATSAPP.label} *`}
             onChange={(e) => handleMIAFileChange('whatsapp', e.target.files)}
             required
-            isImageUpload={true}
+            isImageUpload={true} disabled={isUMV2Blocked}
           />
           <p className="text-xs text-gray-500 mt-1">
             {MIA_PROOF_TYPES.WHATSAPP.description}
@@ -2139,7 +2155,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
             label={`${MIA_PROOF_TYPES.EMAIL.label} *`}
             onChange={(e) => handleMIAFileChange('email', e.target.files)}
             required
-            isImageUpload={true}
+            isImageUpload={true} disabled={isUMV2Blocked}
           />
           <p className="text-xs text-gray-500 mt-1">
             {MIA_PROOF_TYPES.EMAIL.description}
@@ -2155,7 +2171,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
             label={`${MIA_PROOF_TYPES.CALL.label} *`}
             onChange={(e) => handleMIAFileChange('call', e.target.files)}
             required
-            isImageUpload={true}
+            isImageUpload={true} disabled={isUMV2Blocked}
           />
           <p className="text-xs text-gray-500 mt-1">
             {MIA_PROOF_TYPES.CALL.description}
@@ -2308,6 +2324,11 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
           ) : (
             selectedMentee && (
               <>
+                {isUMV2Blocked && (
+                  <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mb-4 rounded-md">
+                    <p className="text-sm font-semibold text-amber-800">⚠️ {UM_V2_NOT_OPEN.error}</p>
+                  </div>
+                )}
                 {MIA_UI_ENABLED && (
                   <div className={getMIACheckboxClasses(isMIA)}>
                     <input type="checkbox" id="mia-checkbox" checked={isMIA} onChange={(e) => setIsMIA(e.target.checked)} className="h-5 w-5 rounded text-red-600 focus:ring-red-500" />
@@ -2384,8 +2405,8 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
               <div className="text-center">
                 <button
                   type="submit"
-                  disabled={isSubmitting || compressionProgress.show}
-                  className={`w-full md:w-auto font-bold py-3 px-12 rounded-lg disabled:bg-gray-400 ${
+                  disabled={isSubmitting || compressionProgress.show || isUMV2Blocked}
+                  className={`w-full md:w-auto font-bold py-3 px-12 rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed ${
                     isRevisionMode
                       ? 'bg-amber-600 hover:bg-amber-700 text-white'
                       : 'bg-green-600 hover:bg-green-700 text-white'

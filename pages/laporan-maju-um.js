@@ -14,6 +14,7 @@ import {
   INITIAL_UPWARD_MOBILITY_STATE,
   validateUpwardMobility,
 } from '../lib/upwardMobilityUtils';
+import { UM_V2_NOT_OPEN } from '../lib/resolveUMVersion';
 import UMSection from '../components/UMSection';
 import {
   MIA_PROOF_TYPES,
@@ -177,6 +178,10 @@ const LaporanMajuPage = () => {
   // UM carry-forward state
   const [praisiDari, setPraisiDari] = useState(null);
   const [lockedSections, setLockedSections] = useState({ bank: false, aset: false, digital: false });
+
+  // UM v2 batches (B10 Bangkit / M9 Maju) are closed until the v2 form ships; server enforces too
+  const [umVersion, setUmVersion] = useState(1);
+  const isUMV2Blocked = umVersion === 2;
 
   // --- Draft/Autosave functionality ---
   const getDraftKey = (menteeName, sessionNo, mentorEmail) =>
@@ -511,6 +516,7 @@ const LaporanMajuPage = () => {
     }));
     setPraisiDari(null);
     setLockedSections({ bank: false, aset: false, digital: false });
+    setUmVersion(1);
 
     if (!selectedMenteeName) {
       setMessage('');
@@ -534,7 +540,9 @@ const LaporanMajuPage = () => {
           : Promise.resolve(null),
         entrepreneurId
           ? fetch(`/api/um/latest-report?entrepreneurId=${encodeURIComponent(entrepreneurId)}`)
-          : Promise.resolve(null),
+          : selectedMenteeData?.Emel
+            ? fetch(`/api/um/latest-report?email=${encodeURIComponent(selectedMenteeData.Emel)}`) // umVersion only
+            : Promise.resolve(null),
       ]);
       if (!response.ok) {
         throw new Error('Masalah sambungan. Sila semak internet dan cuba lagi.');
@@ -544,6 +552,7 @@ const LaporanMajuPage = () => {
       const latarBelakangPrefill = latarBelakangRes?.ok ? await latarBelakangRes.json() : {};
       const latestUMResult = latestUMRes?.ok ? await latestUMRes.json() : {};
       const prevUM = latestUMResult?.data || null;
+      setUmVersion(latestUMResult?.umVersion === 2 ? 2 : 1);
       if (prevUM) {
         setPraisiDari(prevUM.sesi_mentoring || 'Sesi Sebelumnya');
       }
@@ -866,18 +875,21 @@ const LaporanMajuPage = () => {
 
 
   const resetForm = () => {
-    // Clear draft from localStorage
-    try {
-      const draftKey = getDraftKey(
-        formData.NAMA_MENTEE,
-        currentSessionNumber,
-        session?.user?.email
-      );
-      localStorage.removeItem(draftKey);
-      console.log('🗑️ Draft cleared from localStorage');
-    } catch (error) {
-      console.error('Failed to clear draft:', error);
+    // Clear draft from localStorage (kept for a blocked UM v2 mentee; it could not have been submitted)
+    if (!isUMV2Blocked) {
+      try {
+        const draftKey = getDraftKey(
+          formData.NAMA_MENTEE,
+          currentSessionNumber,
+          session?.user?.email
+        );
+        localStorage.removeItem(draftKey);
+        console.log('🗑️ Draft cleared from localStorage');
+      } catch (error) {
+        console.error('Failed to clear draft:', error);
+      }
     }
+    setUmVersion(1);
 
     setFormData({
       ...initialFormState,
@@ -1074,6 +1086,8 @@ const LaporanMajuPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (isMIARevisionBlocked) return;
+    // Stop before image uploads and draft clearing; the banner explains why
+    if (isUMV2Blocked) return;
 
     // Safety Check: Ensure session is valid
     if (status !== 'authenticated' || !session?.user) {
@@ -1769,6 +1783,12 @@ const LaporanMajuPage = () => {
             </div>
           )}
 
+          {isUMV2Blocked && (
+            <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-md">
+              <p className="text-sm font-semibold text-amber-800">⚠️ {UM_V2_NOT_OPEN.error}</p>
+            </div>
+          )}
+
           {/* Conditional rendering based on isMIA status */}
           {isMIARevisionBlocked ? (
             <div className="bg-white p-6 rounded-lg shadow-sm">
@@ -1813,6 +1833,7 @@ const LaporanMajuPage = () => {
                       onFileChange={(e) => handleMIAFileChange('whatsapp', e.target.files)}
                       required
                       isImageUpload={true}
+                      disabled={isUMV2Blocked}
                     />
                     <p className="text-xs text-gray-500 mt-1">
                       {MIA_PROOF_TYPES.WHATSAPP.description}
@@ -1829,6 +1850,7 @@ const LaporanMajuPage = () => {
                       onFileChange={(e) => handleMIAFileChange('email', e.target.files)}
                       required
                       isImageUpload={true}
+                      disabled={isUMV2Blocked}
                     />
                     <p className="text-xs text-gray-500 mt-1">
                       {MIA_PROOF_TYPES.EMAIL.description}
@@ -1845,6 +1867,7 @@ const LaporanMajuPage = () => {
                       onFileChange={(e) => handleMIAFileChange('call', e.target.files)}
                       required
                       isImageUpload={true}
+                      disabled={isUMV2Blocked}
                     />
                     <p className="text-xs text-gray-500 mt-1">
                       {MIA_PROOF_TYPES.CALL.description}
@@ -2446,6 +2469,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                       multiple={false}
                       required={currentSessionNumber === 1}
                       isImageUpload={true}
+                      disabled={isUMV2Blocked}
                     />
                   )}
                   {formData.URL_GAMBAR_GW360 && currentSessionNumber === 1 && (
@@ -2471,6 +2495,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                     multiple={true}
                     required
                     isImageUpload={true}
+                    disabled={isUMV2Blocked}
                   />
                   {formData.URL_GAMBAR_SESI_JSON.length > 0 && (
                     <div className="mt-2">
@@ -2511,6 +2536,7 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                             multiple={true}
                             required={lawatanPremisChecked}
                             isImageUpload={true}
+                            disabled={isUMV2Blocked}
                           />
                           <p className="mt-1 text-sm text-gray-600 italic">
                             Gambar bahagian depan premis bisnes mentee, Gambar-gambar ruang dalam bisnes mentee, Gambar-gambar aset yang ada (terutama yang dibeli menggunakan geran BIMB), selfie depan premise
@@ -2631,8 +2657,8 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                   isRevisionMode
                     ? 'bg-amber-600 hover:bg-amber-700'
                     : 'bg-green-600 hover:bg-green-700'
-                }`}
-                disabled={loading || compressionProgress.show}
+                } disabled:cursor-not-allowed`}
+                disabled={loading || compressionProgress.show || isUMV2Blocked}
               >
                 {compressionProgress.show
                   ? '🔄 Compressing Images...'

@@ -6,6 +6,7 @@ import { prepareMIARequestPayload, MIA_STATUS } from '../../lib/mia';
 import { requireSession, requireSubmitterEmail } from '../../lib/api-guard';
 import { MIA_API_ENABLED } from '../../lib/featureFlags';
 import { buildUMPayload, insertUMWithRetry, logUMFailure, UM_DB_FAILED_WARNING } from '../../lib/umDbWrite';
+import { resolveUMVersion, UM_V2_NOT_OPEN, UM_VERSION_LOOKUP_FAILED } from '../../lib/resolveUMVersion';
 
 
 /** Extract the row number from "SheetName!A37:T37" */
@@ -409,6 +410,21 @@ export default async function handler(req, res) {
       });
     }
 
+    // UM v2 batches (B10 Bangkit / M9 Maju) stay closed until the v2 form ships.
+    // Checked before any reports / UM / Sheets write; a failed lookup fails closed.
+    const umResolution = await resolveUMVersion(supabaseAdmin, {
+      entrepreneurId: entrepreneur.id,
+      mentorId: mentorRecord.id,
+    });
+    if (umResolution.error) {
+      console.error('❌ UM version lookup failed:', umResolution.error);
+      return res.status(503).json({ success: false, ...UM_VERSION_LOOKUP_FAILED, retryable: true });
+    }
+    if (umResolution.version === 2) {
+      console.warn(`⛔ UM v2 batch ${umResolution.batchId}: submission blocked for entrepreneur ${entrepreneur.id}`);
+      return res.status(409).json({ success: false, ...UM_V2_NOT_OPEN, retryable: false });
+    }
+
     // Prepare supabaseAdmin payload - MUST match 'reports' table schema
     const supabasePayload = {
       // Program & Metadata
@@ -628,7 +644,9 @@ export default async function handler(req, res) {
           entrepreneur,
           mentorId: mentorRecord.id,
           sesiNumber: reportData.sesiLaporan,
-          program: 'BANGKIT'
+          program: 'BANGKIT',
+          reportId: supabaseRecordId,
+          umVersion: 1 // v2 never reaches here (guarded before the reports insert)
         });
         console.log('📋 UM payload keys:', Object.keys(umSupabasePayload));
       } catch (error) {

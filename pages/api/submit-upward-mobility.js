@@ -2,6 +2,7 @@
 import { google } from 'googleapis';
 import { createAdminClient } from '../../lib/supabaseAdmin';
 import { requireSession, requireSubmitterEmail } from '../../lib/api-guard';
+import { resolveUMVersion, UM_V2_NOT_OPEN, UM_VERSION_LOOKUP_FAILED } from '../../lib/resolveUMVersion';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -27,6 +28,36 @@ export default async function handler(req, res) {
     } catch (e) {
       console.error('Error parsing UPWARD_MOBILITY_JSON:', e);
       return res.status(400).json({ error: 'Invalid data format' });
+    }
+
+    // UM v2 batches (B10 Bangkit / M9 Maju) stay closed until the v2 form ships.
+    // Checked before the Sheets append, this route's first write. limit(2) so a duplicate
+    // email is checked row by row instead of erroring; any failed lookup fails closed.
+    const guardEmail = (formData.emailUsahawan || '').toLowerCase().trim();
+    if (guardEmail) {
+      const guardClient = createAdminClient();
+      const { data: guardRows, error: guardErr } = await guardClient
+        .from('entrepreneurs')
+        .select('id')
+        .eq('email', guardEmail)
+        .limit(2);
+      if (guardErr) {
+        console.error('❌ UM version lookup failed (entrepreneur):', guardErr.message);
+        return res.status(503).json({ ...UM_VERSION_LOOKUP_FAILED });
+      }
+      const resolutions = await Promise.all(
+        (guardRows || []).map((row) => resolveUMVersion(guardClient, { entrepreneurId: row.id }))
+      );
+      const blocked = resolutions.find((r) => r.version === 2);
+      if (blocked) {
+        console.warn(`⛔ UM v2 batch ${blocked.batchId}: standalone UM blocked for ${guardEmail}`);
+        return res.status(409).json({ ...UM_V2_NOT_OPEN });
+      }
+      const failed = resolutions.find((r) => r.error);
+      if (failed) {
+        console.error('❌ UM version lookup failed:', failed.error);
+        return res.status(503).json({ ...UM_VERSION_LOOKUP_FAILED });
+      }
     }
 
     // --- Google Sheets Setup ---
