@@ -7,7 +7,14 @@ import { requireSession, requireSubmitterEmail } from '../../lib/api-guard';
 import { MIA_API_ENABLED } from '../../lib/featureFlags';
 import { buildUMPayload, buildUMPayloadV2, insertUMWithRetry, logUMFailure, prepareUMSubmission, UM_DB_FAILED_WARNING } from '../../lib/umDbWrite';
 import { resolveUMVersion, isUMV2Open, UM_V2_NOT_OPEN, UM_VERSION_LOOKUP_FAILED } from '../../lib/resolveUMVersion';
-import { umV2ToSheetsUM } from '../../lib/upwardMobilityV2';
+import { umV2ToSheetsUM, umV2ToSheetsV2Block, UM_V2_SHEETS_HEADERS } from '../../lib/upwardMobilityV2';
+
+/** The 18-value UM v2 block set by the handler; falls back to the v1 block ('1', blanks). */
+const sheetsV2Block = (data) => (
+  Array.isArray(data?.UM_SHEETS_V2_BLOCK) && data.UM_SHEETS_V2_BLOCK.length === UM_V2_SHEETS_HEADERS.length
+    ? data.UM_SHEETS_V2_BLOCK
+    : umV2ToSheetsV2Block(null)
+);
 
 
 /** Extract the row number from "SheetName!A37:T37" */
@@ -229,9 +236,16 @@ export default async function handler(req, res) {
       }
       umV2State = umCheck.v2State;
       umBatchId = umResolution.batchId;
-      if (umV2State) {
-        sheetsReportData = { ...reportData, UPWARD_MOBILITY_JSON: JSON.stringify(umV2ToSheetsUM(umV2State)) };
-      }
+      // UM_SHEETS_V2_BLOCK is always set server-side (never taken from the client): v2 values, or '1' + blanks for v1
+      sheetsReportData = {
+        ...reportData,
+        ...(umV2State && { UPWARD_MOBILITY_JSON: JSON.stringify(umV2ToSheetsUM(umV2State)) }),
+        UM_SHEETS_V2_BLOCK: umV2ToSheetsV2Block(umV2State, {
+          umVersion: umResolution.version,
+          isMIA: reportData.MIA_STATUS === 'MIA',
+          sesiNumber: reportData.SESI_NUMBER,
+        }),
+      };
 
       // Prepare Supabase payload - MUST match 'reports' table schema
       const supabasePayload = {
@@ -805,7 +819,7 @@ function mapMajuDataToSheetRow(data) {
     }
   }
 
-  return [
+  const row = [
     // Columns 0-19: Basic session info & reflections
     timestamp,                                    // 0  Timestamp
     data.NAMA_MENTOR || '',                      // 1  NAMA_MENTOR
@@ -900,7 +914,13 @@ function mapMajuDataToSheetRow(data) {
 
     // Column 66: Entrepreneur ID
     data.entrepreneur_id || '',                  // 66 BO ENTREPRENEUR_ID
+
+    // Column 67: BP report_id (not written here)
+    '',                                          // 67 BP report_id
   ];
+
+  // Columns 68-85 (BQ-CH): UM v2 block (UM_VERSI … UM_SWOT_NOTA_T)
+  return [...row, ...sheetsV2Block(data)];
 }
 
 /**
@@ -970,6 +990,9 @@ function mapUMDataToSheetRow(reportData, umData, entrepreneurBatch = '') {
   row[69] = umData.UM_TARIKH_LAWATAN_PREMIS || '';      // BR UM_TARIKH_LAWATAN_PREMIS
 
   // Remaining columns BS-BT (70-71) are reserved/future use - leave empty
+
+  // BU-CL (72-89): UM v2 block (UM_VERSI … UM_SWOT_NOTA_T)
+  sheetsV2Block(reportData).forEach((v, i) => { row[72 + i] = v; });
 
   return row;
 }

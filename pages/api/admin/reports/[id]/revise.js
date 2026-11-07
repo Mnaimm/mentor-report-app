@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../../auth/[...nextauth]';
 import { google } from 'googleapis';
 import { findRowByReportId } from '../../../../../lib/googleSheets';
+import { UM_V2_VERSION, umV2ToSheetsUM, umV2ToSheetsV2Block } from '../../../../../lib/upwardMobilityV2';
 
 // Use SERVICE_ROLE_KEY for admin/mentor endpoints (bypasses RLS)
 const supabase = createClient(
@@ -354,18 +355,31 @@ export default async function handler(req, res) {
                 const spreadsheetId = process.env.GOOGLE_SHEETS_REPORT_ID;
                 const tabName = process.env.Bangkit_TAB || 'Bangkit';
 
+                // UM v2: v1 columns get only the shared fields (same as submitBangkit); the v2 block goes to CQ-DH
+                const umV2Data = umJsonData && Number(umJsonData.umVersion) === UM_V2_VERSION ? umJsonData : null;
+                const sheetsData = umV2Data
+                    ? { ...reportData, UPWARD_MOBILITY_JSON: JSON.stringify(umV2ToSheetsUM(umV2Data)) }
+                    : reportData;
+                const v2Block = umV2ToSheetsV2Block(umV2Data, {
+                    umVersion: umV2Data ? UM_V2_VERSION : 1,
+                    isMIA: reportData.status === 'MIA',
+                    sesiNumber: reportData.sesiLaporan,
+                });
+
                 // Map data to sheet row
-                const rowData = mapBangkitDataToSheetRow(reportData);
+                const rowData = mapBangkitDataToSheetRow(sheetsData);
 
-                // Update the row in Google Sheets
+                // Update the row in Google Sheets (A-CI, plus the UM v2 block CQ-DH so no stale v2 values remain).
+                // The block is skipped for Maju: this route always writes the Bangkit tab.
                 const range = `${tabName}!A${rowNumber}:CI${rowNumber}`;
+                const updates = [{ range, values: [rowData] }];
+                if (!isMaju) updates.push({ range: `${tabName}!CQ${rowNumber}:DH${rowNumber}`, values: [v2Block] });
 
-                await sheets.spreadsheets.values.update({
+                await sheets.spreadsheets.values.batchUpdate({
                     spreadsheetId,
-                    range,
-                    valueInputOption: 'USER_ENTERED',
                     requestBody: {
-                        values: [rowData]
+                        valueInputOption: 'USER_ENTERED',
+                        data: updates
                     }
                 });
 
