@@ -7,7 +7,14 @@ import { requireSession, requireSubmitterEmail } from '../../lib/api-guard';
 import { MIA_API_ENABLED } from '../../lib/featureFlags';
 import { buildUMPayload, buildUMPayloadV2, insertUMWithRetry, logUMFailure, prepareUMSubmission, UM_DB_FAILED_WARNING } from '../../lib/umDbWrite';
 import { resolveUMVersion, isUMV2Open, UM_V2_NOT_OPEN, UM_VERSION_LOOKUP_FAILED } from '../../lib/resolveUMVersion';
-import { umV2ToSheetsUM } from '../../lib/upwardMobilityV2';
+import { umV2ToSheetsUM, umV2ToSheetsV2Block, UM_V2_SHEETS_HEADERS } from '../../lib/upwardMobilityV2';
+
+/** The 18-value UM v2 block set by the handler; falls back to the v1 block ('1', blanks). */
+const sheetsV2Block = (data) => (
+  Array.isArray(data?.UM_SHEETS_V2_BLOCK) && data.UM_SHEETS_V2_BLOCK.length === UM_V2_SHEETS_HEADERS.length
+    ? data.UM_SHEETS_V2_BLOCK
+    : umV2ToSheetsV2Block(null)
+);
 
 
 /** Extract the row number from "SheetName!A37:T37" */
@@ -36,7 +43,7 @@ function deriveLegacyJualanFromKewangan(kewangan) {
 }
 
 const mapBangkitDataToSheetRow = (data, miaRequestId = null) => {
-  const row = Array(93).fill(''); // Columns 0-92 (93 total) — index 92 = DATA_KEWANGAN_JSON
+  const row = Array(112).fill(''); // Columns 0-111 (A-DH) — index 92 = DATA_KEWANGAN_JSON, 94-111 = UM v2 block
 
   // A–J (0-9): Basic session info
   row[0] = new Date().toISOString();                     // A  Timestamp
@@ -180,6 +187,10 @@ const mapBangkitDataToSheetRow = (data, miaRequestId = null) => {
   // CN (91): Entrepreneur ID (UUID from entrepreneurs table)
   row[91] = data?.entrepreneur_id || '';                     // CN ENTREPRENEUR_ID
 
+  // CP (93) MIA_REASON: not written here (left '')
+  // CQ-DH (94-111): UM v2 block (UM_VERSI … UM_SWOT_NOTA_T)
+  sheetsV2Block(data).forEach((v, i) => { row[94 + i] = v; });
+
   return row;
 };
 
@@ -210,7 +221,9 @@ const mapUMToUpwardMobilitySheetRow = (reportData, umData, entrepreneurBatch = '
 
   // ✅ Columns AS-BT (44-71): UM-specific fields (28 columns)
   // Section 1: Engagement Status (3 fields)
-  row[44] = '';                                          // AS UM_STATUS_PENGLIBATAN - not captured in in-form submissions
+  const v2Block = sheetsV2Block(reportData);
+  // AS UM_STATUS_PENGLIBATAN - not captured in in-form v1 submissions; v2 (non-MIA) = 'Active'
+  row[44] = v2Block[0] === '2' ? (umData.UM_STATUS_PENGLIBATAN || '') : '';
   row[45] = umData.UM_STATUS || '';                     // AT UM_STATUS
   row[46] = umData.UM_KRITERIA_IMPROVEMENT || '';       // AU UM_KRITERIA_IMPROVEMENT
 
@@ -248,6 +261,9 @@ const mapUMToUpwardMobilitySheetRow = (reportData, umData, entrepreneurBatch = '
   row[69] = umData.UM_TARIKH_LAWATAN_PREMIS || '';      // BR UM_TARIKH_LAWATAN_PREMIS
 
   // Remaining columns BS-BT (70-71) are reserved/future use - leave empty
+
+  // BU-CL (72-89): UM v2 block (UM_VERSI … UM_SWOT_NOTA_T)
+  v2Block.forEach((v, i) => { row[72 + i] = v; });
 
   return row;
 };
@@ -438,9 +454,16 @@ export default async function handler(req, res) {
     }
     const umV2State = umCheck.v2State;
     // v2: the Sheets mappers get only the UM fields that already have columns; v1-only columns stay blank
-    const sheetsReportData = umV2State
-      ? { ...reportData, UPWARD_MOBILITY_JSON: JSON.stringify(umV2ToSheetsUM(umV2State)) }
-      : reportData;
+    // UM_SHEETS_V2_BLOCK is always set server-side (never taken from the client): v2 values, or '1' + blanks for v1
+    const sheetsReportData = {
+      ...reportData,
+      ...(umV2State && { UPWARD_MOBILITY_JSON: JSON.stringify(umV2ToSheetsUM(umV2State)) }),
+      UM_SHEETS_V2_BLOCK: umV2ToSheetsV2Block(umV2State, {
+        umVersion: umResolution.version,
+        isMIA: reportData.status === 'MIA',
+        sesiNumber: reportData.sesiLaporan,
+      }),
+    };
 
     // Prepare supabaseAdmin payload - MUST match 'reports' table schema
     const supabasePayload = {
