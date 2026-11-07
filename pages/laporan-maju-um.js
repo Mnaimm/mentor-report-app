@@ -16,6 +16,13 @@ import {
 } from '../lib/upwardMobilityUtils';
 import { UM_V2_NOT_OPEN } from '../lib/resolveUMVersion';
 import UMSection from '../components/UMSection';
+import UMSectionV2 from '../components/UMSectionV2';
+import {
+  INITIAL_UM_V2_STATE,
+  validateUpwardMobilityV2,
+  serializeUMV2,
+  umV2PrefillFromRow,
+} from '../lib/upwardMobilityV2';
 import {
   MIA_PROOF_TYPES,
   validateMIAProofs,
@@ -130,6 +137,7 @@ const LaporanMajuPage = () => {
     MIA_PROOF_URL: '',
     // UPWARD MOBILITY FIELDS (Sections 3-6)
     UPWARD_MOBILITY: { ...INITIAL_UPWARD_MOBILITY_STATE },
+    UPWARD_MOBILITY_V2: INITIAL_UM_V2_STATE, // used only when the UM v2 form is open for this mentee
     // KEMASKINI MAKLUMAT (Updated Contact Info)
     KEMASKINI_MAKLUMAT: {
       telefon_baharu: '',
@@ -179,13 +187,21 @@ const LaporanMajuPage = () => {
   const [praisiDari, setPraisiDari] = useState(null);
   const [lockedSections, setLockedSections] = useState({ bank: false, aset: false, digital: false });
 
-  // UM v2 batches (B10 Bangkit / M9 Maju) are closed until the v2 form ships; server enforces too
+  // UM v2 batches (B10 Bangkit / M9 Maju): blocked until opened server-side (umV2Open); server enforces too
   const [umVersion, setUmVersion] = useState(1);
-  const isUMV2Blocked = umVersion === 2;
+  const [umV2Open, setUmV2Open] = useState(false);
+  const isUMV2Blocked = umVersion === 2 && !umV2Open;
+  const useUMV2 = umVersion === 2 && umV2Open;
 
   // --- Draft/Autosave functionality ---
-  const getDraftKey = (menteeName, sessionNo, mentorEmail) =>
-    `laporanMaju:draft:v1:${mentorEmail || 'unknown'}:${menteeName || 'none'}:s${sessionNo}`;
+  // v1 key unchanged so existing drafts survive; the UM v2 form saves under its own key
+  const getDraftKey = (menteeName, sessionNo, mentorEmail, umV2 = false) =>
+    `laporanMaju:draft:v1:${mentorEmail || 'unknown'}:${menteeName || 'none'}:s${sessionNo}${umV2 ? ':um2' : ''}`;
+  const clearDrafts = () => {
+    localStorage.removeItem(getDraftKey(formData.NAMA_MENTEE, currentSessionNumber, session?.user?.email, useUMV2));
+    // v2: also the v1-key draft that may have been restored as a fallback
+    if (useUMV2) localStorage.removeItem(getDraftKey(formData.NAMA_MENTEE, currentSessionNumber, session?.user?.email));
+  };
   const [saveStatus, setSaveStatus] = useState('');
   const [autosaveArmed, setAutosaveArmed] = useState(false);
 
@@ -276,7 +292,8 @@ const LaporanMajuPage = () => {
     const draftKey = getDraftKey(
       formData.NAMA_MENTEE,
       currentSessionNumber,
-      session?.user?.email
+      session?.user?.email,
+      useUMV2
     );
 
     const payload = { ...formData };
@@ -296,7 +313,7 @@ const LaporanMajuPage = () => {
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData, autosaveArmed]);
+  }, [formData, autosaveArmed, useUMV2]);
 
   // --- REVISION MODE DETECTION AND REPORT FETCHING ---
   useEffect(() => {
@@ -502,6 +519,7 @@ const LaporanMajuPage = () => {
       STATUS_PERNIAGAAN_KESELURUHAN: '',
       RUMUSAN_DAN_LANGKAH_KEHADAPAN: '',
       UPWARD_MOBILITY: { ...INITIAL_UPWARD_MOBILITY_STATE },
+      UPWARD_MOBILITY_V2: INITIAL_UM_V2_STATE,
     }));
 
     setCurrentSessionNumber(1);
@@ -517,6 +535,7 @@ const LaporanMajuPage = () => {
     setPraisiDari(null);
     setLockedSections({ bank: false, aset: false, digital: false });
     setUmVersion(1);
+    setUmV2Open(false);
 
     if (!selectedMenteeName) {
       setMessage('');
@@ -539,7 +558,7 @@ const LaporanMajuPage = () => {
           ? fetch(`/api/prefill/maju-latarbelakang?entrepreneur_id=${encodeURIComponent(entrepreneurId)}`)
           : Promise.resolve(null),
         entrepreneurId
-          ? fetch(`/api/um/latest-report?entrepreneurId=${encodeURIComponent(entrepreneurId)}`)
+          ? fetch(`/api/um/latest-report?entrepreneurId=${encodeURIComponent(entrepreneurId)}&program=maju`)
           : selectedMenteeData?.Emel
             ? fetch(`/api/um/latest-report?email=${encodeURIComponent(selectedMenteeData.Emel)}`) // umVersion only
             : Promise.resolve(null),
@@ -552,7 +571,10 @@ const LaporanMajuPage = () => {
       const latarBelakangPrefill = latarBelakangRes?.ok ? await latarBelakangRes.json() : {};
       const latestUMResult = latestUMRes?.ok ? await latestUMRes.json() : {};
       const prevUM = latestUMResult?.data || null;
-      setUmVersion(latestUMResult?.umVersion === 2 ? 2 : 1);
+      const resolvedUMVersion = latestUMResult?.umVersion === 2 ? 2 : 1;
+      const resolvedUMV2 = resolvedUMVersion === 2 && latestUMResult?.umV2Open === true;
+      setUmVersion(resolvedUMVersion);
+      setUmV2Open(resolvedUMV2);
       if (prevUM) {
         setPraisiDari(prevUM.sesi_mentoring || 'Sesi Sebelumnya');
       }
@@ -596,7 +618,12 @@ const LaporanMajuPage = () => {
 
         setHasPremisPhotosUploaded(sessionData.hasPremisPhotos || false);
 
-        if (prevUM) {
+        // v2 mentees get a v2 row (or nothing) from latest-report; never map it into v1 state
+        if (prevUM && resolvedUMV2) {
+          updatedFormData.UPWARD_MOBILITY_V2 = { ...updatedFormData.UPWARD_MOBILITY_V2, ...umV2PrefillFromRow(prevUM) };
+        }
+
+        if (prevUM && resolvedUMVersion !== 2) {
           const parseUMArray = (val) => {
             if (!val) return [];
             if (Array.isArray(val)) return val;
@@ -652,18 +679,20 @@ const LaporanMajuPage = () => {
             UM_TARIKH_LAWATAN_PREMIS: prefillTarikh,
           };
         }
+        if (resolvedUMV2 && prefillTarikh && /^\d{4}-\d{2}-\d{2}$/.test(prefillTarikh) && !updatedFormData.UPWARD_MOBILITY_V2.tarikh_lawatan) {
+          updatedFormData.UPWARD_MOBILITY_V2 = { ...updatedFormData.UPWARD_MOBILITY_V2, tarikh_lawatan: prefillTarikh };
+        }
 
         return updatedFormData;
       });
 
       // --- Restore draft if exists ---
       try {
-        const draftKey = getDraftKey(
-          selectedMenteeName,
-          sessionData.currentSession,
-          session?.user?.email
-        );
-        const saved = localStorage.getItem(draftKey);
+        // v2: own draft first; else the v1-key draft (saved while v2 was blocked) without its UM part
+        const savedV2 = resolvedUMV2
+          ? localStorage.getItem(getDraftKey(selectedMenteeName, sessionData.currentSession, session?.user?.email, true))
+          : null;
+        const saved = savedV2 || localStorage.getItem(getDraftKey(selectedMenteeName, sessionData.currentSession, session?.user?.email));
 
         if (saved) {
           const parsed = JSON.parse(saved);
@@ -682,6 +711,9 @@ const LaporanMajuPage = () => {
               emel: prev.emel,
               NAMA_MENTEE: prev.NAMA_MENTEE,
               UPWARD_MOBILITY: prev.UPWARD_MOBILITY,
+              UPWARD_MOBILITY_V2: savedV2 && parsed.UPWARD_MOBILITY_V2
+                ? { ...prev.UPWARD_MOBILITY_V2, ...parsed.UPWARD_MOBILITY_V2 }
+                : prev.UPWARD_MOBILITY_V2,
             };
 
             return {
@@ -754,6 +786,10 @@ const LaporanMajuPage = () => {
   };
 
   // Handler for UPWARD_MOBILITY nested fields
+  // UM v2 section passes an updater: (prev) => next
+  const handleUMV2Change = (updater) =>
+    setFormData((prev) => ({ ...prev, UPWARD_MOBILITY_V2: updater(prev.UPWARD_MOBILITY_V2) }));
+
   const handleUMChange = (field, value) => {
     setFormData(prev => ({
       ...prev,
@@ -878,18 +914,14 @@ const LaporanMajuPage = () => {
     // Clear draft from localStorage (kept for a blocked UM v2 mentee; it could not have been submitted)
     if (!isUMV2Blocked) {
       try {
-        const draftKey = getDraftKey(
-          formData.NAMA_MENTEE,
-          currentSessionNumber,
-          session?.user?.email
-        );
-        localStorage.removeItem(draftKey);
+        clearDrafts();
         console.log('🗑️ Draft cleared from localStorage');
       } catch (error) {
         console.error('Failed to clear draft:', error);
       }
     }
     setUmVersion(1);
+    setUmV2Open(false);
 
     setFormData({
       ...initialFormState,
@@ -1025,7 +1057,9 @@ const LaporanMajuPage = () => {
       // 4. UPWARD MOBILITY validations (required for all sessions)
       // Section 3: Status & Mobiliti
 
-      const umErrors = validateUpwardMobility(formData.UPWARD_MOBILITY, isMIA);
+      const umErrors = useUMV2
+        ? validateUpwardMobilityV2(formData.UPWARD_MOBILITY_V2, { sesiNumber: currentSessionNumber })
+        : validateUpwardMobility(formData.UPWARD_MOBILITY, isMIA);
       if (umErrors.length > 0) {
         errors.push(...umErrors);
       }
@@ -1332,8 +1366,10 @@ const LaporanMajuPage = () => {
           // KEMASKINI MAKLUMAT - Updated contact information
           KEMASKINI_MAKLUMAT: maklumatBerubah ? formData.KEMASKINI_MAKLUMAT : null,
           batch_round_id: prefillBatchRoundId || null,
-          // UPWARD MOBILITY - Store as JSON for MAJU AppScript
-          UPWARD_MOBILITY_JSON: JSON.stringify({
+          // UPWARD MOBILITY - Store as JSON for MAJU AppScript (v2: own format, see lib/upwardMobilityV2)
+          UPWARD_MOBILITY_JSON: useUMV2
+            ? JSON.stringify(serializeUMV2(formData.UPWARD_MOBILITY_V2, { sesiNumber: currentSessionNumber }))
+            : JSON.stringify({
             UM_STATUS: formData.UPWARD_MOBILITY.UM_STATUS || '',
             UM_KRITERIA_IMPROVEMENT: formData.UPWARD_MOBILITY.UM_KRITERIA_IMPROVEMENT || '',
             UM_TARIKH_LAWATAN_PREMIS: formData.UPWARD_MOBILITY.UM_TARIKH_LAWATAN_PREMIS || '',
@@ -1442,6 +1478,10 @@ const LaporanMajuPage = () => {
       // Enhanced error message based on status code
       if (!response.ok) {
         let userMessage = result.error || result.message;
+        // UM v2 validation (400) returns the full list of missing fields
+        if (Array.isArray(result.errors) && result.errors.length > 0) {
+          userMessage = `${result.error}\n\n${result.errors.join('\n')}`;
+        }
 
         if (response.status === 504) {
           userMessage = `⏱️ Server timeout - your images were uploaded, but we couldn't confirm if data was saved.\n\n` +
@@ -1516,12 +1556,7 @@ const LaporanMajuPage = () => {
 
           // Clear saved draft before resetting
           try {
-            const draftKey = getDraftKey(
-              formData.NAMA_MENTEE,
-              currentSessionNumber,
-              session?.user?.email
-            );
-            localStorage.removeItem(draftKey);
+            clearDrafts();
             console.log('🗑️ [PHASE 5] Draft cleared after successful submission');
           } catch (error) {
             console.error('Failed to clear draft:', error);
@@ -2450,13 +2485,25 @@ Rumus poin-poin penting yang perlu diberi perhatian atau penekanan baik isu berk
                 </div>
               )}
 
-              <UMSection
-                umState={formData.UPWARD_MOBILITY}
-                onUmChange={handleUMChange}
-                lockedSections={lockedSections}
-                onLockSection={handleLockSection}
-                praisiDari={praisiDari}
-              />
+              {useUMV2 ? (
+                <div>
+                  <p className="text-xs font-semibold text-orange-700 mb-3">Format UM baharu · B10 Bangkit / M9 Maju</p>
+                  <UMSectionV2
+                    umState={formData.UPWARD_MOBILITY_V2}
+                    onChange={handleUMV2Change}
+                    sesiNumber={currentSessionNumber}
+                    praisiDari={praisiDari}
+                  />
+                </div>
+              ) : (
+                <UMSection
+                  umState={formData.UPWARD_MOBILITY}
+                  onUmChange={handleUMChange}
+                  lockedSections={lockedSections}
+                  onLockSection={handleLockSection}
+                  praisiDari={praisiDari}
+                />
+              )}
 
 
               <div className="bg-white p-6 rounded-lg shadow-sm">

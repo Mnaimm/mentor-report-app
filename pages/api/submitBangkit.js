@@ -5,8 +5,9 @@ import supabaseAdmin from '../../lib/supabaseAdmin';
 import { prepareMIARequestPayload, MIA_STATUS } from '../../lib/mia';
 import { requireSession, requireSubmitterEmail } from '../../lib/api-guard';
 import { MIA_API_ENABLED } from '../../lib/featureFlags';
-import { buildUMPayload, insertUMWithRetry, logUMFailure, UM_DB_FAILED_WARNING } from '../../lib/umDbWrite';
-import { resolveUMVersion, UM_V2_NOT_OPEN, UM_VERSION_LOOKUP_FAILED } from '../../lib/resolveUMVersion';
+import { buildUMPayload, buildUMPayloadV2, insertUMWithRetry, logUMFailure, prepareUMSubmission, UM_DB_FAILED_WARNING } from '../../lib/umDbWrite';
+import { resolveUMVersion, isUMV2Open, UM_V2_NOT_OPEN, UM_VERSION_LOOKUP_FAILED } from '../../lib/resolveUMVersion';
+import { umV2ToSheetsUM } from '../../lib/upwardMobilityV2';
 
 
 /** Extract the row number from "SheetName!A37:T37" */
@@ -410,8 +411,8 @@ export default async function handler(req, res) {
       });
     }
 
-    // UM v2 batches (B10 Bangkit / M9 Maju) stay closed until the v2 form ships.
-    // Checked before any reports / UM / Sheets write; a failed lookup fails closed.
+    // UM v2 batches (B10 Bangkit / M9 Maju) stay closed until opened by UM_V2_ENABLED
+    // or UM_V2_TEST_BATCH_IDS. Checked before any reports / UM / Sheets write; a failed lookup fails closed.
     const umResolution = await resolveUMVersion(supabaseAdmin, {
       entrepreneurId: entrepreneur.id,
       mentorId: mentorRecord.id,
@@ -420,10 +421,26 @@ export default async function handler(req, res) {
       console.error('❌ UM version lookup failed:', umResolution.error);
       return res.status(503).json({ success: false, ...UM_VERSION_LOOKUP_FAILED, retryable: true });
     }
-    if (umResolution.version === 2) {
+    if (umResolution.version === 2 && !isUMV2Open(umResolution.batchId)) {
       console.warn(`⛔ UM v2 batch ${umResolution.batchId}: submission blocked for entrepreneur ${entrepreneur.id}`);
       return res.status(409).json({ success: false, ...UM_V2_NOT_OPEN, retryable: false });
     }
+
+    // Client form version must match the server's; v2 UM data is validated here, before any write
+    const umCheck = prepareUMSubmission(reportData.UPWARD_MOBILITY_JSON, {
+      serverVersion: umResolution.version,
+      sesiNumber: reportData.sesiLaporan,
+      isMIA: reportData.status === 'MIA',
+    });
+    if (!umCheck.ok) {
+      console.warn(`⛔ UM check failed (${umCheck.body.code}) for entrepreneur ${entrepreneur.id}`, umCheck.body.errors || '');
+      return res.status(umCheck.status).json({ success: false, ...umCheck.body, retryable: false });
+    }
+    const umV2State = umCheck.v2State;
+    // v2: the Sheets mappers get only the UM fields that already have columns; v1-only columns stay blank
+    const sheetsReportData = umV2State
+      ? { ...reportData, UPWARD_MOBILITY_JSON: JSON.stringify(umV2ToSheetsUM(umV2State)) }
+      : reportData;
 
     // Prepare supabaseAdmin payload - MUST match 'reports' table schema
     const supabasePayload = {
@@ -639,15 +656,23 @@ export default async function handler(req, res) {
 
       let umSupabasePayload = null;
       try {
-        const umData = JSON.parse(reportData.UPWARD_MOBILITY_JSON);
-        umSupabasePayload = buildUMPayload(umData, {
-          entrepreneur,
-          mentorId: mentorRecord.id,
-          sesiNumber: reportData.sesiLaporan,
-          program: 'BANGKIT',
-          reportId: supabaseRecordId,
-          umVersion: 1 // v2 never reaches here (guarded before the reports insert)
-        });
+        umSupabasePayload = umV2State
+          ? buildUMPayloadV2(umV2State, {
+              entrepreneur,
+              mentorId: mentorRecord.id,
+              sesiNumber: reportData.sesiLaporan,
+              program: 'BANGKIT',
+              reportId: supabaseRecordId,
+              batchId: umResolution.batchId
+            })
+          : buildUMPayload(JSON.parse(reportData.UPWARD_MOBILITY_JSON), {
+              entrepreneur,
+              mentorId: mentorRecord.id,
+              sesiNumber: reportData.sesiLaporan,
+              program: 'BANGKIT',
+              reportId: supabaseRecordId,
+              umVersion: 1
+            });
         console.log('📋 UM payload keys:', Object.keys(umSupabasePayload));
       } catch (error) {
         umError = `UM payload could not be built: ${error.message}`;
@@ -710,7 +735,7 @@ export default async function handler(req, res) {
         console.log('🔗 Bangkit Sheet ID:', spreadsheetId, '- Tab:', bangkitTab);
 
         // Map data to Sheet row
-        rowData = mapBangkitDataToSheetRow(reportData, miaRequestId);
+        rowData = mapBangkitDataToSheetRow(sheetsReportData, miaRequestId);
         // Column P (index 15) must remain Fokus Area 2 - store report_id in reserved column instead
         rowData[80] = supabaseRecordId; // Column CC (reserved) = report_id
 
@@ -757,8 +782,8 @@ export default async function handler(req, res) {
       try {
         console.log('📊 Starting dual-write to Upward Mobility Google Sheet...');
 
-        // Parse UM data
-        const umData = JSON.parse(reportData.UPWARD_MOBILITY_JSON);
+        // Parse UM data (v2: shared fields only)
+        const umData = JSON.parse(sheetsReportData.UPWARD_MOBILITY_JSON);
 
         // Get UM sheet configuration
         const umSpreadsheetId = process.env.GOOGLE_SHEET_ID_UM;
@@ -773,7 +798,7 @@ export default async function handler(req, res) {
         console.log('📊 Entrepreneur batch for UM sheet:', entrepreneurBatchForUM);
 
         // Map data to UM sheet row
-        const umRowData = mapUMToUpwardMobilitySheetRow(reportData, umData, entrepreneurBatchForUM);
+        const umRowData = mapUMToUpwardMobilitySheetRow(sheetsReportData, umData, entrepreneurBatchForUM);
 
         // Append to UM sheet with 8s timeout
         const umAppendRes = await Promise.race([

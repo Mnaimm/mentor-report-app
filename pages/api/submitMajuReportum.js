@@ -5,8 +5,9 @@ import supabaseAdmin from '../../lib/supabaseAdmin';
 import { prepareMIARequestPayload } from '../../lib/mia';
 import { requireSession, requireSubmitterEmail } from '../../lib/api-guard';
 import { MIA_API_ENABLED } from '../../lib/featureFlags';
-import { buildUMPayload, insertUMWithRetry, logUMFailure, UM_DB_FAILED_WARNING } from '../../lib/umDbWrite';
-import { resolveUMVersion, UM_V2_NOT_OPEN, UM_VERSION_LOOKUP_FAILED } from '../../lib/resolveUMVersion';
+import { buildUMPayload, buildUMPayloadV2, insertUMWithRetry, logUMFailure, prepareUMSubmission, UM_DB_FAILED_WARNING } from '../../lib/umDbWrite';
+import { resolveUMVersion, isUMV2Open, UM_V2_NOT_OPEN, UM_VERSION_LOOKUP_FAILED } from '../../lib/resolveUMVersion';
+import { umV2ToSheetsUM } from '../../lib/upwardMobilityV2';
 
 
 /** Extract the row number from "SheetName!A37:T37" */
@@ -96,6 +97,9 @@ export default async function handler(req, res) {
     let completionPromise = Promise.resolve();
     let entrepreneur = null;
     let mentorId = null;
+    let umV2State = null; // parsed + validated v2 UM data (null on the v1 path)
+    let umBatchId = null;
+    let sheetsReportData = reportData; // v2: Sheets mappers get only the UM fields that already have columns
 
     {
       console.log('📊 Starting Supabase write for MAJU report...');
@@ -201,16 +205,32 @@ export default async function handler(req, res) {
       console.log(`✅ Mentor resolved: ${mentorId}`);
       // ============================================================
 
-      // UM v2 batches (B10 Bangkit / M9 Maju) stay closed until the v2 form ships.
-      // Checked before any reports / UM / Sheets write; a failed lookup fails closed.
+      // UM v2 batches (B10 Bangkit / M9 Maju) stay closed until opened by UM_V2_ENABLED
+      // or UM_V2_TEST_BATCH_IDS. Checked before any reports / UM / Sheets write; a failed lookup fails closed.
       const umResolution = await resolveUMVersion(supabaseAdmin, { entrepreneurId, mentorId });
       if (umResolution.error) {
         console.error('❌ UM version lookup failed:', umResolution.error);
         return res.status(503).json({ success: false, ...UM_VERSION_LOOKUP_FAILED, retryable: true });
       }
-      if (umResolution.version === 2) {
+      if (umResolution.version === 2 && !isUMV2Open(umResolution.batchId)) {
         console.warn(`⛔ UM v2 batch ${umResolution.batchId}: submission blocked for entrepreneur ${entrepreneurId}`);
         return res.status(409).json({ success: false, ...UM_V2_NOT_OPEN, retryable: false });
+      }
+
+      // Client form version must match the server's; v2 UM data is validated here, before any write
+      const umCheck = prepareUMSubmission(reportData.UPWARD_MOBILITY_JSON, {
+        serverVersion: umResolution.version,
+        sesiNumber: reportData.SESI_NUMBER,
+        isMIA: reportData.MIA_STATUS === 'MIA',
+      });
+      if (!umCheck.ok) {
+        console.warn(`⛔ UM check failed (${umCheck.body.code}) for entrepreneur ${entrepreneurId}`, umCheck.body.errors || '');
+        return res.status(umCheck.status).json({ success: false, ...umCheck.body, retryable: false });
+      }
+      umV2State = umCheck.v2State;
+      umBatchId = umResolution.batchId;
+      if (umV2State) {
+        sheetsReportData = { ...reportData, UPWARD_MOBILITY_JSON: JSON.stringify(umV2ToSheetsUM(umV2State)) };
       }
 
       // Prepare Supabase payload - MUST match 'reports' table schema
@@ -462,15 +482,23 @@ export default async function handler(req, res) {
 
       let umSupabasePayload = null;
       try {
-        const umData = JSON.parse(reportData.UPWARD_MOBILITY_JSON);
-        umSupabasePayload = buildUMPayload(umData, {
-          entrepreneur,
-          mentorId,
-          sesiNumber: reportData.SESI_NUMBER,
-          program: 'MAJU',
-          reportId: supabaseRecordId,
-          umVersion: 1 // v2 never reaches here (guarded before the reports insert)
-        });
+        umSupabasePayload = umV2State
+          ? buildUMPayloadV2(umV2State, {
+              entrepreneur,
+              mentorId,
+              sesiNumber: reportData.SESI_NUMBER,
+              program: 'MAJU',
+              reportId: supabaseRecordId,
+              batchId: umBatchId
+            })
+          : buildUMPayload(JSON.parse(reportData.UPWARD_MOBILITY_JSON), {
+              entrepreneur,
+              mentorId,
+              sesiNumber: reportData.SESI_NUMBER,
+              program: 'MAJU',
+              reportId: supabaseRecordId,
+              umVersion: 1
+            });
         console.log('📋 UM payload keys:', Object.keys(umSupabasePayload));
       } catch (error) {
         umError = `UM payload could not be built: ${error.message}`;
@@ -525,7 +553,7 @@ export default async function handler(req, res) {
         }
 
         // Prepare row data
-        const rowData = mapMajuDataToSheetRow(reportData);
+        const rowData = mapMajuDataToSheetRow(sheetsReportData);
         console.log('📊 Prepared row data (first 5 values):', rowData.slice(0, 5));
         console.log('📊 Folder_ID in row data (index 25):', rowData[25]);
 
@@ -582,7 +610,7 @@ export default async function handler(req, res) {
         console.log('📊 Starting dual-write to Upward Mobility Google Sheet...');
 
         // Parse UM data
-        const umData = JSON.parse(reportData.UPWARD_MOBILITY_JSON);
+        const umData = JSON.parse(sheetsReportData.UPWARD_MOBILITY_JSON); // v2: shared fields only
 
         if (!umSpreadsheetId) {
           throw new Error('Missing UPWARD_MOBILITY_SPREADSHEET_ID environment variable');
@@ -593,7 +621,7 @@ export default async function handler(req, res) {
         console.log('📊 Entrepreneur batch for UM sheet:', entrepreneurBatchForUM);
 
         // Map data to UM sheet row (using exact Bangkit column structure)
-        const umRowData = mapUMDataToSheetRow(reportData, umData, entrepreneurBatchForUM);
+        const umRowData = mapUMDataToSheetRow(sheetsReportData, umData, entrepreneurBatchForUM);
 
         // Append to UM sheet with 8s timeout
         const umAppendRes = await Promise.race([
