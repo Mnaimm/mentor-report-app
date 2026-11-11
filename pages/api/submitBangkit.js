@@ -7,7 +7,7 @@ import { requireSession, requireSubmitterEmail } from '../../lib/api-guard';
 import { MIA_API_ENABLED } from '../../lib/featureFlags';
 import { buildUMPayload, buildUMPayloadV2, insertUMWithRetry, logUMFailure, prepareUMSubmission, UM_DB_FAILED_WARNING } from '../../lib/umDbWrite';
 import { resolveUMVersion, isUMV2Open, UM_V2_NOT_OPEN, UM_VERSION_LOOKUP_FAILED } from '../../lib/resolveUMVersion';
-import { umV2ToSheetsUM, umV2ToSheetsV2Block, UM_V2_SHEETS_HEADERS } from '../../lib/upwardMobilityV2';
+import { umV2ToSheetsUM, umV2ToSheetsV2Block, UM_V2_SHEETS_HEADERS, toYesNo_ } from '../../lib/upwardMobilityV2';
 
 /** The 18-value UM v2 block set by the handler; falls back to the v1 block ('1', blanks). */
 const sheetsV2Block = (data) => (
@@ -135,12 +135,12 @@ const mapBangkitDataToSheetRow = (data, miaRequestId = null) => {
   row[56] = umData.UM_KRITERIA_IMPROVEMENT || '';       // BE UM_KRITERIA_IMPROVEMENT
 
   // Section 2: BIMB Channels & Fintech (6 fields)
-  row[57] = umData.UM_AKAUN_BIMB || '';                 // BF UM_AKAUN_BIMB
-  row[58] = umData.UM_BIMB_BIZ || '';                   // BG UM_BIMB_BIZ
-  row[59] = umData.UM_AL_AWFAR || '';                   // BH UM_AL_AWFAR
-  row[60] = umData.UM_MERCHANT_TERMINAL || '';          // BI UM_MERCHANT_TERMINAL
-  row[61] = umData.UM_FASILITI_LAIN || '';              // BJ UM_FASILITI_LAIN
-  row[62] = umData.UM_MESINKIRA || '';                  // BK UM_MESINKIRA
+  row[57] = toYesNo_(umData.UM_AKAUN_BIMB) || '';                 // BF UM_AKAUN_BIMB
+  row[58] = toYesNo_(umData.UM_BIMB_BIZ) || '';                   // BG UM_BIMB_BIZ
+  row[59] = toYesNo_(umData.UM_AL_AWFAR) || '';                   // BH UM_AL_AWFAR
+  row[60] = toYesNo_(umData.UM_MERCHANT_TERMINAL) || '';          // BI UM_MERCHANT_TERMINAL
+  row[61] = toYesNo_(umData.UM_FASILITI_LAIN) || '';              // BJ UM_FASILITI_LAIN
+  row[62] = toYesNo_(umData.UM_MESINKIRA) || '';                  // BK UM_MESINKIRA
 
   // Section 3: Financial & Employment Metrics (12 fields: 6 values + 6 ulasan)
   row[63] = umData.UM_PENDAPATAN_SEMASA || '';          // BL UM_PENDAPATAN_SEMASA
@@ -228,12 +228,12 @@ const mapUMToUpwardMobilitySheetRow = (reportData, umData, entrepreneurBatch = '
   row[46] = umData.UM_KRITERIA_IMPROVEMENT || '';       // AU UM_KRITERIA_IMPROVEMENT
 
   // Section 2: BIMB Channels & Fintech (6 fields)
-  row[47] = umData.UM_AKAUN_BIMB || '';                 // AV UM_AKAUN_BIMB
-  row[48] = umData.UM_BIMB_BIZ || '';                   // AW UM_BIMB_BIZ
-  row[49] = umData.UM_AL_AWFAR || '';                   // AX UM_AL_AWFAR
-  row[50] = umData.UM_MERCHANT_TERMINAL || '';          // AY UM_MERCHANT_TERMINAL
-  row[51] = umData.UM_FASILITI_LAIN || '';              // AZ UM_FASILITI_LAIN
-  row[52] = umData.UM_MESINKIRA || '';                  // BA UM_MESINKIRA
+  row[47] = toYesNo_(umData.UM_AKAUN_BIMB) || '';                 // AV UM_AKAUN_BIMB
+  row[48] = toYesNo_(umData.UM_BIMB_BIZ) || '';                   // AW UM_BIMB_BIZ
+  row[49] = toYesNo_(umData.UM_AL_AWFAR) || '';                   // AX UM_AL_AWFAR
+  row[50] = toYesNo_(umData.UM_MERCHANT_TERMINAL) || '';          // AY UM_MERCHANT_TERMINAL
+  row[51] = toYesNo_(umData.UM_FASILITI_LAIN) || '';              // AZ UM_FASILITI_LAIN
+  row[52] = toYesNo_(umData.UM_MESINKIRA) || '';                  // BA UM_MESINKIRA
 
   // Section 3: Financial & Employment Metrics (12 fields: 6 values + 6 ulasan)
   row[53] = umData.UM_PENDAPATAN_SEMASA || '';          // BB UM_PENDAPATAN_SEMASA
